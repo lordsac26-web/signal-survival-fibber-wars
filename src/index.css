@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;700;900&family=Space+Grotesk:wght@600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -29,9 +31,9 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --font-heading: ui-sans-serif, system-ui, sans-serif;
-    --font-body: ui-sans-serif, system-ui, sans-serif;
-    --font-display: ui-sans-serif, system-ui, sans-serif;
+    --font-heading: "Space Grotesk", ui-sans-serif, sans-serif;
+    --font-body: "Chivo", ui-sans-serif, sans-serif;
+    --font-display: "Space Grotesk", ui-sans-serif, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -88,5 +90,20 @@
 
   body {
     @apply bg-background text-foreground font-body;
+    margin: 0;
+    overflow-x: hidden;
   }
 }
+
+.game-grid {
+  background-color: #102b32;
+  background-image: linear-gradient(rgba(103,232,249,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(103,232,249,.055) 1px, transparent 1px), radial-gradient(circle at 20% 15%, rgba(8,145,178,.35), transparent 35%), radial-gradient(circle at 80% 80%, rgba(249,115,22,.18), transparent 35%);
+  background-size: 42px 42px, 42px 42px, auto, auto;
+}
+.van-shop {
+  background-color: #24323b;
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0, rgba(255,255,255,.035) 12px, transparent 12px, transparent 24px);
+}
+.game-shake { animation: game-shake .12s linear; }
+@keyframes game-shake { 0%,100%{transform:translate(0)} 25%{transform:translate(-4px,2px)} 75%{transform:translate(4px,-2px)} }
+@media (prefers-reduced-motion: reduce) { .game-shake { animation: none; } }

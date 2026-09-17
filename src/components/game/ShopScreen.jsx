@@ -1,0 +1,11 @@
+import { useState } from 'react';
+import { SHOP_ITEMS, WEAPONS, pick } from '@/game/signalData';
+import GameButton from '@/components/game/GameButton';
+
+const stock=()=>pick([...Object.entries(WEAPONS).map(([id,w])=>({id,...w,cost:22,weapon:true})),...SHOP_ITEMS],4);
+export default function ShopScreen({ run, onContinue, onChange }) {
+  const [items,setItems]=useState(stock),[rerolls,setRerolls]=useState(0);
+  const buy=item=>{if(run.signal<item.cost||(item.weapon&&run.weapons.length>=6))return;onChange(item.weapon?{...run,signal:run.signal-item.cost,weapons:[...run.weapons,item.id]}:{...item.apply(run),signal:run.signal-item.cost});setItems(v=>v.filter(x=>x!==item));};
+  const reroll=()=>{const cost=4+rerolls*2;if(run.signal<cost)return;onChange({...run,signal:run.signal-cost});setItems(stock());setRerolls(v=>v+1);};
+  return <main className="van-shop min-h-screen p-5 text-white sm:p-9"><div className="mx-auto max-w-5xl"><header className="flex flex-wrap items-end justify-between gap-4"><div><p className="font-black uppercase tracking-[.3em] text-amber-300">Company Van • Definitely Organized</p><h1 className="text-4xl font-black uppercase sm:text-5xl">Between-Wave Shop</h1></div><div className="rounded-xl bg-cyan-300 px-5 py-3 text-xl font-black text-slate-950">Signal: {run.signal}</div></header><div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{items.map(i=><article key={`${i.id}-${i.weapon}`} className="flex min-h-64 flex-col rounded-2xl border-2 border-slate-600 bg-slate-900/95 p-5"><span className="text-4xl">{i.icon}</span><h2 className="mt-4 text-xl font-black">{i.name}</h2><p className="mt-2 flex-1 text-sm font-semibold leading-relaxed text-slate-300">{i.desc}</p><button disabled={run.signal<i.cost||(i.weapon&&run.weapons.length>=6)} onClick={()=>buy(i)} className="mt-4 min-h-11 cursor-pointer rounded-lg bg-amber-300 px-3 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">Buy • {i.cost}</button></article>)}</div><div className="mt-7 flex flex-wrap justify-center gap-4"><GameButton tone="dark" onClick={reroll} disabled={run.signal<4+rerolls*2}>Reroll • {4+rerolls*2}</GameButton><GameButton onClick={onContinue}>Start Wave {run.wave+1}</GameButton></div></div></main>
+}

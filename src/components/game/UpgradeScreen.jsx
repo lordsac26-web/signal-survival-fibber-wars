@@ -1,0 +1,6 @@
+import { UPGRADES, pick } from '@/game/signalData';
+
+export default function UpgradeScreen({ onPick }) {
+  const choices=pick(UPGRADES,3);
+  return <main className="game-grid flex min-h-screen items-center justify-center p-5 text-white"><section className="w-full max-w-4xl"><div className="text-center"><p className="font-black uppercase tracking-[.3em] text-cyan-200">Signal Acquired</p><h1 className="mt-2 text-4xl font-black uppercase sm:text-5xl">Choose an Upgrade</h1><p className="mt-2 text-slate-300">Professional development, but actually useful.</p></div><div className="mt-8 grid gap-4 md:grid-cols-3">{choices.map(u=><button key={u.id} onClick={()=>onPick(u)} className="group min-h-56 cursor-pointer rounded-3xl border-2 border-cyan-300/30 bg-slate-900/90 p-6 text-left transition-[background-color,border-color] duration-200 hover:border-cyan-200 hover:bg-slate-800 focus-visible:outline focus-visible:outline-4 focus-visible:outline-white/60"><span className="text-5xl">{u.icon}</span><h2 className="mt-5 text-2xl font-black text-white">{u.name}</h2><p className="mt-2 font-bold text-cyan-200">{u.desc}</p></button>)}</div></section></main>
+}
