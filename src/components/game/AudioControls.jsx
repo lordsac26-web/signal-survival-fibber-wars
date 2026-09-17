@@ -1,0 +1,4 @@
+import { Volume2, VolumeX } from 'lucide-react';
+import { getAudio, setAudio } from '@/game/audio';
+import { useState } from 'react';
+export default function AudioControls(){const [a,setA]=useState(getAudio);const change=n=>{const v={...a,...n};setA(v);setAudio(v)};return <div className="mt-5 flex items-center justify-center gap-3 rounded-xl bg-slate-950/40 p-3"><button aria-label={a.muted?'Unmute sound':'Mute sound'} onClick={()=>change({muted:!a.muted})} className="flex size-11 cursor-pointer items-center justify-center rounded-lg bg-slate-800 hover:bg-slate-700">{a.muted?<VolumeX/>:<Volume2/>}</button><label className="sr-only" htmlFor="game-volume">Game volume</label><input id="game-volume" aria-label="Game volume" type="range" min="0" max="1" step=".05" value={a.volume} onChange={e=>change({volume:+e.target.value,muted:false})} className="w-40 cursor-pointer accent-cyan-300"/></div>}

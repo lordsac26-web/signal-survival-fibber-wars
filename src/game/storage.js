@@ -1,20 +1,4 @@
-const KEY = 'signal-survival-save-v1';
-const fresh = { highWave: 0, highKills: 0, runs: 0, unlocked: ['rookie'] };
-
-export function loadSave() {
-  try { return { ...fresh, ...JSON.parse(localStorage.getItem(KEY)) }; }
-  catch { return fresh; }
-}
-
-export function recordRun(run) {
-  const save = loadSave();
-  const next = {
-    ...save,
-    runs: save.runs + 1,
-    highWave: Math.max(save.highWave, run.wave),
-    highKills: Math.max(save.highKills, run.kills),
-    unlocked: run.wave >= 3 ? [...new Set([...save.unlocked, 'nomad'])] : save.unlocked
-  };
-  localStorage.setItem(KEY, JSON.stringify(next));
-  return next;
-}
+const KEY='signal-survival-save-v1';
+const fresh={version:2,highWave:0,highKills:0,runs:0,totalKills:0,unlocked:['rookie']};
+export function loadSave(){try{const old=JSON.parse(localStorage.getItem(KEY))||{};const save={...fresh,...old,version:2,unlocked:Array.isArray(old.unlocked)?old.unlocked:['rookie']};if(!save.unlocked.includes('rookie'))save.unlocked.unshift('rookie');return save}catch{return{...fresh}}}
+export function recordRun(run){const save=loadSave(),total=(save.totalKills||0)+run.kills;const unlocked=new Set(save.unlocked);if(run.wave>=3)unlocked.add('nomad');if(total>=250)unlocked.add('veteran');if(run.signal>=500)unlocked.add('oracle');if(run.wave>=5)unlocked.add('frenzy');if(run.character?.id==='cleaner'&&run.specialProgress>=60)unlocked.add('cleaner');if(run.wave>=7)unlocked.add('bucket');if(save.runs+1>=5)unlocked.add('dispatch');if(run.wave>=4)unlocked.add('cleaner');const next={...save,runs:save.runs+1,totalKills:total,highWave:Math.max(save.highWave,run.wave),highKills:Math.max(save.highKills,run.kills),unlocked:[...unlocked]};localStorage.setItem(KEY,JSON.stringify(next));return next}

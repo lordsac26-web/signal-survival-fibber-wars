@@ -1,0 +1,2 @@
+const cache={};
+export function enemySprite(kind,e){if(cache[kind])return cache[kind];const size=e.r*2+8,c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d'),m=size/2;x.fillStyle=e.color;x.beginPath();x.arc(m,m,e.r,0,7);x.fill();x.fillStyle='#fff';for(let i=0;i<e.eyes;i++){const ex=m+(i-(e.eyes-1)/2)*7;x.beginPath();x.arc(ex,m-4,4,0,7);x.fill();x.fillStyle='#172033';x.beginPath();x.arc(ex+1,m-4,2,0,7);x.fill();x.fillStyle='#fff'}x.fillStyle='#172033';x.fillRect(m-5,m+7,10,3);cache[kind]=c;return c}
