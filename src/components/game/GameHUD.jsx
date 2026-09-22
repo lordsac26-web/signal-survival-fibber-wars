@@ -1,9 +1,11 @@
-import { RadioTower, Skull, Timer, Gauge } from 'lucide-react';
+import { RadioTower, Skull, Timer, Gauge, ClipboardList } from 'lucide-react';
 import { WEAPONS } from '@/game/data/combat';
 
 const weapon = value => typeof value === 'string' ? WEAPONS[value] : value;
 
-export default function GameHUD({ hud, wave, weapons, slots=6 }) {
+// NEW: onOpenStats is optional (defaults to undefined) so this component
+// doesn't break if some other screen ever reuses GameHUD without wiring it up.
+export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats }) {
   const hp = Math.max(0, hud.hp || 0);
   const max = hud.maxHp || 1;
   return <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 text-white sm:p-5">
@@ -17,10 +19,26 @@ export default function GameHUD({ hud, wave, weapons, slots=6 }) {
         <div className="text-xs font-black uppercase tracking-widest text-cyan-200">Wave {wave}</div>
         <div className="flex items-center gap-2 text-2xl font-black tabular-nums"><Timer className="size-5"/>{Math.ceil(hud.time||0)}s</div>
       </div>
-      <div className="space-y-1 rounded-xl bg-slate-950/75 px-3 py-2 text-sm font-black">
-        <div className="flex gap-2 text-cyan-200"><RadioTower className="size-4"/>{hud.signal||0}</div>
-        <div className="flex gap-2 text-rose-300"><Skull className="size-4"/>{hud.kills||0}</div>
-        {hud.stress && <div className="flex gap-2 text-amber-300"><Gauge className="size-4"/>{hud.fps} FPS</div>}
+      <div className="flex items-start gap-2">
+        <div className="space-y-1 rounded-xl bg-slate-950/75 px-3 py-2 text-sm font-black">
+          <div className="flex gap-2 text-cyan-200"><RadioTower className="size-4"/>{hud.signal||0}</div>
+          <div className="flex gap-2 text-rose-300"><Skull className="size-4"/>{hud.kills||0}</div>
+          {hud.stress && <div className="flex gap-2 text-amber-300"><Gauge className="size-4"/>{hud.fps} FPS</div>}
+        </div>
+        {/* NEW: the parent HUD wrapper above is `pointer-events-none` (so it
+            never blocks clicks/taps meant for the game underneath), which
+            means this button needs `pointer-events-auto` explicitly or it
+            would be visible but unclickable — a classic "why won't this
+            button click" gotcha with overlay HUDs. */}
+        {onOpenStats && (
+          <button
+            onClick={onOpenStats}
+            title="View stats (Esc)"
+            className="pointer-events-auto flex size-11 items-center justify-center rounded-xl border-2 border-cyan-200 bg-slate-950/85 text-cyan-200 hover:bg-slate-900"
+          >
+            <ClipboardList className="size-5"/>
+          </button>
+        )}
       </div>
     </div>
     <div className="mt-3 flex justify-center gap-1">{Array.from({length:Math.max(slots,weapons.length)},(_,i)=>{const w=weapon(weapons[i]);return <div key={i} className="flex size-10 items-center justify-center rounded-lg border-2 border-white/20 bg-slate-950/75 text-xl" title={w?.name||'Empty tool slot'}>{w?.icon||'·'}</div>})}</div>
