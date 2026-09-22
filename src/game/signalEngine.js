@@ -9,7 +9,16 @@ const clamp=(n,a,b)=>n<a?a:n>b?b:n;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const weaponOf=w=>typeof w==='string'?WEAPONS[w]:w;
 
-export function createSignalEngine(canvas,run,input,cb){
+// `paused` is a mutable ref object (the same pattern already used for `input`
+// a few lines below) rather than a plain boolean argument, because a plain
+// boolean is only read once, when createSignalEngine() is first called. React
+// re-renders don't re-invoke this function — the engine is created exactly
+// once per wave (see the `key={run.wave}` on <GameArena>'s <canvas> owner) — so
+// the only way for React state (a click on a "view stats" button) to reach
+// into an already-running rAF loop is a ref whose `.current` the loop reads
+// fresh every frame. Defaulted so any existing caller that doesn't pass one
+// still works exactly as before (game just never pauses).
+export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
  const ctx=canvas.getContext('2d',{alpha:false}),dpr=Math.min(devicePixelRatio||1,2),grid=new SpatialHash(96);
  const enemies=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,r:10,lastShot:-1}));
  const shots=new ObjectPool(320,i=>({poolIndex:i,active:false,x:0,y:0,vx:0,vy:0,r:5,life:0,id:0}));
@@ -48,6 +57,22 @@ export function createSignalEngine(canvas,run,input,cb){
  }
  function draw(){ctx.fillStyle='#172d32';ctx.fillRect(0,0,W,H);ctx.strokeStyle='rgba(83,211,190,.08)';ctx.lineWidth=1;for(let x=0;x<W;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}for(let y=0;y<H;y+=48){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}ctx.fillStyle='#67e8f9';for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(d.active&&d.x>-8&&d.x<W+8&&d.y>-8&&d.y<H+8)ctx.fillRect(d.x-4,d.y-4,8,8)}for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.kind===kind&&e.x>-40&&e.x<W+40&&e.y>-40&&e.y<H+40)ctx.drawImage(e.sprite,e.x-e.sprite.width/2,e.y-e.sprite.height/2)}}for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>-10&&s.x<W+10&&s.y>-10&&s.y<H+10){ctx.fillStyle=s.color;if(s.helper){ctx.fillRect(s.x-7,s.y-4,14,12);ctx.fillStyle='#fde047';ctx.fillRect(s.x-9,s.y-9,18,5)}else{ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,7);ctx.fill()}}}for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(q.active&&q.x>=0&&q.x<=W&&q.y>=0&&q.y<=H){ctx.globalAlpha=Math.max(0,q.life*2);ctx.fillStyle=q.color;ctx.fillRect(q.x,q.y,3,3)}}ctx.globalAlpha=1;for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;ctx.fillStyle=n.crit?'#fde047':'#fff';ctx.font=n.crit?'bold 18px Chivo':'bold 13px Chivo';ctx.fillText(n.value,n.x,n.y)}ctx.fillStyle=run.character.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();ctx.fillStyle=run.character.vest;ctx.fillRect(p.x-14,p.y+2,28,16);ctx.fillStyle=run.character.belt;ctx.fillRect(p.x-15,p.y+11,30,5);ctx.fillStyle=run.character.color;ctx.fillRect(p.x-20,p.y-17,40,8);ctx.fillStyle='#fff';ctx.fillRect(p.x-8,p.y-5,6,7);ctx.fillRect(p.x+3,p.y-5,6,7);if(specialTimer>0){ctx.strokeStyle='#fde047';ctx.lineWidth=3;ctx.beginPath();ctx.arc(p.x,p.y,25+Math.sin(performance.now()*.02)*5,0,7);ctx.stroke()}}
  function key(e){if(e.key==='F9'){stress=!stress;if(stress){for(let i=0;i<500;i++)spawnEnemy()}cb.flash(stress?'STRESS MODE: 500 IMPAIRMENTS':'STRESS MODE OFF')}} window.addEventListener('keydown',key);resize();sfx('wave');if(run.wave%5===0)sfx('boss');
- function frame(now){const delta=Math.min(MAX_DT,(now-last)/1000);last=now;acc+=delta;while(acc>=STEP&&!over){fixedUpdate(STEP);acc-=STEP}draw();frames++;fpsClock+=delta;if(fpsClock>=1){fps=frames/fpsClock;frames=0;fpsClock=0;lowFx=fps<52;separate=fps>=42}if(!over)raf=requestAnimationFrame(frame)}raf=requestAnimationFrame(frame);window.addEventListener('resize',resize);
+ function frame(now){
+  // PAUSE CHECK — this is the entire pause feature. When paused.current is
+  // true we skip fixedUpdate() (so enemies/cooldowns/regen/the timer all
+  // simply stop advancing) and skip draw() (so the last real frame just sits
+  // there on screen, like a paused video). We still keep `last=now` on every
+  // paused frame so that whenever paused.current flips back to false, the
+  // very next real frame computes a small, normal delta instead of one giant
+  // delta covering the entire time the stats screen was open (which would
+  // otherwise make fixedUpdate() run hundreds of catch-up steps at once).
+  // We also still call requestAnimationFrame so the loop keeps ticking over
+  // at ~60fps while paused, ready to resume the instant the flag flips —
+  // the alternative (cancelling raf and starting a fresh loop on resume) is
+  // more efficient but adds a second place `over`/cleanup has to agree on,
+  // which isn't worth it for a menu that's only open for a few seconds.
+  if(paused.current){last=now;if(!over)raf=requestAnimationFrame(frame);return}
+  const delta=Math.min(MAX_DT,(now-last)/1000);last=now;acc+=delta;while(acc>=STEP&&!over){fixedUpdate(STEP);acc-=STEP}draw();frames++;fpsClock+=delta;if(fpsClock>=1){fps=frames/fpsClock;frames=0;fpsClock=0;lowFx=fps<52;separate=fps>=42}if(!over)raf=requestAnimationFrame(frame)
+ }raf=requestAnimationFrame(frame);window.addEventListener('resize',resize);
  return()=>{over=true;cancelAnimationFrame(raf);window.removeEventListener('resize',resize);window.removeEventListener('keydown',key)}
 }
