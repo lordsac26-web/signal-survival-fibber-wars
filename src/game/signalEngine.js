@@ -9,6 +9,7 @@ const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
 const clamp=(n,a,b)=>n<a?a:n>b?b:n;
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const weaponOf=w=>typeof w==='string'?WEAPONS[w]:w;
+const signalForLevel=level=>30+level*15+level*level*2;
 
 // RENDER-SMOOTHNESS CONTRACT (fixes the combat jitter/tearing reports):
 // 1. Every draw coordinate is Math.round()ed — subpixel drawImage under a
@@ -32,7 +33,8 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
  const numbers=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,life:0,value:0,crit:false}));
  const turrets=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,inv:0,r:13,wid:null,mode:'pellet',color:'#f59e0b',life:0,maxLife:1,fireCd:0,fire:.5,damage:10,range:300,born:0,lookA:0}));
  const structures=new ObjectPool(24,i=>({poolIndex:i,active:false,type:null,x:0,y:0,life:0,maxLife:1,r:20,born:0,uses:0,rearm:0,power:1,fireCd:0,lookA:0}));
- let W=0,H=0,last=performance.now(),acc=0,raf,spawn=0,hudClock=0,soundClock=0,shotId=0,over=false,stress=false,lowFx=false,separate=true,fps=60,fpsClock=0,frames=0,lastNumber=0;
+ const W=1100,H=800;
+ let viewW=W,viewH=H,scale=1,camX=0,camY=0,last=performance.now(),acc=0,raf,spawn=0,hudClock=0,soundClock=0,shotId=0,over=false,stress=false,lowFx=false,separate=true,fps=60,fpsClock=0,frames=0,lastNumber=0;
  let slow=0,timeScale=1,shakeMag=0;
  const duration=Math.min(90,20+(run.wave-1)*4); let time=duration,signal=run.signal,kills=run.kills,xp=run.xp||0,levels=0,progress=run.specialProgress||0,unlocked=run.specialUnlocked||false,specialCooldown=0,specialTimer=0,damageDealt=0;const killsByType={};
  const trigger=run.character.special.type;let eliteKills=trigger==='elite'?progress:0,meleeHits=trigger==='melee'?progress:0,healed=trigger==='healing'?progress:0,damageTaken=trigger==='damage'?progress:0;
@@ -44,10 +46,11 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
  const structCap=()=>6+Math.floor((run.engineering||0)/10);
  const deployCdMax=(item,d)=>d.cd*(1-.12*Math.min((item.stacks||1)-1,3));
  function addShake(v){shakeMag=Math.min(20,shakeMag+v)}
- function resize(){const r=canvas.getBoundingClientRect();W=Math.round(r.width);H=Math.round(r.height);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);grid.resize(W,H);if(!p.x){p.x=W/2;p.y=H/2}}
+ function updateCamera(){camX=Math.round(clamp(p.x-viewW/2,0,Math.max(0,W-viewW)));camY=Math.round(clamp(p.y-viewH/2,0,Math.max(0,H-viewH)))}
+ function resize(){const r=canvas.getBoundingClientRect();scale=Math.max(1,r.width/W,r.height/H);viewW=r.width/scale;viewH=r.height/scale;canvas.width=Math.round(r.width*dpr);canvas.height=Math.round(r.height*dpr);grid.resize(W,H);if(!p.x){p.x=W/2;p.y=H/2}updateCamera()}
  function particle(x,y,color,count){if(lowFx)count=Math.min(2,count);for(let i=0;i<count;i++){let q=particles.acquire();if(!q){q=particles.items[(shotId+i)%particles.items.length];}q.x=x;q.y=y;q.vx=(Math.random()-.5)*150;q.vy=(Math.random()-.5)*150;q.life=.42;q.color=color}}
  function damageNumber(x,y,value,crit){if(performance.now()-lastNumber<45)return;lastNumber=performance.now();let n=numbers.acquire();if(!n)return;n.x=x;n.y=y;n.life=.55;n.value=Math.round(value);n.crit=crit}
- function kill(e){kills++;xp+=e.value;killsByType[e.kind]=(killsByType[e.kind]||0)+1;if(e.elite)eliteKills++;const d=pickups.acquire();if(d){d.x=e.x;d.y=e.y;d.value=e.value+(Math.random()<(run.bonusSignal||0)?e.value:0)}if((run.luck||0)&&Math.random()<run.luck*.002){const b=pickups.acquire();if(b){b.x=e.x+7;b.y=e.y+7;b.value=e.value}}if(run.cleaningKillsHeal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+run.cleaningKillsHeal);healed+=p.hp-before}particle(e.x,e.y,e.color,lowFx?2:10);if(e.elite)addShake(5);enemies.release(e)}
+ function kill(e){kills++;killsByType[e.kind]=(killsByType[e.kind]||0)+1;if(e.elite)eliteKills++;const d=pickups.acquire();if(d){d.x=e.x;d.y=e.y;d.value=e.value+(Math.random()<(run.bonusSignal||0)?e.value:0)}if((run.luck||0)&&Math.random()<run.luck*.002){const b=pickups.acquire();if(b){b.x=e.x+7;b.y=e.y+7;b.value=e.value}}if(run.cleaningKillsHeal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+run.cleaningKillsHeal);healed+=p.hp-before}particle(e.x,e.y,e.color,lowFx?2:10);if(e.elite)addShake(5);enemies.release(e)}
  // STAT HOOKS: damage/attackSpeed/crit/range multiply or trigger here;
  // spliceQuality adds craftsmanship damage; cleanliness is a damage bonus vs
  // dirty impairments; instakill fails the inspection instantly; lifeSteal is
@@ -59,7 +62,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
  function nearestVisitor(e){const d=Math.hypot(e.x-queryX,e.y-queryY);if(d<nearestDist){nearestBest=e;nearestDist=d}}
  function nearest(range){queryX=p.x;queryY=p.y;nearestBest=null;nearestDist=range;grid.visit(p.x,p.y,range,nearestVisitor);return nearestBest}
  function nearestAt(x,y,range){queryX=x;queryY=y;nearestBest=null;nearestDist=range;grid.visit(x,y,range,nearestVisitor);return nearestBest}
- function spawnEnemy(kind){const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||TYPES[(Math.random()*Math.min(TYPES.length,2+(run.wave/2|0)))|0]],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?W+pad:edge===3?-pad:Math.random()*W;e.y=edge===0?-pad:edge===2?H+pad:Math.random()*H;e.hp=base.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage;e.r=base.r;e.value=base.value;e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base)}
+ function spawnEnemy(kind){const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||TYPES[(Math.random()*Math.min(TYPES.length,2+(run.wave/2|0)))|0]],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;e.hp=base.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage;e.r=base.r;e.value=base.value;e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base)}
  // AOE burst (Closure Cannon mortar) — sequential grid pass, never nested in a visit
  function explode(x,y,dmg,color,r){queryX=x;queryY=y;queryR=r;queryDamage=dmg;queryColor=color;grid.visit(x,y,r,areaVisitor);particle(x,y,color,lowFx?3:12);addShake(2)}
  // Projectile launch — origin defaults to the player so turrets pass their own x/y.
@@ -136,6 +139,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
   // deployable input: C cycles the selected item (HUD highlight follows), Q places it
   if(input.current.cycle){input.current.cycle=false;const list=run.deployables||[];if(list.length){const cur=Math.min(Math.max(0,input.current.deploySel||0),list.length-1);const nxt=(cur+1)%list.length;input.current.deploySel=nxt;cb.flash(`DEPLOY: ${list[nxt].name}`)}}
   if(input.current.deploy){input.current.deploy=false;placeStructure()}
+  updateCamera();
   spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<Math.min(.65,run.wave*.05))spawnEnemy();spawn=Math.max(.1,.76-run.wave*.045)}grid.clear();
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active)grid.insert(e)}
   structuresUpdate(dt); // mounts fire + pedestal buff, uses the freshly built enemy grid
@@ -155,7 +159,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
    e.x+=Math.cos(a)*e.speed*slowMul*dt;e.y+=Math.sin(a)*e.speed*slowMul*dt;
    if(separate){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
    if(distance(p,e)<p.r+e.r&&p.inv<=0){if(run.firstHitBlocked&&!firstBlockUsed){firstBlockUsed=true;cb.flash('FIRST HIT POLITELY DECLINED')}else if(Math.random()>Math.min(.6,run.dodge||0)){const dmg=Math.max(2,e.damage-run.armor*1.5)*(1-Math.min(.4,(run.signalStrength||0)*.003));p.hp-=dmg;damageTaken+=dmg;if(run.hitSpeedBoost)hurtBoost=2;sfx('hit');particle(p.x,p.y,'#fff',12);addShake(4)}p.inv=.55}}
-  for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(!d.active)continue;const dd=distance(p,d);if(dd<120){d.x+=(p.x-d.x)*dt*7;d.y+=(p.y-d.y)*dt*7}if(dd<p.r+10){signal+=d.value;sfx('pickup');pickups.release(d);while(xp>=18+(run.level+levels)*8){xp-=18+(run.level+levels)*8;levels++;sfx('level');cb.flash('SIGNAL LEVEL UP!')}}}
+  for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(!d.active)continue;const dd=distance(p,d);if(dd<120){d.x+=(p.x-d.x)*dt*7;d.y+=(p.y-d.y)*dt*7}if(dd<p.r+10){signal+=d.value;xp+=d.value;sfx('pickup');pickups.release(d);while(xp>=signalForLevel(run.level+levels)){xp-=signalForLevel(run.level+levels);levels++;sfx('level');cb.flash('SIGNAL LEVEL UP!')}}}
   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(!q.active)continue;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=.94;q.vy*=.94;q.life-=dt;if(q.life<=0)particles.release(q)}for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;n.y-=25*dt;n.life-=dt;if(n.life<=0)numbers.release(n)}if(soundClock<=0){for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active){sfx(e.sound);break}}soundClock=.35+Math.random()*.35}unlockCheck();
   if((p.hp<=0||time<=0)&&!over){over=true;const harvest=p.hp>0?Math.round(run.harvesting||0):0;signal+=harvest;sfx(p.hp<=0?'death':'clear');cancelAnimationFrame(raf);cb.finish({...run,hp:Math.max(0,p.hp),signal,kills,xp,pendingLevels:levels,specialProgress:progress,specialUnlocked:unlocked,won:p.hp>0,damageDealt:Math.round(damageDealt),healed:Math.round(healed),killsByType})}
   hudClock-=dt;if(hudClock<=0){const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,kills,specialUnlocked:unlocked,specialCooldown,specialName:run.character.special.name,fps:Math.round(fps),stress,
@@ -168,10 +172,12 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
  function drawTurretBody(x,y,color,a,r){ctx.strokeStyle='#475569';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-r,y+r);ctx.moveTo(x,y);ctx.lineTo(x+r,y+r);ctx.moveTo(x,y);ctx.lineTo(x,y+r);ctx.stroke();ctx.fillStyle='#334155';ctx.fillRect(x-r+2,y-r+2,r*2-4,r*2-6);ctx.strokeStyle=color;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*(r+6),y+Math.sin(a)*(r+6));ctx.stroke();drawHardHat(x,y-r+2);drawEyes(x,y,a)}
  function draw(){
   const sx=Math.round((Math.random()-.5)*shakeMag),sy=Math.round((Math.random()-.5)*shakeMag);
-  ctx.setTransform(dpr,0,0,dpr,Math.round(sx*dpr),Math.round(sy*dpr));
-  ctx.fillStyle='#172d32';ctx.fillRect(-24,-24,W+48,H+48);
-  ctx.strokeStyle='rgba(83,211,190,.08)';ctx.lineWidth=1;for(let x=0;x<W;x+=48){ctx.beginPath();ctx.moveTo(x,-24);ctx.lineTo(x,H+24);ctx.stroke()}for(let y=0;y<H;y+=48){ctx.beginPath();ctx.moveTo(-24,y);ctx.lineTo(W+24,y);ctx.stroke()}
-  ctx.fillStyle='#67e8f9';for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(d.active&&d.x>-8&&d.x<W+8&&d.y>-8&&d.y<H+8)ctx.fillRect(Math.round(d.x)-4,Math.round(d.y)-4,8,8)}
+  const zoom=dpr*scale;
+  ctx.setTransform(zoom,0,0,zoom,Math.round((sx-camX)*zoom),Math.round((sy-camY)*zoom));
+  ctx.fillStyle='#172d32';ctx.fillRect(camX-24,camY-24,viewW+48,viewH+48);
+  ctx.strokeStyle='rgba(83,211,190,.08)';ctx.lineWidth=1;for(let x=Math.floor(camX/48)*48;x<camX+viewW;x+=48){ctx.beginPath();ctx.moveTo(x,camY-24);ctx.lineTo(x,camY+viewH+24);ctx.stroke()}for(let y=Math.floor(camY/48)*48;y<camY+viewH;y+=48){ctx.beginPath();ctx.moveTo(camX-24,y);ctx.lineTo(camX+viewW+24,y);ctx.stroke()}
+  ctx.strokeStyle='rgba(103,232,249,.25)';ctx.lineWidth=2;ctx.strokeRect(0,0,W,H);
+  ctx.fillStyle='#67e8f9';for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(d.active&&d.x>camX-8&&d.x<camX+viewW+8&&d.y>camY-8&&d.y<camY+viewH+8)ctx.fillRect(Math.round(d.x)-4,Math.round(d.y)-4,8,8)}
   // structures (under enemies): pop-in scale, fade out during the last 1.5s of life
   for(let i=0;i<structures.items.length;i++){const st=structures.items[i];if(!st.active)continue;const def=STRUCTURES[st.type];if(!def)continue;const x=Math.round(st.x),y=Math.round(st.y),grow=Math.min(1,st.born*4);
    ctx.globalAlpha=(st.life<1.5?Math.max(.2,st.life/1.5):1)*(.4+.6*grow);
@@ -182,9 +188,9 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
    else if(def.kind==='buff'){ctx.fillStyle='rgba(250,204,21,.10)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.fillStyle='#a8a29e';ctx.fillRect(x-12,y,24,10);ctx.fillRect(x-8,y-8,16,8);drawHardHat(x,y-12);drawEyes(x,y-2,st.lookA)}
    ctx.globalAlpha=1}
   for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;const grow=Math.min(1,t.born*4);ctx.globalAlpha=t.life<1?Math.max(.2,t.life):1;drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
-  for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.kind===kind&&e.x>-40&&e.x<W+40&&e.y>-40&&e.y<H+40)ctx.drawImage(e.sprite,Math.round(e.x-e.sprite.width/2),Math.round(e.y-e.sprite.height/2))}}
-  for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>-10&&s.x<W+10&&s.y>-10&&s.y<H+10){const x=Math.round(s.x),y=Math.round(s.y);ctx.fillStyle=s.color;if(s.helper){ctx.fillRect(x-7,y-4,14,12);ctx.fillStyle='#fde047';ctx.fillRect(x-9,y-9,18,5)}else{ctx.beginPath();ctx.arc(x,y,s.r,0,7);ctx.fill()}}}
-  for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(q.active&&q.x>=0&&q.x<=W&&q.y>=0&&q.y<=H){ctx.globalAlpha=Math.max(0,q.life*2);ctx.fillStyle=q.color;ctx.fillRect(Math.round(q.x),Math.round(q.y),3,3)}}ctx.globalAlpha=1;
+  for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.kind===kind&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40)ctx.drawImage(e.sprite,Math.round(e.x-e.sprite.width/2),Math.round(e.y-e.sprite.height/2))}}
+  for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>camX-10&&s.x<camX+viewW+10&&s.y>camY-10&&s.y<camY+viewH+10){const x=Math.round(s.x),y=Math.round(s.y);ctx.fillStyle=s.color;if(s.helper){ctx.fillRect(x-7,y-4,14,12);ctx.fillStyle='#fde047';ctx.fillRect(x-9,y-9,18,5)}else{ctx.beginPath();ctx.arc(x,y,s.r,0,7);ctx.fill()}}}
+  for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(q.active&&q.x>=camX&&q.x<=camX+viewW&&q.y>=camY&&q.y<=camY+viewH){ctx.globalAlpha=Math.max(0,q.life*2);ctx.fillStyle=q.color;ctx.fillRect(Math.round(q.x),Math.round(q.y),3,3)}}ctx.globalAlpha=1;
   for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;ctx.fillStyle=n.crit?'#fde047':'#fff';ctx.font=n.crit?'bold 18px Chivo':'bold 13px Chivo';ctx.fillText(n.value,Math.round(n.x),Math.round(n.y))}
   const px=Math.round(p.x),py=Math.round(p.y);
   ctx.fillStyle=run.character.color;ctx.beginPath();ctx.arc(px,py,p.r,0,7);ctx.fill();ctx.fillStyle=run.character.vest;ctx.fillRect(px-14,py+2,28,16);ctx.fillStyle=run.character.belt;ctx.fillRect(px-15,py+11,30,5);ctx.fillStyle=run.character.color;ctx.fillRect(px-20,py-17,40,8);ctx.fillStyle='#fff';ctx.fillRect(px-8,py-5,6,7);ctx.fillRect(px+3,py-5,6,7);if(specialTimer>0){ctx.strokeStyle='#fde047';ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,py,25+Math.sin(performance.now()*.02)*5,0,7);ctx.stroke()}}
