@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { loadSave, recordRun, pullCloud } from '@/game/storage';
 import { applyMods, dailySeed } from '@/game/data/generation';
 import { WEAPONS } from '@/game/data/combat';
+import { DEPLOYABLES } from '@/game/data/structures';
 import MenuScreen from '@/components/game/MenuScreen';
 import CharacterSelect from '@/components/game/CharacterSelect';
 import GameArena from '@/components/game/GameArena';
@@ -27,6 +28,9 @@ export default function SignalSurvival() {
     // every consumer (HUD, engine, shop slot rules, swap picker) can assume
     // run.weapons entries are always full objects.
     const ids = useAlt && c.altStart ? c.altStart : c.start;
+    // Some technicians (Bucket-Truck Boss) clock in with a deployable already
+    // on their belt — it becomes the first entry in run.deployables.
+    const startDeploy = DEPLOYABLES.find(d => d.id === c.startDeployable);
     const startingWeapons = ids.map((id, i) => {
       const base = WEAPONS[id];
       return {
@@ -49,6 +53,7 @@ export default function SignalSurvival() {
       buys: 0,
       weapons: startingWeapons,
       items: [],
+      deployables: startDeploy ? [{ id: startDeploy.id, name: startDeploy.name, icon: startDeploy.icon, structure: startDeploy.structure, stacks: 1 }] : [],
       seed: dailySeed(),
       specialProgress: 0,
       specialUnlocked: false,

@@ -5,7 +5,7 @@ const weapon = value => typeof value === 'string' ? WEAPONS[value] : value;
 
 // NEW: onOpenStats is optional (defaults to undefined) so this component
 // doesn't break if some other screen ever reuses GameHUD without wiring it up.
-export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats }) {
+export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, onSelectDeploy }) {
   const hp = Math.max(0, hud.hp || 0);
   const max = hud.maxHp || 1;
   return <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 text-white sm:p-5">
@@ -42,5 +42,31 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats }) 
       </div>
     </div>
     <div className="mt-3 flex justify-center gap-1">{Array.from({length:Math.max(slots,weapons.length)},(_,i)=>{const w=weapon(weapons[i]);return <div key={i} className="flex size-10 items-center justify-center rounded-lg border-2 border-white/20 bg-slate-950/75 text-xl" title={w?.name||'Empty tool slot'}>{w?.icon||'·'}</div>})}</div>
+    {/* Deployable bar: structure counter (deployed/permit cap) + one slot per
+        owned deployable with its cooldown + stack level. Clicking a slot
+        selects it (the HUD wrapper is pointer-events-none, so slots need
+        pointer-events-auto like the stats button above). */}
+    {hud.deploy?.items?.length > 0 && (
+      <div className="mt-1 flex items-center justify-center gap-1">
+        <span className="rounded-md border-2 border-white/20 bg-slate-950/75 px-2 py-1 text-xs font-black text-amber-200" title="Structures deployed / permit cap">🧱 {hud.deploy.structures}/{hud.deploy.cap}</span>
+        {hud.deploy.items.map((d, i) => (
+          <button
+            key={i}
+            onClick={() => onSelectDeploy?.(i)}
+            title={`${d.name} — place with Q (C to switch)`}
+            className={`pointer-events-auto relative flex size-10 cursor-pointer items-center justify-center rounded-lg border-2 text-xl ${d.selected ? 'border-amber-300 bg-slate-900' : 'border-white/20 bg-slate-950/75'}`}
+          >
+            {d.icon}
+            {d.stacks > 1 && <span className="absolute -right-1 -top-1 rounded-full bg-amber-300 px-1 text-[10px] font-black text-slate-950">{d.stacks}</span>}
+            {d.cd > 0 && (
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md text-xs font-black tabular-nums text-white" style={{ background: `conic-gradient(rgba(2,6,23,.8) ${(d.cd / d.cdMax) * 360}deg, rgba(2,6,23,.35) 0deg)` }}>
+                {Math.ceil(d.cd)}
+              </span>
+            )}
+          </button>
+        ))}
+        <span className="ml-1 hidden text-xs font-black uppercase text-cyan-100/70 sm:block">Q</span>
+      </div>
+    )}
   </div>;
 }

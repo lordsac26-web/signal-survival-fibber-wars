@@ -6,7 +6,7 @@ import StatChips from '@/components/game/StatChips';
 
 export default function ShopScreen({ run, onContinue, onChange }) {
   const gen = useMemo(() => createGenerator(run.seed + run.wave * 7919), []);
-  const stock = () => [gen.weapon(run.luck), gen.weapon(run.luck), gen.passive(run.luck), gen.passive(run.luck)];
+  const stock = () => [gen.weapon(run.luck), gen.weapon(run.luck), gen.passive(run.luck), Math.random() < .45 ? gen.deployable(run.luck) : gen.passive(run.luck)];
   const [items, setItems] = useState(stock);
   const [rerolls, setRerolls] = useState(0);
 
@@ -59,6 +59,14 @@ export default function ShopScreen({ run, onContinue, onChange }) {
   const commitPurchase = (item, replaceIndex = null) => {
     let next = applyMods(run, item);
     next = { ...next, signal: run.signal - item.cost, items: [...(run.items || []), item], buys: (run.buys || 0) + 1 };
+    // Deployables: first purchase grants the Q-key placement ability; extra
+    // copies stack (−12% cooldown, +20% potency per copy, bonus capped at 3).
+    if (item.deploy) {
+      const existing = (run.deployables || []).find(d => d.structure === item.structure);
+      next.deployables = existing
+        ? run.deployables.map(d => (d.structure === item.structure ? { ...d, stacks: d.stacks + 1 } : d))
+        : [...(run.deployables || []), { id: item.id, name: item.name, icon: item.icon, structure: item.structure, stacks: 1 }];
+    }
     if (item.baseId) {
       next.weapons = replaceIndex == null
         ? [...run.weapons, item]                                       // normal case: had an open slot
@@ -112,7 +120,10 @@ export default function ShopScreen({ run, onContinue, onChange }) {
                 <span className="text-4xl">{i.icon}</span>
                 <div className="mt-3 text-xs font-black uppercase" style={{ color: RARITY[i.rarity].color }}>{i.rarity}</div>
                 <h2 className="mt-1 text-lg font-black leading-tight">{i.name}</h2>
-                <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">{i.baseId ? `${i.pattern} tool • ${Math.round(i.damage)} dmg • ${i.rate}s` : 'Passive field gear'}</p>
+                <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                  {i.deploy ? 'Deployable structure • place with Q' : i.baseId ? (i.turret ? `${i.turret.mode} turret • deploys every ${i.rate}s` : `${i.pattern} tool • ${Math.round(i.damage)} dmg • ${i.rate}s`) : 'Passive field gear'}
+                </p>
+                {i.deploy && (() => { const owned = (run.deployables || []).find(d => d.structure === i.structure); return <p className="mt-1 text-xs font-black text-amber-200">{owned ? `Upgrades Lv ${owned.stacks} → ${owned.stacks + 1}: faster cooldown, stronger effect` : 'First purchase unlocks the placement ability'}</p>; })()}
                 <div className="mt-1 flex-1"><StatChips item={i} /></div>
                 {i.special && <p className="mt-1 text-xs font-bold text-amber-200">{i.special}</p>}
                 <button

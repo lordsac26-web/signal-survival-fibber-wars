@@ -3,6 +3,7 @@ import { createSignalEngine } from '@/game/signalEngine';
 import GameHUD from '@/components/game/GameHUD';
 import TouchControls from '@/components/game/TouchControls';
 import SpecialButton from '@/components/game/SpecialButton';
+import DeployButton from '@/components/game/DeployButton';
 import StatsScreen from '@/components/game/StatsScreen'; // NEW: the Brotato-style stat sheet overlay
 
 export default function GameArena({ run, onFinish }) {
@@ -44,6 +45,10 @@ export default function GameArena({ run, onFinish }) {
       if (['arrowleft', 'a'].includes(k)) input.current.x = -1;
       if (['arrowright', 'd'].includes(k)) input.current.x = 1;
       if (k === 'e') input.current.special = true;
+      // Deployables: Q places the selected structure at the player's feet,
+      // C cycles which owned deployable is selected (HUD highlight follows).
+      if (k === 'q') input.current.deploy = true;
+      if (k === 'c') input.current.cycle = true;
     };
     const up = e => {
       const k = e.key.toLowerCase();
@@ -77,9 +82,11 @@ export default function GameArena({ run, onFinish }) {
         weapons={run.weapons}
         slots={run.character.slots || 6}
         onOpenStats={toggleStats} // NEW: renders a small clipboard icon button in the HUD
+        onSelectDeploy={i => { input.current.deploySel = i; }} // click a deployable slot to select it
       />
       <TouchControls input={input} />
       <SpecialButton hud={hud} input={input} />
+      <DeployButton hud={hud} input={input} />
       {flash && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-5 text-center">
           <span className="-rotate-2 rounded-lg bg-amber-300 px-5 py-2 text-xl font-black text-slate-950 shadow-[5px_5px_0_#ea580c] sm:text-2xl">{flash}</span>

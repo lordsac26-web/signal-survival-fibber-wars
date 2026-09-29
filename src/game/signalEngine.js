@@ -1,4 +1,5 @@
 import { ENEMIES, WEAPONS } from '@/game/data/combat';
+import { STRUCTURES } from '@/game/data/structures';
 import ObjectPool from '@/game/performance/ObjectPool';
 import SpatialHash from '@/game/performance/SpatialHash';
 import { enemySprite } from '@/game/performance/spriteAtlas';
@@ -13,24 +14,35 @@ const weaponOf=w=>typeof w==='string'?WEAPONS[w]:w;
 // 1. Every draw coordinate is Math.round()ed — subpixel drawImage under a
 //    devicePixelRatio transform is what made hit/knockback/death animations shimmer.
 // 2. Screen shake is an integer camera offset computed ONCE per frame inside
-//    draw() with an exponentially-decaying magnitude — no per-entity shake, no
-//    CSS/DOM animation restarting itself, no random magnitude jumps.
-// 3. Crit hit-stop is a brief global time-scale dip (10% for ~40ms, eased back)
-//    — the old version skipped simulation steps, which read as stutter.
+//    draw() with an exponentially-decaying magnitude.
+// 3. Crit hit-stop is a brief global time-scale dip (10% for ~40ms, eased back).
 // 4. The canvas backing store is integer-sized, only on real resize events.
+//
+// DEPLOYABLES: weapon-turret archetypes (w.turret) live in the `turrets` pool
+// and fire through the same `shots` pool as the player; player-placed
+// structures (Q key) live in the `structures` pool. Both integrate with the
+// enemy spatial hash for targeting, and structure-vs-enemy steering is a small
+// per-enemy loop over the (tiny) active-structure list — no repathing, no O(n²).
 export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
  const ctx=canvas.getContext('2d',{alpha:false}),dpr=Math.min(devicePixelRatio||1,2),grid=new SpatialHash(96);
  const enemies=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,r:10,lastShot:-1}));
- const shots=new ObjectPool(320,i=>({poolIndex:i,active:false,x:0,y:0,vx:0,vy:0,r:5,life:0,id:0,pen:0}));
+ const shots=new ObjectPool(320,i=>({poolIndex:i,active:false,x:0,y:0,vx:0,vy:0,r:5,life:0,id:0,pen:0,mortar:false,boom:false}));
  const particles=new ObjectPool(300,i=>({poolIndex:i,active:false,x:0,y:0,vx:0,vy:0,life:0,color:'#fff'}));
  const pickups=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,value:1}));
  const numbers=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,life:0,value:0,crit:false}));
+ const turrets=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,inv:0,r:13,wid:null,mode:'pellet',color:'#f59e0b',life:0,maxLife:1,fireCd:0,fire:.5,damage:10,range:300,born:0,lookA:0}));
+ const structures=new ObjectPool(24,i=>({poolIndex:i,active:false,type:null,x:0,y:0,life:0,maxLife:1,r:20,born:0,uses:0,rearm:0,power:1,fireCd:0,lookA:0}));
  let W=0,H=0,last=performance.now(),acc=0,raf,spawn=0,hudClock=0,soundClock=0,shotId=0,over=false,stress=false,lowFx=false,separate=true,fps=60,fpsClock=0,frames=0,lastNumber=0;
  let slow=0,timeScale=1,shakeMag=0;
  const duration=Math.min(90,20+(run.wave-1)*4); let time=duration,signal=run.signal,kills=run.kills,xp=run.xp||0,levels=0,progress=run.specialProgress||0,unlocked=run.specialUnlocked||false,specialCooldown=0,specialTimer=0,damageDealt=0;const killsByType={};
  const trigger=run.character.special.type;let eliteKills=trigger==='elite'?progress:0,meleeHits=trigger==='melee'?progress:0,healed=trigger==='healing'?progress:0,damageTaken=trigger==='damage'?progress:0;
  const p={x:0,y:0,r:17,hp:run.hp,maxHp:run.maxHp,inv:0,regen:0};let hurtBoost=0,firstBlockUsed=false;const cooldowns=new Float32Array(run.weapons.length);
- let queryX=0,queryY=0,queryR=0,queryDamage=0,queryColor='#fff',queryShot=null,queryHits=0,nearestBest=null,nearestDist=0;
+ let queryX=0,queryY=0,queryR=0,queryDamage=0,queryColor='#fff',queryShot=null,queryHits=0,queryStruct=null,nearestBest=null,nearestDist=0;
+ // deployable state: per-structure-type cooldowns, the (tiny) active structure
+ // list, and the pedestal attack-speed buff (recomputed every fixed step)
+ const deployCds={};let activeStructs=[],structCount=0,pedestalBuff=0;
+ const structCap=()=>6+Math.floor((run.engineering||0)/10);
+ const deployCdMax=(item,d)=>d.cd*(1-.12*Math.min((item.stacks||1)-1,3));
  function addShake(v){shakeMag=Math.min(20,shakeMag+v)}
  function resize(){const r=canvas.getBoundingClientRect();W=Math.round(r.width);H=Math.round(r.height);canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);grid.resize(W,H);if(!p.x){p.x=W/2;p.y=H/2}}
  function particle(x,y,color,count){if(lowFx)count=Math.min(2,count);for(let i=0;i<count;i++){let q=particles.acquire();if(!q){q=particles.items[(shotId+i)%particles.items.length];}q.x=x;q.y=y;q.vx=(Math.random()-.5)*150;q.vy=(Math.random()-.5)*150;q.life=.42;q.color=color}}
@@ -40,41 +52,136 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
  // spliceQuality adds craftsmanship damage; cleanliness is a damage bonus vs
  // dirty impairments; instakill fails the inspection instantly; lifeSteal is
  // % of damage dealt returned as HP; knockback (item stat + crit special) shoves.
+ // NOTE: hit() multiplies by run.damage — callers pass UN-multipled base damage.
  function hit(e,base,color,melee=false){if(!e.active)return;const crit=Math.random()<(run.crit||0);let amount=base*run.damage*(crit?2:1)*(1+(run.spliceQuality||0)*.004);if(e.dirty)amount*=1+(run.cleanliness||0)*.01;if(Math.random()<(run.instakill||0)){amount=e.hp+1;cb.flash('FIBBER CLAUSE!')}e.hp-=amount;damageDealt+=amount;queryHits++;if(melee)meleeHits++;particle(e.x,e.y,color,crit?8:2);damageNumber(e.x,e.y,amount,crit);if(crit){const kb=(run.critKnockback||0)+(run.knockback||0);if(kb){const a=Math.atan2(e.y-p.y,e.x-p.x);e.x+=Math.cos(a)*kb*8;e.y+=Math.sin(a)*kb*8}slow=.04;addShake(3)}if(run.lifeSteal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+amount*run.lifeSteal);healed+=p.hp-before}if(e.hp<=0)kill(e)}
  function areaVisitor(e){if(e.active&&Math.hypot(e.x-queryX,e.y-queryY)<queryR+e.r)hit(e,queryDamage,queryColor,true)}
- function shotVisitor(e){const s=queryShot;if(!s.active||!e.active||e.lastShot===s.id)return;if(Math.hypot(e.x-s.x,e.y-s.y)<e.r+s.r){e.lastShot=s.id;hit(e,s.damage,s.color,false);if(!s.pierce){if(s.pen>0)s.pen--;else shots.release(s)}}}
- function nearestVisitor(e){const d=Math.hypot(e.x-p.x,e.y-p.y);if(d<nearestDist){nearestBest=e;nearestDist=d}}
- function nearest(range){nearestBest=null;nearestDist=range;grid.visit(p.x,p.y,range,nearestVisitor);return nearestBest}
+ function shotVisitor(e){const s=queryShot;if(!s.active||!e.active||e.lastShot===s.id)return;if(Math.hypot(e.x-s.x,e.y-s.y)<e.r+s.r){e.lastShot=s.id;if(s.mortar){s.boom=true;return}hit(e,s.damage,s.color,false);if(!s.pierce){if(s.pen>0)s.pen--;else shots.release(s)}}}
+ function nearestVisitor(e){const d=Math.hypot(e.x-queryX,e.y-queryY);if(d<nearestDist){nearestBest=e;nearestDist=d}}
+ function nearest(range){queryX=p.x;queryY=p.y;nearestBest=null;nearestDist=range;grid.visit(p.x,p.y,range,nearestVisitor);return nearestBest}
+ function nearestAt(x,y,range){queryX=x;queryY=y;nearestBest=null;nearestDist=range;grid.visit(x,y,range,nearestVisitor);return nearestBest}
  function spawnEnemy(kind){const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||TYPES[(Math.random()*Math.min(TYPES.length,2+(run.wave/2|0)))|0]],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?W+pad:edge===3?-pad:Math.random()*W;e.y=edge===0?-pad:edge===2?H+pad:Math.random()*H;e.hp=base.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage;e.r=base.r;e.value=base.value;e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base)}
+ // AOE burst (Closure Cannon mortar) — sequential grid pass, never nested in a visit
+ function explode(x,y,dmg,color,r){queryX=x;queryY=y;queryR=r;queryDamage=dmg;queryColor=color;grid.visit(x,y,r,areaVisitor);particle(x,y,color,lowFx?3:12);addShake(2)}
+ // Projectile launch — origin defaults to the player so turrets pass their own x/y.
  // STAT HOOKS: engineering boosts turret-pattern (spark family) tool damage;
  // pierce grants extra penetrations to non-piercing projectiles; range scales
  // shot lifetime (travel) and melee/area radius (see attack).
- function launch(w,angle){const s=shots.acquire();if(!s)return;s.id=++shotId;s.x=p.x;s.y=p.y;s.vx=Math.cos(angle)*540;s.vy=Math.sin(angle)*540;s.r=w.helper?9:w.pattern==='beam'?7:5;s.life=w.range*run.range/540;s.damage=w.damage+(w.family==='spark'?(run.engineering||0)*.5:0);s.color=w.color;s.helper=!!w.helper;s.pen=Math.round(run.pierce||0);s.pierce=['pierce','beam','beamSweep'].includes(w.pattern)}
- function attack(w){const t=nearest(w.range*run.range);if(!t)return;const a=Math.atan2(t.y-p.y,t.x-p.x),pattern=w.pattern||'projectile';sfx(w.family||'laser');queryHits=0;if(['melee','nova','cone','orbiting'].includes(pattern)){queryX=p.x;queryY=p.y;queryR=w.range*run.range;queryDamage=w.damage;queryColor=w.color;grid.visit(p.x,p.y,queryR,areaVisitor);if(w.heal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+w.heal);healed+=p.hp-before}particle(p.x,p.y,w.color,7)}else{launch(w,a);if(pattern==='chain'){launch(w,a-.16);launch(w,a+.16)}}}
+ function launch(w,angle,ox=p.x,oy=p.y){const s=shots.acquire();if(!s)return;const v=w.speed||540;s.id=++shotId;s.x=ox;s.y=oy;s.vx=Math.cos(angle)*v;s.vy=Math.sin(angle)*v;s.r=w.helper?9:w.pattern==='beam'?7:5;s.life=w.range*run.range/v;s.damage=w.damage+(w.family==='spark'?(run.engineering||0)*.5:0);s.color=w.color;s.helper=!!w.helper;s.pen=Math.round(run.pierce||0);s.pierce=['pierce','beam','beamSweep'].includes(w.pattern);s.mortar=!!w.mortar;s.boom=false}
+ function attack(w){if(w.turret){deployTurret(w);return}const t=nearest(w.range*run.range);if(!t)return;const a=Math.atan2(t.y-p.y,t.x-p.x),pattern=w.pattern||'projectile';sfx(w.family||'laser');queryHits=0;if(['melee','nova','cone','orbiting'].includes(pattern)){queryX=p.x;queryY=p.y;queryR=w.range*run.range;queryDamage=w.damage;queryColor=w.color;grid.visit(p.x,p.y,queryR,areaVisitor);if(w.heal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+w.heal);healed+=p.hp-before}particle(p.x,p.y,w.color,7)}else{launch(w,a);if(pattern==='chain'){launch(w,a-.16);launch(w,a+.16)}}}
+ // AUTO-DEPLOY TURRET WEAPONS: every rate/attackSpeed seconds, drop a sentry
+ // near the player instead of firing directly. Turret damage/HP/lifetime/cap
+ // all scale with the weapon's rolls + Engineering (see structures.js for
+ // per-archetype tuning: life, cap, fire, mode).
+ function deployTurret(w){const cfg=w.turret;
+  let count=0;for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(t.active&&t.wid===w.id)count++}
+  if(count>=cfg.cap+Math.floor((run.engineering||0)/15))return; // silently at cap — HUD shows the live turrets
+  const t=turrets.acquire();if(!t)return;const a=Math.random()*6.28;
+  t.wid=w.id;t.mode=cfg.mode;t.color=w.color;t.born=0;t.inv=0;t.r=13;
+  t.x=clamp(p.x+Math.cos(a)*26,20,W-20);t.y=clamp(p.y+Math.sin(a)*26,20,H-20);
+  t.life=t.maxLife=cfg.life+(run.engineering||0)*.04;
+  t.fire=cfg.fire;t.fireCd=cfg.fire*.4;
+  t.damage=w.damage*(1+(run.engineering||0)*.01)*(1+((run.spliceQuality||0)+(run.turretQuality||0))*.004);
+  t.range=w.range;t.hp=20+(run.engineering||0)*2;t.lookA=a+Math.PI;
+  sfx('deploy');particle(t.x,t.y,'#d6d3d1',lowFx?2:8)}
+ function turretContact(e){const t=queryStruct;if(!e.active||t.inv>0)return;if(Math.hypot(e.x-t.x,e.y-t.y)<t.r+e.r+4){t.hp-=e.damage*.5;t.inv=.5}}
+ function turretsUpdate(dt){for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;
+  t.born+=dt;t.inv=Math.max(0,t.inv-dt);t.fireCd-=dt;t.life-=dt;
+  if(t.life<=0||t.hp<=0){particle(t.x,t.y,'#94a3b8',lowFx?2:5);turrets.release(t);continue} // quiet despawn — no shake spam
+  if(t.inv<=0){queryStruct=t;grid.visit(t.x,t.y,t.r+40,turretContact)} // impairments dent the sentry on contact
+  if(t.fireCd<=0){const target=nearestAt(t.x,t.y,t.range*run.range);
+   if(target){const ang=Math.atan2(target.y-t.y,target.x-t.x);t.lookA=ang;t.fireCd=t.fire;
+    if(t.mode==='pellet'){launch({damage:t.damage,range:t.range,pattern:'projectile',color:t.color},ang,t.x,t.y);sfx('snip')}
+    else if(t.mode==='mortar'){launch({damage:t.damage,range:t.range,pattern:'mortar',color:t.color,mortar:true,speed:260},ang,t.x,t.y);sfx('packet')}
+    else if(t.mode==='pulse'){launch({damage:t.damage,range:t.range,pattern:'pierce',color:t.color,speed:620},ang,t.x,t.y);sfx('laser')}
+    else{for(let k=-2;k<=2;k++)launch({damage:t.damage,range:t.range,pattern:'projectile',color:t.color},ang+k*.22,t.x,t.y);sfx('spark')}
+   }else t.fireCd=.12}}}
+ // Player-placed structures: expire quietly (fade is handled in draw), mounts
+ // fire through the same projectile pool, pedestals set the attack-speed buff.
+ function structuresUpdate(dt){activeStructs.length=0;
+  for(let i=0;i<structures.items.length;i++){const s=structures.items[i];if(!s.active)continue;
+   s.born+=dt;s.life-=dt;s.rearm=Math.max(0,s.rearm-dt);
+   if(s.life<=0){particle(s.x,s.y,'#94a3b8',lowFx?2:4);structures.release(s);continue}
+   activeStructs.push(s)}
+  structCount=activeStructs.length;pedestalBuff=0;
+  for(let i=0;i<activeStructs.length;i++){const s=activeStructs[i],def=STRUCTURES[s.type];if(!def)continue;
+   if(def.kind==='turret'){s.fireCd-=dt;if(s.fireCd<=0){const target=nearestAt(s.x,s.y,def.range*run.range);if(target){const ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;launch({damage:def.damage*(1+.2*(s.power-1))*(1+(run.engineering||0)*.01),range:def.range,pattern:'projectile',color:def.color},ang,s.x,s.y);sfx('snip');s.fireCd=def.fire}else s.fireCd=.15}}
+   else if(def.kind==='buff'&&Math.hypot(p.x-s.x,p.y-s.y)<s.r)pedestalBuff=Math.max(pedestalBuff,def.buff+.05*(s.power-1))}}
+ // Q-key placement: structure appears AT the player, respecting per-type
+ // cooldown and the total permit cap (6 + Engineering/10).
+ function placeStructure(){const list=run.deployables||[];if(!list.length)return;
+  const idx=Math.min(Math.max(0,input.current.deploySel||0),list.length-1);
+  const item=list[idx],def=STRUCTURES[item.structure];if(!def)return;
+  if((deployCds[item.structure]||0)>0){cb.flash(`REBOOTING ${def.name.toUpperCase()} — ${Math.ceil(deployCds[item.structure])}s`);return}
+  let count=0;for(let i=0;i<structures.items.length;i++)if(structures.items[i].active)count++;
+  if(count>=structCap()){cb.flash('PERMIT LIMIT: TOO MUCH STRUCTURE');return}
+  const s=structures.acquire();if(!s){cb.flash('PERMIT LIMIT');return}
+  s.active=true;s.type=item.structure;s.x=clamp(p.x,30,W-30);s.y=clamp(p.y,30,H-30);
+  s.born=0;s.life=s.maxLife=def.life+(run.engineering||0)*.06;s.r=def.r;
+  s.power=Math.min(item.stacks||1,4);s.rearm=0;s.fireCd=.3;s.lookA=Math.random()*6.28;s.uses=def.uses||0;
+  deployCds[item.structure]=deployCdMax(item,def);
+  sfx('deploy');particle(p.x,p.y,'#d6d3d1',lowFx?3:8);cb.flash(`${def.name.toUpperCase()} DEPLOYED`)}
  function unlockCheck(){const sp=run.character.special;if(!sp||unlocked)return;if(sp.type==='kills')progress=kills;else if(sp.type==='signal')progress=signal;else if(sp.type==='elite')progress=eliteKills;else if(sp.type==='melee')progress=meleeHits;else if(sp.type==='healing')progress=healed;else if(sp.type==='damage')progress=damageTaken;else if(sp.type==='wave')progress=run.wave;if(progress>=sp.goal){unlocked=true;sfx('special');cb.flash(`SPECIAL UNLOCKED: ${sp.name} — Press E`)}}
- function activateSpecial(){if(!unlocked||specialCooldown>0)return;const id=run.character.special.id;specialCooldown=run.character.special.cooldown;specialTimer=5;sfx('special');cb.flash(run.character.special.name.toUpperCase());addShake(8);if(id==='clause'){enemies.each(e=>{if(distance(p,e)<260)hit(e,e.hp+1,'#fbbf24')})}else if(id==='trace'){enemies.each(e=>hit(e,90,'#22d3ee'))}else if(id==='deepclean'){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+45);healed+=p.hp-before;queryX=p.x;queryY=p.y;queryR=260;queryDamage=55;queryColor='#34d399';grid.visit(p.x,p.y,260,areaVisitor)}else if(id==='fortify'||id==='crew'){for(let i=0;i<12;i++)launch({damage:42+(run.engineering||0),range:500,pattern:'pierce',color:'#fbbf24',helper:id==='crew'},i*Math.PI/6)}else if(id==='callback'){queryX=p.x;queryY=p.y;queryR=300;queryDamage=80;queryColor='#67e8f9';grid.visit(p.x,p.y,300,areaVisitor)}particle(p.x,p.y,'#ffffff',lowFx?8:28)}
+ function activateSpecial(){if(!unlocked||specialCooldown>0)return;const id=run.character.special.id;specialCooldown=run.character.special.cooldown;specialTimer=5;sfx('special');cb.flash(run.character.special.name.toUpperCase());addShake(8);
+  if(id==='clause'){enemies.each(e=>{if(distance(p,e)<260)hit(e,e.hp+1,'#fbbf24')})}
+  else if(id==='trace'){enemies.each(e=>hit(e,90,'#22d3ee'))}
+  else if(id==='deepclean'){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+45);healed+=p.hp-before;queryX=p.x;queryY=p.y;queryR=260;queryDamage=55;queryColor='#34d399';grid.visit(p.x,p.y,260,areaVisitor)}
+  // BUCKET-TRUCK BOSS identity: the special deploys an upgraded turret nest
+  // (3 hard-hatted sentries around the player) instead of a one-off blast.
+  else if(id==='fortify'){for(let i=0;i<3;i++){const t=turrets.acquire();if(!t)continue;const a=i*2.09-1.05;t.x=clamp(p.x+Math.cos(a)*46,20,W-20);t.y=clamp(p.y+Math.sin(a)*46,20,H-20);t.wid='nest';t.mode='pellet';t.color='#facc15';t.born=0;t.inv=0;t.r=15;t.life=t.maxLife=6+(run.engineering||0)*.05;t.fire=.25;t.fireCd=.2;t.damage=30*(1+(run.engineering||0)*.01);t.range=340;t.hp=40+(run.engineering||0)*2;t.lookA=a+Math.PI;particle(t.x,t.y,'#fde047',lowFx?2:6)}}
+  else if(id==='crew'){for(let i=0;i<12;i++)launch({damage:42+(run.engineering||0),range:500,pattern:'pierce',color:'#fbbf24',helper:true},i*Math.PI/6)}
+  else if(id==='callback'){queryX=p.x;queryY=p.y;queryR=300;queryDamage=80;queryColor='#67e8f9';grid.visit(p.x,p.y,300,areaVisitor)}
+  particle(p.x,p.y,'#ffffff',lowFx?8:28)}
  function separateVisitor(other){const e=queryShot;if(!other.active||other===e)return;let dx=e.x-other.x,dy=e.y-other.y,d2=dx*dx+dy*dy,min=e.r+other.r;if(d2>0&&d2<min*min){const push=(min-Math.sqrt(d2))*.025;e.x+=dx*push;e.y+=dy*push}}
- function fixedUpdate(dt){time-=dt;soundClock-=dt;hurtBoost=Math.max(0,hurtBoost-dt);p.inv=Math.max(0,p.inv-dt);specialCooldown=Math.max(0,specialCooldown-dt);specialTimer=Math.max(0,specialTimer-dt);p.regen+=dt*run.regen;if(p.regen>=1){const h=p.regen|0,before=p.hp;p.hp=Math.min(p.maxHp,p.hp+h);healed+=p.hp-before;p.regen-=h}let ix=input.current.x,iy=input.current.y;if(ix||iy){const m=Math.hypot(ix,iy)||1,boost=((run.character.special.id==='sprint'&&specialTimer>0)?1.8:1)*(hurtBoost>0?1.3:1);p.x+=ix/m*run.speed*boost*dt;p.y+=iy/m*run.speed*boost*dt}p.x=clamp(p.x,p.r,W-p.r);p.y=clamp(p.y,p.r,H-p.r);if(input.current.special){input.current.special=false;activateSpecial()}
+ function fixedUpdate(dt){time-=dt;soundClock-=dt;hurtBoost=Math.max(0,hurtBoost-dt);p.inv=Math.max(0,p.inv-dt);specialCooldown=Math.max(0,specialCooldown-dt);specialTimer=Math.max(0,specialTimer-dt);for(const k in deployCds)if(deployCds[k]>0)deployCds[k]=Math.max(0,deployCds[k]-dt);p.regen+=dt*run.regen;if(p.regen>=1){const h=p.regen|0,before=p.hp;p.hp=Math.min(p.maxHp,p.hp+h);healed+=p.hp-before;p.regen-=h}let ix=input.current.x,iy=input.current.y;if(ix||iy){const m=Math.hypot(ix,iy)||1,boost=((run.character.special.id==='sprint'&&specialTimer>0)?1.8:1)*(hurtBoost>0?1.3:1);p.x+=ix/m*run.speed*boost*dt;p.y+=iy/m*run.speed*boost*dt}p.x=clamp(p.x,p.r,W-p.r);p.y=clamp(p.y,p.r,H-p.r);if(input.current.special){input.current.special=false;activateSpecial()}
+  // deployable input: C cycles the selected item (HUD highlight follows), Q places it
+  if(input.current.cycle){input.current.cycle=false;const list=run.deployables||[];if(list.length){const cur=Math.min(Math.max(0,input.current.deploySel||0),list.length-1);const nxt=(cur+1)%list.length;input.current.deploySel=nxt;cb.flash(`DEPLOY: ${list[nxt].name}`)}}
+  if(input.current.deploy){input.current.deploy=false;placeStructure()}
   spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<Math.min(.65,run.wave*.05))spawnEnemy();spawn=Math.max(.1,.76-run.wave*.045)}grid.clear();
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active)grid.insert(e)}
-  for(let i=0;i<run.weapons.length;i++){cooldowns[i]-=dt;const w=weaponOf(run.weapons[i]);if(w&&cooldowns[i]<=0){attack(w);cooldowns[i]=w.rate/(run.attackSpeed*((run.character.special.id==='frenzy'&&specialTimer>0)?2.5:1))}}
-  for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(!s.active)continue;s.life-=dt;if(s.life<=0){shots.release(s);continue}s.x+=s.vx*dt;s.y+=s.vy*dt;queryShot=s;grid.visit(s.x,s.y,s.r+34,shotVisitor)}
+  structuresUpdate(dt); // mounts fire + pedestal buff, uses the freshly built enemy grid
+  for(let i=0;i<run.weapons.length;i++){cooldowns[i]-=dt;const w=weaponOf(run.weapons[i]);if(w&&cooldowns[i]<=0){attack(w);cooldowns[i]=w.rate/(run.attackSpeed*(1+pedestalBuff)*((run.character.special.id==='frenzy'&&specialTimer>0)?2.5:1))}}
+  turretsUpdate(dt);
+  for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(!s.active)continue;s.life-=dt;if(s.life<=0){if(s.mortar)explode(s.x,s.y,s.damage,s.color,55);shots.release(s);continue}s.x+=s.vx*dt;s.y+=s.vy*dt;queryShot=s;grid.visit(s.x,s.y,s.r+34,shotVisitor);if(s.boom){explode(s.x,s.y,s.damage,s.color,55);shots.release(s);continue}}
   // STAT HOOKS: armor flat-reduces contact damage; dodge is a capped (60%)
   // chance to ignore it entirely; signalStrength resists impairment damage.
-  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(!e.active)continue;const a=Math.atan2(p.y-e.y,p.x-e.x);e.x+=Math.cos(a)*e.speed*dt;e.y+=Math.sin(a)*e.speed*dt;if(separate){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}if(distance(p,e)<p.r+e.r&&p.inv<=0){if(run.firstHitBlocked&&!firstBlockUsed){firstBlockUsed=true;cb.flash('FIRST HIT POLITELY DECLINED')}else if(Math.random()>Math.min(.6,run.dodge||0)){const dmg=Math.max(2,e.damage-run.armor*1.5)*(1-Math.min(.4,(run.signalStrength||0)*.003));p.hp-=dmg;damageTaken+=dmg;if(run.hitSpeedBoost)hurtBoost=2;sfx('hit');particle(p.x,p.y,'#fff',12);addShake(4)}p.inv=.55}}
+  // STRUCTURES: barricades shove enemies out (local steering, tiny m), traps
+  // chomp + shove, snares slow — none of it touches the player.
+  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(!e.active)continue;const a=Math.atan2(p.y-e.y,p.x-e.x);
+   let slowMul=1;
+   for(let k=0;k<activeStructs.length;k++){const st=activeStructs[k];if(!st.active)continue;const def=STRUCTURES[st.type];if(!def)continue;
+    if(def.kind==='block'){const dx=e.x-st.x,dy=e.y-st.y,sd=Math.hypot(dx,dy),min=st.r+e.r;if(sd<min){const push=(min-sd)*.55;e.x+=dx/(sd||1)*push;e.y+=dy/(sd||1)*push}}
+    else if(def.kind==='trap'&&st.rearm<=0&&st.uses>0){const sd=Math.hypot(e.x-st.x,e.y-st.y);if(sd<st.r+e.r){st.rearm=.7;st.uses--;hit(e,def.chomp*(1+.2*(st.power-1)),'#f87171',false);const ba=Math.atan2(e.y-st.y,e.x-st.x);e.x+=Math.cos(ba)*22;e.y+=Math.sin(ba)*22;sfx('snip');if(st.uses<=0){particle(st.x,st.y,'#f87171',lowFx?2:6);structures.release(st);structCount--}}}
+    else if(def.kind==='slow'){if(Math.hypot(e.x-st.x,e.y-st.y)<st.r)slowMul=Math.min(slowMul,1-(def.slow+.05*(st.power-1)))}}
+   e.x+=Math.cos(a)*e.speed*slowMul*dt;e.y+=Math.sin(a)*e.speed*slowMul*dt;
+   if(separate){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
+   if(distance(p,e)<p.r+e.r&&p.inv<=0){if(run.firstHitBlocked&&!firstBlockUsed){firstBlockUsed=true;cb.flash('FIRST HIT POLITELY DECLINED')}else if(Math.random()>Math.min(.6,run.dodge||0)){const dmg=Math.max(2,e.damage-run.armor*1.5)*(1-Math.min(.4,(run.signalStrength||0)*.003));p.hp-=dmg;damageTaken+=dmg;if(run.hitSpeedBoost)hurtBoost=2;sfx('hit');particle(p.x,p.y,'#fff',12);addShake(4)}p.inv=.55}}
   for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(!d.active)continue;const dd=distance(p,d);if(dd<120){d.x+=(p.x-d.x)*dt*7;d.y+=(p.y-d.y)*dt*7}if(dd<p.r+10){signal+=d.value;sfx('pickup');pickups.release(d);while(xp>=18+(run.level+levels)*8){xp-=18+(run.level+levels)*8;levels++;sfx('level');cb.flash('SIGNAL LEVEL UP!')}}}
   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(!q.active)continue;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=.94;q.vy*=.94;q.life-=dt;if(q.life<=0)particles.release(q)}for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;n.y-=25*dt;n.life-=dt;if(n.life<=0)numbers.release(n)}if(soundClock<=0){for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active){sfx(e.sound);break}}soundClock=.35+Math.random()*.35}unlockCheck();
-  // Wave end: harvesting grants its bonus Signal before the run snapshot.
   if((p.hp<=0||time<=0)&&!over){over=true;const harvest=p.hp>0?Math.round(run.harvesting||0):0;signal+=harvest;sfx(p.hp<=0?'death':'clear');cancelAnimationFrame(raf);cb.finish({...run,hp:Math.max(0,p.hp),signal,kills,xp,pendingLevels:levels,specialProgress:progress,specialUnlocked:unlocked,won:p.hp>0,damageDealt:Math.round(damageDealt),healed:Math.round(healed),killsByType})}
-  hudClock-=dt;if(hudClock<=0){cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,kills,specialUnlocked:unlocked,specialCooldown,specialName:run.character.special.name,fps:Math.round(fps),stress});hudClock=.1}
+  hudClock-=dt;if(hudClock<=0){const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,kills,specialUnlocked:unlocked,specialCooldown,specialName:run.character.special.name,fps:Math.round(fps),stress,
+   deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,STRUCTURES[d.structure]),selected:i===depIdx})),structures:structCount,cap:structCap()}:null});hudClock=.1}
  }
+ // Silly-but-mandated accessories: every turret and structure gets a hard hat
+ // and googly eyes (pupils track whatever it's currently aiming at).
+ function drawHardHat(x,y){ctx.fillStyle='#facc15';ctx.beginPath();ctx.arc(x,y,7,Math.PI,0);ctx.fill();ctx.fillRect(x-8,y-1,16,2)}
+ function drawEyes(x,y,a){const px=Math.cos(a)*1.5,py=Math.sin(a)*1.5;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x-4,y,3.2,0,7);ctx.fill();ctx.beginPath();ctx.arc(x+4,y,3.2,0,7);ctx.fill();ctx.fillStyle='#111';ctx.beginPath();ctx.arc(x-4+px,y+py,1.5,0,7);ctx.fill();ctx.beginPath();ctx.arc(x+4+px,y+py,1.5,0,7);ctx.fill()}
+ function drawTurretBody(x,y,color,a,r){ctx.strokeStyle='#475569';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-r,y+r);ctx.moveTo(x,y);ctx.lineTo(x+r,y+r);ctx.moveTo(x,y);ctx.lineTo(x,y+r);ctx.stroke();ctx.fillStyle='#334155';ctx.fillRect(x-r+2,y-r+2,r*2-4,r*2-6);ctx.strokeStyle=color;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*(r+6),y+Math.sin(a)*(r+6));ctx.stroke();drawHardHat(x,y-r+2);drawEyes(x,y,a)}
  function draw(){
-  // Shake: ONE integer camera offset per frame; magnitude decays smoothly in frame().
   const sx=Math.round((Math.random()-.5)*shakeMag),sy=Math.round((Math.random()-.5)*shakeMag);
   ctx.setTransform(dpr,0,0,dpr,Math.round(sx*dpr),Math.round(sy*dpr));
   ctx.fillStyle='#172d32';ctx.fillRect(-24,-24,W+48,H+48);
   ctx.strokeStyle='rgba(83,211,190,.08)';ctx.lineWidth=1;for(let x=0;x<W;x+=48){ctx.beginPath();ctx.moveTo(x,-24);ctx.lineTo(x,H+24);ctx.stroke()}for(let y=0;y<H;y+=48){ctx.beginPath();ctx.moveTo(-24,y);ctx.lineTo(W+24,y);ctx.stroke()}
   ctx.fillStyle='#67e8f9';for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(d.active&&d.x>-8&&d.x<W+8&&d.y>-8&&d.y<H+8)ctx.fillRect(Math.round(d.x)-4,Math.round(d.y)-4,8,8)}
+  // structures (under enemies): pop-in scale, fade out during the last 1.5s of life
+  for(let i=0;i<structures.items.length;i++){const st=structures.items[i];if(!st.active)continue;const def=STRUCTURES[st.type];if(!def)continue;const x=Math.round(st.x),y=Math.round(st.y),grow=Math.min(1,st.born*4);
+   ctx.globalAlpha=(st.life<1.5?Math.max(.2,st.life/1.5):1)*(.4+.6*grow);
+   if(def.kind==='turret')drawTurretBody(x,y,def.color,st.lookA,13*grow+3);
+   else if(def.kind==='block'){ctx.fillStyle='#fb923c';ctx.fillRect(x-st.r,y-8,st.r*2,16);ctx.fillStyle='#fff';for(let k=0;k<4;k++)ctx.fillRect(x-st.r+6+k*12,y-8,5,16);drawHardHat(x,y-14);drawEyes(x,y-2,st.lookA)}
+   else if(def.kind==='trap'){ctx.fillStyle='#525252';ctx.fillRect(x-14,y-8,28,14);ctx.fillStyle='#ef4444';for(let k=0;k<5;k++){ctx.fillRect(x-12+k*6,y-8,3,6);ctx.fillRect(x-9+k*6,y-2,3,6)}drawHardHat(x,y-16);drawEyes(x,y-4,st.lookA)}
+   else if(def.kind==='slow'){ctx.fillStyle='rgba(34,211,238,.12)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.strokeStyle='rgba(103,232,249,.55)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,st.r*.66*grow,0,4.6);ctx.stroke();drawEyes(x,y,st.lookA)}
+   else if(def.kind==='buff'){ctx.fillStyle='rgba(250,204,21,.10)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.fillStyle='#a8a29e';ctx.fillRect(x-12,y,24,10);ctx.fillRect(x-8,y-8,16,8);drawHardHat(x,y-12);drawEyes(x,y-2,st.lookA)}
+   ctx.globalAlpha=1}
+  for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;const grow=Math.min(1,t.born*4);ctx.globalAlpha=t.life<1?Math.max(.2,t.life):1;drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
   for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.kind===kind&&e.x>-40&&e.x<W+40&&e.y>-40&&e.y<H+40)ctx.drawImage(e.sprite,Math.round(e.x-e.sprite.width/2),Math.round(e.y-e.sprite.height/2))}}
   for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>-10&&s.x<W+10&&s.y>-10&&s.y<H+10){const x=Math.round(s.x),y=Math.round(s.y);ctx.fillStyle=s.color;if(s.helper){ctx.fillRect(x-7,y-4,14,12);ctx.fillStyle='#fde047';ctx.fillRect(x-9,y-9,18,5)}else{ctx.beginPath();ctx.arc(x,y,s.r,0,7);ctx.fill()}}}
   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(q.active&&q.x>=0&&q.x<=W&&q.y>=0&&q.y<=H){ctx.globalAlpha=Math.max(0,q.life*2);ctx.fillStyle=q.color;ctx.fillRect(Math.round(q.x),Math.round(q.y),3,3)}}ctx.globalAlpha=1;
@@ -83,20 +190,14 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
   ctx.fillStyle=run.character.color;ctx.beginPath();ctx.arc(px,py,p.r,0,7);ctx.fill();ctx.fillStyle=run.character.vest;ctx.fillRect(px-14,py+2,28,16);ctx.fillStyle=run.character.belt;ctx.fillRect(px-15,py+11,30,5);ctx.fillStyle=run.character.color;ctx.fillRect(px-20,py-17,40,8);ctx.fillStyle='#fff';ctx.fillRect(px-8,py-5,6,7);ctx.fillRect(px+3,py-5,6,7);if(specialTimer>0){ctx.strokeStyle='#fde047';ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,py,25+Math.sin(performance.now()*.02)*5,0,7);ctx.stroke()}}
  function key(e){if(e.key==='F9'){stress=!stress;if(stress){for(let i=0;i<500;i++)spawnEnemy()}cb.flash(stress?'STRESS MODE: 500 IMPAIRMENTS':'STRESS MODE OFF')}} window.addEventListener('keydown',key);resize();sfx('wave');if(run.wave%5===0)sfx('boss');
  function frame(now){
-  // PAUSE: skip sim + render, but keep `last` fresh so resume doesn't produce
-  // one giant catch-up delta.
   if(paused.current){last=now;if(!over)raf=requestAnimationFrame(frame);return}
   let delta=Math.min(MAX_DT,(now-last)/1000);last=now;
-  // HIT-STOP as time-scale: crits dip the whole sim to 10% for ~40ms and ease
-  // back — never skipping render/sim steps, which caused visible stutter.
   slow=Math.max(0,slow-delta);
   const target=slow>0?.1:1;
   timeScale+=(target-timeScale)*Math.min(1,delta*18);
   if(Math.abs(timeScale-target)<.005)timeScale=target;
   delta*=timeScale;
   acc+=delta;while(acc>=STEP&&!over){fixedUpdate(STEP);acc-=STEP}
-  // Shake magnitude decays smoothly (exponential) toward zero, consumed once
-  // per frame inside draw().
   shakeMag*=Math.exp(-7*delta);if(shakeMag<.05)shakeMag=0;
   draw();frames++;fpsClock+=delta;if(fpsClock>=1){fps=frames/fpsClock;frames=0;fpsClock=0;lowFx=fps<52;separate=fps>=42}if(!over)raf=requestAnimationFrame(frame)
  }raf=requestAnimationFrame(frame);window.addEventListener('resize',resize);
