@@ -3,6 +3,7 @@ import { STRUCTURES } from '@/game/data/structures';
 import ObjectPool from '@/game/performance/ObjectPool';
 import SpatialHash from '@/game/performance/SpatialHash';
 import { enemySprite } from '@/game/performance/spriteAtlas';
+import { drawProjectile } from '@/game/performance/drawProjectile';
 import { sfx } from '@/game/audio';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
@@ -27,7 +28,7 @@ const signalForLevel=level=>30+level*15+level*level*2;
 export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
  const ctx=canvas.getContext('2d',{alpha:false}),dpr=Math.min(devicePixelRatio||1,2),grid=new SpatialHash(96);
  const enemies=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,r:10,lastShot:-1}));
- const shots=new ObjectPool(320,i=>({poolIndex:i,active:false,x:0,y:0,vx:0,vy:0,r:5,life:0,id:0,pen:0,mortar:false,boom:false}));
+ const shots=new ObjectPool(320,i=>({poolIndex:i,active:false,x:0,y:0,vx:0,vy:0,r:5,life:0,id:0,pen:0,mortar:false,pattern:'projectile',boom:false}));
  const particles=new ObjectPool(300,i=>({poolIndex:i,active:false,x:0,y:0,vx:0,vy:0,life:0,color:'#fff'}));
  const pickups=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,value:1}));
  const numbers=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,life:0,value:0,crit:false}));
@@ -69,7 +70,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
  // STAT HOOKS: engineering boosts turret-pattern (spark family) tool damage;
  // pierce grants extra penetrations to non-piercing projectiles; range scales
  // shot lifetime (travel) and melee/area radius (see attack).
- function launch(w,angle,ox=p.x,oy=p.y){const s=shots.acquire();if(!s)return;const v=w.speed||540;s.id=++shotId;s.x=ox;s.y=oy;s.vx=Math.cos(angle)*v;s.vy=Math.sin(angle)*v;s.r=w.helper?9:w.pattern==='beam'?7:5;s.life=w.range*run.range/v;s.damage=w.damage+(w.family==='spark'?(run.engineering||0)*.5:0);s.color=w.color;s.helper=!!w.helper;s.pen=Math.round(run.pierce||0);s.pierce=['pierce','beam','beamSweep'].includes(w.pattern);s.mortar=!!w.mortar;s.boom=false}
+ function launch(w,angle,ox=p.x,oy=p.y){const s=shots.acquire();if(!s)return;const v=w.speed||540;s.id=++shotId;s.x=ox;s.y=oy;s.vx=Math.cos(angle)*v;s.vy=Math.sin(angle)*v;s.r=w.helper?9:w.pattern==='beam'?7:5;s.life=w.range*run.range/v;s.damage=w.damage+(w.family==='spark'?(run.engineering||0)*.5:0);s.color=w.color;s.helper=!!w.helper;s.pen=Math.round(run.pierce||0);s.pierce=['pierce','beam','beamSweep'].includes(w.pattern);s.mortar=!!w.mortar;s.pattern=w.pattern;s.boom=false}
  function attack(w){if(w.turret){deployTurret(w);return}const t=nearest(w.range*run.range);if(!t)return;const a=Math.atan2(t.y-p.y,t.x-p.x),pattern=w.pattern||'projectile';sfx(w.family||'laser');queryHits=0;if(['melee','nova','cone','orbiting'].includes(pattern)){queryX=p.x;queryY=p.y;queryR=w.range*run.range;queryDamage=w.damage;queryColor=w.color;grid.visit(p.x,p.y,queryR,areaVisitor);if(w.heal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+w.heal);healed+=p.hp-before}particle(p.x,p.y,w.color,7)}else{launch(w,a);if(pattern==='chain'){launch(w,a-.16);launch(w,a+.16)}}}
  // AUTO-DEPLOY TURRET WEAPONS: every rate/attackSpeed seconds, drop a sentry
  // near the player instead of firing directly. Turret damage/HP/lifetime/cap
@@ -189,7 +190,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false}){
    ctx.globalAlpha=1}
   for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;const grow=Math.min(1,t.born*4);ctx.globalAlpha=t.life<1?Math.max(.2,t.life):1;drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
   for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.kind===kind&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40)ctx.drawImage(e.sprite,Math.round(e.x-e.sprite.width/2),Math.round(e.y-e.sprite.height/2))}}
-  for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>camX-10&&s.x<camX+viewW+10&&s.y>camY-10&&s.y<camY+viewH+10){const x=Math.round(s.x),y=Math.round(s.y);ctx.fillStyle=s.color;if(s.helper){ctx.fillRect(x-7,y-4,14,12);ctx.fillStyle='#fde047';ctx.fillRect(x-9,y-9,18,5)}else{ctx.beginPath();ctx.arc(x,y,s.r,0,7);ctx.fill()}}}
+  for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>camX-28&&s.x<camX+viewW+28&&s.y>camY-28&&s.y<camY+viewH+28)drawProjectile(ctx,s)}
   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(q.active&&q.x>=camX&&q.x<=camX+viewW&&q.y>=camY&&q.y<=camY+viewH){ctx.globalAlpha=Math.max(0,q.life*2);ctx.fillStyle=q.color;ctx.fillRect(Math.round(q.x),Math.round(q.y),3,3)}}ctx.globalAlpha=1;
   for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;ctx.fillStyle=n.crit?'#fde047':'#fff';ctx.font=n.crit?'bold 18px Chivo':'bold 13px Chivo';ctx.fillText(n.value,Math.round(n.x),Math.round(n.y))}
   const px=Math.round(p.x),py=Math.round(p.y);
