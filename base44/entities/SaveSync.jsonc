@@ -1,0 +1,27 @@
+{
+  "name": "SaveSync",
+  "type": "object",
+  "properties": {
+    "data": {
+      "type": "object",
+      "description": "The player's full save blob (progress, unlocks, achievements, settings) for cross-device sync"
+    }
+  },
+  "required": [
+    "data"
+  ],
+  "rls": {
+    "read": {
+      "created_by_id": "{{user.id}}"
+    },
+    "create": {
+      "created_by_id": "{{user.id}}"
+    },
+    "update": {
+      "created_by_id": "{{user.id}}"
+    },
+    "delete": {
+      "created_by_id": "{{user.id}}"
+    }
+  }
+}

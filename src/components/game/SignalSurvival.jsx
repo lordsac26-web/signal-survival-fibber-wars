@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { loadSave, recordRun } from '@/game/storage';
+import { useEffect, useState } from 'react';
+import { loadSave, recordRun, pullCloud } from '@/game/storage';
 import { applyMods, dailySeed } from '@/game/data/generation';
-import { WEAPONS } from '@/game/data/combat'; // NEW: needed to expand starting-weapon ids into full weapon objects
+import { WEAPONS } from '@/game/data/combat';
 import MenuScreen from '@/components/game/MenuScreen';
 import CharacterSelect from '@/components/game/CharacterSelect';
 import GameArena from '@/components/game/GameArena';
@@ -14,35 +14,25 @@ export default function SignalSurvival() {
   const [screen, setScreen] = useState('menu');
   const [save, setSave] = useState(loadSave);
   const [run, setRun] = useState(null);
-  const [unlocked, setUnlocked] = useState(false);
+  const [newUnlocks, setNewUnlocks] = useState([]);
 
-  const start = c => {
-    // WHY THIS CHANGE:
-    // characters.js gives each character's starting loadout as plain string ids,
-    // e.g. start: ['cleaver'] — just a key into the WEAPONS table in combat.js.
-    // Shop-bought weapons (generation.js -> createGenerator().weapon()) are a
-    // completely different shape: a full object with its own damage/rate/range,
-    // a rarity, rolled stat mods, a slotType ('melee' | 'ranged'), etc.
-    //
-    // Before this change, run.weapons held a mix of both shapes at once, and every
-    // place that touched run.weapons (the HUD, the engine, the shop's slot-limit
-    // check) had to carry a `typeof w === 'string' ? lookup : use-as-is` branch to
-    // cope. That's also *why* the Veteran's "max 4 melee / 4 ranged" rule quietly
-    // mishandled starting weapons — string entries had no slotType, so the shop
-    // fell back to guessing from a hardcoded name list instead of checking it properly.
-    //
-    // Fixing it once, here, at the moment a run is created, means every downstream
-    // consumer can assume "a weapon in run.weapons is always a full object" and
-    // the swap-picker UI in ShopScreen.jsx can show real stats for starting weapons
-    // too, not just shop-bought ones.
-    const startingWeapons = c.start.map(id => {
+  // Cross-device/refresh persistence: pull a newer cloud save once on boot.
+  // localStorage is the instant source of truth; the cloud record only wins
+  // when it carries a newer timestamp.
+  useEffect(() => { pullCloud().then(s => { if (s) setSave(s); }); }, []);
+
+  const start = (c, useAlt = false) => {
+    // Expand starting-weapon ids (default or unlocked alternate kit) into full
+    // weapon objects with slotType — the same shape shop weapons have, so
+    // every consumer (HUD, engine, shop slot rules, swap picker) can assume
+    // run.weapons entries are always full objects.
+    const ids = useAlt && c.altStart ? c.altStart : c.start;
+    const startingWeapons = ids.map((id, i) => {
       const base = WEAPONS[id];
       return {
         ...base,
-        baseId: id,                 // matches the field shop weapons use to mean "this is a weapon, not a passive"
-        id: `start-${id}`,          // unique key, mirrors the `w-<n>` / `p-<n>` ids the generator makes up
-        // Same rule generation.js uses: melee-pattern weapons (including chain-whip
-        // types) count as 'melee', everything else counts as 'ranged'.
+        baseId: id,
+        id: `start-${i}-${id}`,
         slotType: ['melee', 'chain'].includes(base.pattern) ? 'melee' : 'ranged'
       };
     });
@@ -56,7 +46,8 @@ export default function SignalSurvival() {
       kills: 0,
       xp: 0,
       pendingLevels: 0,
-      weapons: startingWeapons,     // was: [...c.start]
+      buys: 0,
+      weapons: startingWeapons,
       items: [],
       seed: dailySeed(),
       specialProgress: 0,
@@ -69,9 +60,9 @@ export default function SignalSurvival() {
   const finish = next => {
     setRun(next);
     if (!next.won) {
-      const before = save.unlocked.length, fresh = recordRun(next);
-      setSave(fresh);
-      setUnlocked(fresh.unlocked.length > before);
+      const res = recordRun(next);
+      setSave(res.save);
+      setNewUnlocks(res.newUnlocks);
       setScreen('summary');
     } else if (next.pendingLevels > 0) {
       setScreen('upgrade');
@@ -98,5 +89,5 @@ export default function SignalSurvival() {
   if (screen === 'game') return <GameArena key={run.wave} run={run} onFinish={finish} />;
   if (screen === 'upgrade') return <UpgradeScreen key={`${run.wave}-${run.level}`} run={run} onPick={upgrade} />;
   if (screen === 'shop') return <ShopScreen run={run} onChange={setRun} onContinue={nextWave} />;
-  return <SummaryScreen run={run} newlyUnlocked={unlocked} onMenu={() => setScreen('menu')} onRetry={() => setScreen('select')} />;
+  return <SummaryScreen run={run} newUnlocks={newUnlocks} onMenu={() => setScreen('menu')} onRetry={() => setScreen('select')} />;
 }

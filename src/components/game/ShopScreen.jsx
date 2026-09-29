@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { createGenerator, applyMods, dailySeed, RARITY } from '@/game/data/generation';
 import { sfx } from '@/game/audio';
 import GameButton from '@/components/game/GameButton';
+import StatChips from '@/components/game/StatChips';
 
 export default function ShopScreen({ run, onContinue, onChange }) {
   const gen = useMemo(() => createGenerator(run.seed + run.wave * 7919), []);
@@ -57,11 +58,14 @@ export default function ShopScreen({ run, onContinue, onChange }) {
   // chosen slot (replaceIndex is set, from the picker below).
   const commitPurchase = (item, replaceIndex = null) => {
     let next = applyMods(run, item);
-    next = { ...next, signal: run.signal - item.cost, items: [...(run.items || []), item] };
+    next = { ...next, signal: run.signal - item.cost, items: [...(run.items || []), item], buys: (run.buys || 0) + 1 };
     if (item.baseId) {
       next.weapons = replaceIndex == null
         ? [...run.weapons, item]                                       // normal case: had an open slot
         : run.weapons.map((w, i) => (i === replaceIndex ? item : w));  // swap case: replace that slot in place
+      // peak-count trackers feed the "own 3 melee tools / carry 6 tools" unlocks
+      next.meleePeak = Math.max(run.meleePeak || 0, next.weapons.filter(w => (w.slotType || 'ranged') === 'melee').length);
+      next.toolPeak = Math.max(run.toolPeak || 0, next.weapons.length);
     }
     onChange(next);
     setItems(v => v.filter(x => x !== item));
@@ -108,7 +112,9 @@ export default function ShopScreen({ run, onContinue, onChange }) {
                 <span className="text-4xl">{i.icon}</span>
                 <div className="mt-3 text-xs font-black uppercase" style={{ color: RARITY[i.rarity].color }}>{i.rarity}</div>
                 <h2 className="mt-1 text-lg font-black leading-tight">{i.name}</h2>
-                <p className="mt-2 flex-1 text-sm font-semibold leading-relaxed text-slate-300">{i.desc}{i.special ? ` • ${i.special}` : ''}</p>
+                <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">{i.baseId ? `${i.pattern} tool • ${Math.round(i.damage)} dmg • ${i.rate}s` : 'Passive field gear'}</p>
+                <div className="mt-1 flex-1"><StatChips item={i} /></div>
+                {i.special && <p className="mt-1 text-xs font-bold text-amber-200">{i.special}</p>}
                 <button
                   disabled={run.signal < i.cost}
                   onClick={() => buy(i)}

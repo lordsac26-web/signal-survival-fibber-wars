@@ -1,7 +1,46 @@
-import { Skull, RadioTower, Waves } from 'lucide-react';
+import { HeartPulse, RadioTower, ShoppingCart, Skull, Sparkles, Sword, Waves } from 'lucide-react';
 import GameButton from '@/components/game/GameButton';
 
-export default function SummaryScreen({ run, newlyUnlocked, onMenu, onRetry }) {
-  return <main className="game-grid flex min-h-screen items-center justify-center p-5 text-white"><section className="w-full max-w-xl rounded-3xl border-2 border-rose-400/30 bg-slate-950/75 p-7 text-center shadow-2xl sm:p-10"><p className="font-black uppercase tracking-[.3em] text-rose-300">Shift Terminated</p><h1 className="mt-2 text-4xl font-black uppercase sm:text-5xl">Truck Rolled.</h1><p className="mt-3 text-slate-300">Dispatch says “great effort” in a tone that suggests otherwise.</p>{newlyUnlocked&&<div className="mt-6 rounded-xl border-2 border-amber-300 bg-amber-300/10 p-4 font-black text-amber-200">New technician unlocked in the Field Manual!</div>}<div className="my-8 grid grid-cols-3 gap-2"><Stat icon={<Waves/>} value={run.wave} label="Wave"/><Stat icon={<Skull/>} value={run.kills} label="Repairs"/><Stat icon={<RadioTower/>} value={run.signal} label="Signal"/></div><div className="flex flex-col gap-3 sm:flex-row"><GameButton tone="dark" onClick={onMenu} className="flex-1">Break Room</GameButton><GameButton onClick={onRetry} className="flex-1">Another Shift</GameButton></div></section></main>
+export default function SummaryScreen({ run, newUnlocks = [], onMenu, onRetry }) {
+  return (
+    <main className="game-grid flex min-h-screen items-center justify-center p-5 text-white">
+      <section className="w-full max-w-xl rounded-3xl border-2 border-rose-400/30 bg-slate-950/75 p-7 text-center shadow-2xl sm:p-10">
+        <p className="font-black uppercase tracking-[.3em] text-rose-300">Shift Terminated</p>
+        <h1 className="mt-2 text-4xl font-black uppercase sm:text-5xl">Truck Rolled.</h1>
+        <p className="mt-3 text-slate-300">Dispatch says “great effort” in a tone that suggests otherwise.</p>
+        {newUnlocks.length > 0 && (
+          <div className="mt-5 space-y-2">
+            {newUnlocks.map((u, i) => (
+              <div key={i} className="flex items-center justify-center gap-2 rounded-xl border-2 border-amber-300 bg-amber-300/10 p-3 font-black text-amber-200">
+                <Sparkles className="size-5 shrink-0" />
+                <span className="text-sm sm:text-base">NEW! {u.type === 'technician' ? 'Technician' : u.type === 'toolkit' ? 'Starting toolkit' : 'Achievement'} — {u.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="my-8 grid grid-cols-3 gap-2">
+          <Stat icon={<Waves />} value={run.wave} label="Wave" />
+          <Stat icon={<Skull />} value={run.kills} label="Repairs" />
+          <Stat icon={<RadioTower />} value={run.signal} label="Signal" />
+          <Stat icon={<Sword />} value={run.damageDealt || 0} label="Damage" />
+          <Stat icon={<ShoppingCart />} value={run.buys || 0} label="Bought" />
+          <Stat icon={<HeartPulse />} value={run.healed || 0} label="Healed" />
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <GameButton tone="dark" onClick={onMenu} className="flex-1">Break Room</GameButton>
+          <GameButton onClick={onRetry} className="flex-1">Another Shift</GameButton>
+        </div>
+      </section>
+    </main>
+  );
 }
-function Stat({icon,value,label}){return <div className="rounded-xl bg-slate-900 p-3"><div className="mx-auto mb-1 flex justify-center text-cyan-300">{icon}</div><div className="text-2xl font-black tabular-nums">{value}</div><div className="text-xs font-black uppercase text-slate-400">{label}</div></div>}
+
+function Stat({ icon, value, label }) {
+  return (
+    <div className="rounded-xl bg-slate-900 p-3">
+      <div className="mx-auto mb-1 flex justify-center text-cyan-300">{icon}</div>
+      <div className="text-2xl font-black tabular-nums">{value}</div>
+      <div className="text-xs font-black uppercase text-slate-400">{label}</div>
+    </div>
+  );
+}

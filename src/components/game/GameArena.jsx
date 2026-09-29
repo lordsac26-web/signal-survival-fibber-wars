@@ -25,7 +25,6 @@ export default function GameArena({ run, onFinish }) {
 
   const [hud, setHud] = useState(run);
   const [flash, setFlash] = useState('');
-  const [shake, setShake] = useState(false);
 
   const toggleStats = () => {
     const next = !showStats;
@@ -39,7 +38,7 @@ export default function GameArena({ run, onFinish }) {
       // NEW: Escape (desktop) toggles the stats screen just like the on-screen
       // button does (for touch). Returning immediately means a held movement
       // key doesn't also register on the same keypress that opened the panel.
-      if (k === 'escape') { toggleStats(); return; }
+      if ((k === 'escape' || k === 'tab') && !e.repeat) { e.preventDefault(); toggleStats(); return; }
       if (['arrowup', 'w'].includes(k)) input.current.y = -1;
       if (['arrowdown', 's'].includes(k)) input.current.y = 1;
       if (['arrowleft', 'a'].includes(k)) input.current.x = -1;
@@ -59,8 +58,7 @@ export default function GameArena({ run, onFinish }) {
     const clean = createSignalEngine(canvas.current, run, input, {
       hud: setHud,
       finish: onFinish,
-      flash: t => { setFlash(t); setTimeout(() => setFlash(''), 1400); },
-      shake: () => { setShake(true); setTimeout(() => setShake(false), 120); }
+      flash: t => { setFlash(t); setTimeout(() => setFlash(''), 1400); }
     }, paused);
 
     return () => {
@@ -68,11 +66,10 @@ export default function GameArena({ run, onFinish }) {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <main className={`relative h-screen w-screen overflow-hidden bg-slate-950 ${shake ? 'game-shake' : ''}`}>
+    <main className="relative h-screen w-screen overflow-hidden bg-slate-950">
       <canvas ref={canvas} className="h-full w-full" />
       <GameHUD
         hud={hud}
