@@ -31,6 +31,12 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+    --game-bg: 190 51% 12%;
+    --game-panel: 215 45% 13%;
+    --game-ink: 200 30% 96%;
+    --game-muted: 210 20% 73%;
+    --game-signal: 188 86% 73%;
+    --game-warm: 45 93% 67%;
     --font-heading: "Space Grotesk", ui-sans-serif, sans-serif;
     --font-body: "Chivo", ui-sans-serif, sans-serif;
     --font-display: "Space Grotesk", ui-sans-serif, sans-serif;
@@ -46,6 +52,12 @@
   }
 
   .dark {
+    --game-bg: 190 51% 12%;
+    --game-panel: 215 45% 13%;
+    --game-ink: 200 30% 96%;
+    --game-muted: 210 20% 73%;
+    --game-signal: 188 86% 73%;
+    --game-warm: 45 93% 67%;
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;

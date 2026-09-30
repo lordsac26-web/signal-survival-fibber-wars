@@ -4,7 +4,15 @@
   "properties": {
     "data": {
       "type": "object",
-      "description": "The player's full save blob (progress, unlocks, achievements, settings) for cross-device sync"
+      "description": "Versioned account-bound profile and solo checkpoint; legacy blobs remain readable."
+    },
+    "revision": {
+      "type": "integer",
+      "description": "Optimistic concurrency revision for managed saves"
+    },
+    "commit_id": {
+      "type": "string",
+      "description": "Stable idempotent outbox operation id"
     }
   },
   "required": [

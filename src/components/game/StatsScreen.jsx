@@ -46,7 +46,7 @@ export default function StatsScreen({ run, onClose }) {
                         <dd className="font-black tabular-nums text-white">{formatStat(info.kind, run[key])}</dd>
                       </div>
                       <p className="text-[11px] leading-snug text-slate-400">{info.desc}</p>
-                      {bd.items > 0 && <p className="text-[11px] font-bold text-cyan-200/80">{bd.text}</p>}
+                      <p className="text-[11px] font-bold text-cyan-200/80">{bd.text}</p>
                     </div>
                   );
                 })}
@@ -63,7 +63,7 @@ export default function StatsScreen({ run, onClose }) {
                 <span className="text-2xl">{w.icon}</span>
                 <span>
                   <span className="block font-black leading-tight">{w.name}</span>
-                  <span className="block text-xs text-slate-400">{Math.round(w.damage)} dmg • {w.rate}s cooldown • {w.slotType}</span>
+                  <span className="block text-xs text-slate-400">{w.rarity} • {Math.round(w.damage)} dmg • {w.rate}s cooldown • {w.range} reach • {w.slotType}</span>
                 </span>
               </div>
             ))}
@@ -74,7 +74,7 @@ export default function StatsScreen({ run, onClose }) {
           <p><span className="font-black text-white">Passive — </span>{c.passive}</p>
           <p className="mt-1"><span className="font-black text-white">{c.special.name} — </span>{c.special.desc}</p>
           <p className="mt-1 font-bold text-cyan-200">
-            {run.specialUnlocked ? 'SPECIAL READY — press E' : `${c.special.trigger}: ${Math.floor(run.specialProgress || 0)}/${c.special.goal}`}
+            Granted on selection • E / touch • {Math.ceil(run.specialCooldown || 0)}s remaining / {c.special.cooldown}s cooldown
           </p>
         </div>
 

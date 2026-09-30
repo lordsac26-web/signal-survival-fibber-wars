@@ -2,6 +2,7 @@ import { ArrowLeft, CheckCircle2, LockKeyhole, RadioTower } from 'lucide-react';
 import { CHARACTERS } from '@/game/data/characters';
 import { WEAPON_ARCHETYPES } from '@/game/data/generation';
 import { CHALLENGES, ACHIEVEMENTS, LOADOUTS } from '@/game/data/unlocks';
+import CareerChallenges from '@/components/game/CareerChallenges';
 
 function Bar({ value, goal }) {
   return (
@@ -19,7 +20,7 @@ export default function GalleryScreen({ save, onBack }) {
     <main className="game-grid min-h-screen p-5 text-white sm:p-10">
       <div className="mx-auto max-w-6xl">
         <button onClick={onBack} className="mb-7 flex min-h-11 cursor-pointer items-center gap-2 font-bold text-cyan-100 hover:text-white"><ArrowLeft /> Break Room</button>
-        <h1 className="text-4xl font-black uppercase">Field Manual</h1>
+        <h1 className="text-4xl font-black uppercase">Career Rewards</h1>
         <p className="mt-2 text-slate-300">
           {(save.unlocked || []).length}/{CHARACTERS.length} technicians • {save.totalKills || 0} career repairs • {save.runs || 0} shifts • best haul {save.bestSignal || 0} Signal • {save.deaths || 0} truck rolls
         </p>
@@ -27,7 +28,7 @@ export default function GalleryScreen({ save, onBack }) {
         <h2 className="mt-9 text-xl font-black uppercase text-cyan-200">Technicians</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {CHARACTERS.map(c => {
-            const done = (save.unlocked || []).includes(c.id) || c.id === 'rookie';
+            const done = true;
             const ch = CHALLENGES.find(x => x.id === c.id);
             return (
               <div key={c.id} className="rounded-xl border border-white/10 bg-slate-900/80 p-4">
@@ -41,6 +42,7 @@ export default function GalleryScreen({ save, onBack }) {
           })}
         </div>
 
+        <CareerChallenges save={save}/>
         <h2 className="mt-9 text-xl font-black uppercase text-amber-200">Starting Toolkits</h2>
         <p className="mt-1 text-sm text-slate-400">Career milestones unlock alternate starting loadouts — pick them on the character select screen.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

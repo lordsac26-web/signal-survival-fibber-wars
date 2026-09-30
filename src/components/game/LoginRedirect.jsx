@@ -1,0 +1,2 @@
+import { Navigate, useLocation } from 'react-router-dom';
+export default function LoginRedirect(){const loc=useLocation();return <Navigate to={`/login?returnTo=${encodeURIComponent(loc.pathname+loc.search)}`} replace/>}

@@ -1,5 +1,7 @@
-import SignalSurvival from '@/components/game/SignalSurvival';
-
+import { Link } from 'react-router-dom';
+import SiteNav from '@/components/game/SiteNav';
+import Logo from '@/components/game/Logo';
+import LandingArtwork from '@/components/game/LandingArtwork';
 export default function Home(){
-  return <SignalSurvival/>;
+  return <main className="game-grid min-h-screen px-5 pb-12 font-body text-game-ink sm:px-8"><SiteNav/><section className="mx-auto grid max-w-6xl items-center gap-10 py-10 lg:grid-cols-2 lg:py-20"><div><Logo/><p className="mx-auto mt-8 max-w-lg text-center text-xl leading-relaxed text-game-muted">The job site has gone feral. Dispatch says it’s a quick fix. Dispatch is fibbing.</p><p className="mt-4 text-center font-bold text-game-signal">Eleven characters. One van. Absolutely no sensible bend radius.</p><div className="mt-8 grid gap-3 sm:grid-cols-2"><Link to="/player" className="flex min-h-14 items-center justify-center rounded-xl border-2 border-game-signal bg-game-signal px-5 font-black uppercase text-game-bg">Clock in • Solo</Link><Link to="/multiplayer" className="flex min-h-14 items-center justify-center rounded-xl border-2 border-game-warm/50 bg-game-panel px-5 font-black uppercase text-game-warm">Multiplayer lobby</Link><Link to="/field-guide" className="flex min-h-12 items-center justify-center rounded-xl border border-game-signal/30 px-5 font-bold">How to Play / Field Guide</Link><Link to="/settings" className="flex min-h-12 items-center justify-center rounded-xl border border-game-signal/30 px-5 font-bold">Settings</Link></div><p className="mt-5 text-center text-sm text-game-muted">Read the guide without signing in. Sign in when you enter your player profile. No paywall.</p></div><LandingArtwork/></section><footer className="mx-auto max-w-6xl border-t border-game-signal/20 pt-5 text-center text-sm text-game-muted">Mid-Hudson Fibber: We found the fault. It was probably in the paperwork.</footer></main>;
 }

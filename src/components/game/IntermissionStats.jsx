@@ -1,0 +1,4 @@
+import { STAT_INFO, formatStat, statBreakdown } from '@/game/data/stats';
+export default function IntermissionStats({run}){
+  return <details open className="mt-5 rounded-2xl border border-game-signal/20 bg-game-panel p-4"><summary className="min-h-11 cursor-pointer font-heading text-lg font-bold">Full stat contributions</summary><dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(STAT_INFO).map(([key,info])=><div key={key} className="rounded-lg bg-game-bg p-3"><div className="flex justify-between gap-2 text-sm"><dt className="font-bold">{info.label}</dt><dd className="font-bold text-game-signal">{formatStat(info.kind,run[key])}</dd></div><p className="mt-1 text-xs text-game-muted">{statBreakdown(run,key).text}</p><p className="mt-1 text-xs text-game-muted">{info.desc}</p></div>)}</dl></details>;
+}

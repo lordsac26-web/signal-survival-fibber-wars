@@ -27,11 +27,7 @@ export default function GameArena({ run, onFinish }) {
   const [hud, setHud] = useState(run);
   const [flash, setFlash] = useState('');
 
-  const toggleStats = () => {
-    const next = !showStats;
-    setShowStats(next);
-    paused.current = next;
-  };
+  const toggleStats = () => setShowStats(current => {paused.current=!current;return !current});
 
   useEffect(() => {
     const down = e => {
@@ -96,7 +92,7 @@ export default function GameArena({ run, onFinish }) {
           enough — every stat it needs to display (damage, armor, crit, the
           current weapon loadout, etc.) already lives as plain fields on the
           run object itself; see StatsScreen.jsx for the full breakdown. */}
-      {showStats && <StatsScreen run={run} onClose={toggleStats} />}
+      {showStats && <StatsScreen run={{...run,...hud}} onClose={toggleStats} />}
     </main>
   );
 }

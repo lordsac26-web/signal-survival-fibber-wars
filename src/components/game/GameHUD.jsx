@@ -1,5 +1,6 @@
 import { RadioTower, Skull, Timer, Gauge, ClipboardList } from 'lucide-react';
 import { WEAPONS } from '@/game/data/combat';
+import ProgressMeters from '@/components/game/ProgressMeters';
 
 const weapon = value => typeof value === 'string' ? WEAPONS[value] : value;
 
@@ -21,7 +22,7 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, on
       </div>
       <div className="flex items-start gap-2">
         <div className="space-y-1 rounded-xl bg-slate-950/75 px-3 py-2 text-sm font-black">
-          <div className="flex gap-2 text-cyan-200"><RadioTower className="size-4"/>{hud.signal||0}</div>
+          <div className="flex gap-2 text-cyan-200"><RadioTower className="size-4"/>{Math.round(hud.signal||0)} <span className="sr-only">spendable Signal</span></div>
           <div className="flex gap-2 text-rose-300"><Skull className="size-4"/>{hud.kills||0}</div>
           {hud.stress && <div className="flex gap-2 text-amber-300"><Gauge className="size-4"/>{hud.fps} FPS</div>}
         </div>
@@ -42,6 +43,7 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, on
       </div>
     </div>
     <div className="mt-3 flex justify-center gap-1">{Array.from({length:Math.max(slots,weapons.length)},(_,i)=>{const w=weapon(weapons[i]);return <div key={i} className="flex size-10 items-center justify-center rounded-lg border-2 border-white/20 bg-slate-950/75 text-xl" title={w?.name||'Empty tool slot'}>{w?.icon||'·'}</div>})}</div>
+    <ProgressMeters hud={hud}/>
     {/* Deployable bar: structure counter (deployed/permit cap) + one slot per
         owned deployable with its cooldown + stack level. Clicking a slot
         selects it (the HUD wrapper is pointer-events-none, so slots need

@@ -11,6 +11,12 @@ module.exports = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		colors: {
+            'game-bg': 'hsl(var(--game-bg))',
+            'game-panel': 'hsl(var(--game-panel))',
+            'game-ink': 'hsl(var(--game-ink))',
+            'game-muted': 'hsl(var(--game-muted))',
+            'game-signal': 'hsl(var(--game-signal))',
+            'game-warm': 'hsl(var(--game-warm))',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

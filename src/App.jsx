@@ -7,6 +7,16 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import Home from '@/pages/Home';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import LoginRedirect from '@/components/game/LoginRedirect';
+import Player from '@/pages/Player';
+import FieldGuide from '@/pages/FieldGuide';
+import Settings from '@/pages/Settings';
+import Multiplayer from '@/pages/Multiplayer';
 // Add page imports here
 
 const AuthenticatedApp = () => {
@@ -21,22 +31,25 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // Handle authentication errors
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
-  }
+  // Public landing/guide/settings/auth never redirect. ProtectedRoute owns login.
+  const publicPaths = ['/', '/field-guide', '/settings', '/login', '/register', '/forgot-password', '/reset-password'];
+  if (authError?.type === 'user_not_registered' && !publicPaths.includes(window.location.pathname)) return <UserNotRegisteredError />;
 
   // Render the main app
   return (
     <Routes>
       {/* Add your page Route elements here */}
       <Route path="/" element={<Home />} />
+      <Route path="/field-guide" element={<FieldGuide />} />
+      <Route path="/settings" element={<Settings />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route element={<ProtectedRoute unauthenticatedElement={<LoginRedirect />} />}>
+        <Route path="/player" element={<Player />} />
+        <Route path="/multiplayer" element={<Multiplayer />} />
+      </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

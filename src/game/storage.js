@@ -1,104 +1,76 @@
 import { base44 } from '@/api/base44Client';
-import { CHALLENGES, ACHIEVEMENTS, LOADOUTS } from '@/game/data/unlocks';
-
-// THE save manager: every persistent read/write goes through this module
-// (progress, unlocks, challenges, achievements, per-type kill logs, settings)
-// so future features like daily challenges hook in here instead of adding
-// new storage keys. Same localStorage key as v1 so existing careers survive.
-const KEY = 'signal-survival-save-v1';
-const SETTINGS_KEY = 'signal-survival-audio-v1';
-const FRESH = {
-  version: 3, highWave: 0, highKills: 0, runs: 0, totalKills: 0, deaths: 0, bestSignal: 0,
-  healPeak: 0, meleePeak: 0, toolPeak: 0, noBuyWave: 0,
-  highWaveByCharacter: {}, killsByType: {},
-  unlocked: ['rookie'], achievements: [], loadouts: [], updatedAt: 0
-};
-
-export function loadSave() {
-  try {
-    const old = JSON.parse(localStorage.getItem(KEY)) || {};
-    const save = {
-      ...FRESH, ...old,
-      unlocked: Array.isArray(old.unlocked) ? old.unlocked : ['rookie'],
-      achievements: Array.isArray(old.achievements) ? old.achievements : [],
-      loadouts: Array.isArray(old.loadouts) ? old.loadouts : [],
-      highWaveByCharacter: old.highWaveByCharacter || {},
-      killsByType: old.killsByType || {}
-    };
-    if (!save.unlocked.includes('rookie')) save.unlocked.unshift('rookie');
-    return save;
-  } catch { return { ...FRESH }; }
+import { freshProfile, migrateProfile, completeRun } from '@/game/progression/profileModel';
+import { normalizeRun } from '@/game/progression/runRules';
+import { appendSample } from '@/game/data/balanceAudit';
+const LEGACY='signal-survival-save-v1', AUDIO='signal-survival-audio-v1', CLAIM='signal-survival-legacy-owner';
+const key=id=>`signal-survival-v4:${id}`;
+const listeners=new Set();let epoch=0,inFlight=false;
+let state={ownerId:null,profile:freshProfile(),status:'loading',revision:0,dirty:false,commitId:null,conflict:null,error:'',legacyPending:false};
+const emit=patch=>{state={...state,...patch};listeners.forEach(fn=>fn())};
+export const subscribeSave=fn=>{listeners.add(fn);return()=>listeners.delete(fn)};
+export const getSaveState=()=>state;
+export const loadSave=()=>state.profile;
+function cache(){localStorage.setItem(key(state.ownerId),JSON.stringify({ownerId:state.ownerId,profile:state.profile,revision:state.revision,dirty:state.dirty,commitId:state.commitId,sentCommitId:state.sentCommitId}))}
+function readable(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}}
+export async function bindProfile(ownerId){
+  const token=++epoch,stored=readable(key(ownerId));
+  const valid=stored?.ownerId===ownerId;
+  emit({ownerId,profile:migrateProfile(valid?stored.profile:{}),revision:valid?stored.revision:0,dirty:valid?stored.dirty:false,commitId:valid?stored.commitId:null,sentCommitId:valid?stored.sentCommitId:null,status:'loading',conflict:null,error:'',legacyPending:!!readable(LEGACY)&&!localStorage.getItem(CLAIM)});
+  try{
+    const {data:cloud}=await base44.functions.invoke('playerProfile',{action:'load'});
+    if(token!==epoch)return;
+    if(cloud.data?.ownerId && cloud.data.ownerId!==ownerId)throw new Error('Cloud profile owner mismatch');
+    if(state.dirty && cloud.commitId===state.commitId)emit({revision:cloud.revision,dirty:false});
+    else if(state.dirty && cloud.commitId && cloud.commitId===state.sentCommitId)emit({revision:cloud.revision});
+    if(state.dirty && cloud.revision!==state.revision){emit({status:'conflict',conflict:{profile:migrateProfile(cloud.data || {}),revision:cloud.revision}});return}
+    if(!state.dirty)emit({profile:migrateProfile(cloud.data || (valid?stored.profile:{})),revision:cloud.revision});
+    emit({status:state.dirty?'saving':'saved'});cache();
+    if(cloud.data?.version!==4 && !state.dirty)updateProfile(p=>p);
+    if(state.dirty)await retrySave();
+  }catch(error){if(token===epoch)emit({status:navigator.onLine?'error':'offline',error:error.message})}
 }
-
-function persist(save) {
-  save.updatedAt = Date.now();
-  localStorage.setItem(KEY, JSON.stringify(save));
+export function unbindProfile(ownerId){if(state.ownerId===ownerId){epoch++;emit({ownerId:null,profile:freshProfile(),status:'loading',dirty:false,conflict:null})}}
+export function updateProfile(update){
+  if(!state.ownerId || state.status==='loading' || state.conflict)throw new Error('Resolve or load your profile first');
+  const profile=migrateProfile(typeof update==='function'?update(state.profile):update);profile.ownerId=state.ownerId;profile.updatedAt=Date.now();
+  emit({profile,dirty:true,commitId:crypto.randomUUID(),error:'',status:navigator.onLine?'saving':'offline'});
+  try{cache()}catch(error){emit({status:'error',error:`Local save failed: ${error.message}`});return}
+  void retrySave();
 }
-
-// Called once per completed run (on death). Merges the run into the career
-// save, evaluates every challenge/achievement/loadout unlock, and returns the
-// new save plus a list of this run's NEW unlocks for the summary screen.
-export function recordRun(run) {
-  const save = loadSave();
-  const next = { ...save,
-    runs: (save.runs || 0) + 1,
-    totalKills: (save.totalKills || 0) + (run.kills || 0),
-    deaths: (save.deaths || 0) + (run.hp <= 0 ? 1 : 0),
-    highWave: Math.max(save.highWave || 0, run.wave || 0),
-    highKills: Math.max(save.highKills || 0, run.kills || 0),
-    bestSignal: Math.max(save.bestSignal || 0, run.signal || 0),
-    healPeak: Math.max(save.healPeak || 0, run.healed || 0),
-    meleePeak: Math.max(save.meleePeak || 0, run.meleePeak || 0, (run.weapons || []).filter(w => w.slotType === 'melee').length),
-    toolPeak: Math.max(save.toolPeak || 0, run.toolPeak || 0, (run.weapons || []).length),
-    noBuyWave: (run.buys || 0) === 0 ? Math.max(save.noBuyWave || 0, run.wave || 0) : (save.noBuyWave || 0),
-    highWaveByCharacter: { ...save.highWaveByCharacter, [run.character.id]: Math.max(save.highWaveByCharacter?.[run.character.id] || 0, run.wave || 0) },
-    killsByType: { ...save.killsByType }
-  };
-  for (const [kind, n] of Object.entries(run.killsByType || {})) next.killsByType[kind] = (next.killsByType[kind] || 0) + n;
-
-  const newUnlocks = [];
-  next.unlocked = [...save.unlocked];
-  for (const ch of CHALLENGES) if (!next.unlocked.includes(ch.id) && ch.check(next, run)) { next.unlocked.push(ch.id); newUnlocks.push({ type: 'technician', label: ch.name }); }
-  next.achievements = [...save.achievements];
-  for (const a of ACHIEVEMENTS) if (!next.achievements.includes(a.id) && a.check(next)) { next.achievements.push(a.id); newUnlocks.push({ type: 'achievement', label: a.name }); }
-  next.loadouts = [...save.loadouts];
-  for (const l of LOADOUTS) if (!next.loadouts.includes(l.id) && l.check(next)) { next.loadouts.push(l.id); newUnlocks.push({ type: 'toolkit', label: `${l.charName} — ${l.tools}` }); }
-
-  persist(next);
-  syncCloud(next);
-  return { save: next, newUnlocks };
+export async function retrySave(){
+  if(inFlight || !state.ownerId || state.conflict)return;
+  if(!state.dirty){await bindProfile(state.ownerId);return}
+  if(!navigator.onLine){emit({status:'offline'});return}
+  inFlight=true;const token=epoch,ownerId=state.ownerId,commitId=state.commitId;
+  try{
+    emit({status:'saving',sentCommitId:commitId});cache();
+    const {data:res}=await base44.functions.invoke('playerProfile',{action:'save',data:state.profile,baseRevision:state.revision,commitId});
+    if(token!==epoch || ownerId!==state.ownerId)return;
+    if(res.conflict){emit({status:'conflict',conflict:{profile:migrateProfile(res.data),revision:res.revision}});return}
+    emit({revision:res.revision,dirty:state.commitId!==commitId,status:state.commitId===commitId?'saved':'saving'});cache();
+  }catch(error){if(token===epoch)emit({status:navigator.onLine?'error':'offline',error:error.message})}
+  finally{inFlight=false;if(state.ownerId && state.dirty && state.status==='saving')void retrySave()}
 }
-
-// ---- optional cross-device sync via the SaveSync entity (owner-only RLS) ----
-// Fully best-effort: localStorage remains the source of truth; if the player
-// isn't signed in (or is offline) these calls silently no-op.
-let syncing = false;
-export async function syncCloud(save) {
-  if (syncing) return;
-  syncing = true;
-  try {
-    const list = await base44.entities.SaveSync.list('-updated_date', 5);
-    if (list && list.length) await base44.entities.SaveSync.update(list[0].id, { data: save });
-    else await base44.entities.SaveSync.create({ data: save });
-  } catch { /* not signed in / offline — local save still valid */ }
-  syncing = false;
+export function resolveConflict(choice){
+  const remote=state.conflict;if(!remote)return;
+  emit({conflict:null,revision:remote.revision,profile:choice==='cloud'?remote.profile:state.profile,dirty:choice!=='cloud',status:choice==='cloud'?'saved':'saving',commitId:crypto.randomUUID()});
+  cache();if(choice!=='cloud')void retrySave();
 }
-
-export async function pullCloud() {
-  try {
-    const list = await base44.entities.SaveSync.list('-updated_date', 5);
-    const rec = list && list[0];
-    const local = loadSave();
-    if (rec?.data && (rec.data.updatedAt || 0) > (local.updatedAt || 0)) { persist(rec.data); return rec.data; }
-  } catch { /* ignore */ }
-  return null;
+export function importLegacy(){
+  if(localStorage.getItem(CLAIM))return;
+  const legacy=readable(LEGACY);if(!legacy)return;
+  updateProfile({...migrateProfile(legacy),settings:readable(AUDIO) || state.profile.settings});
+  localStorage.setItem(CLAIM,state.ownerId);emit({legacyPending:false});
 }
-
-// ---- settings (audio.js persists through here so it's all one save manager) ----
-export function loadSettings() {
-  try { return { muted: false, volume: .55, ...JSON.parse(localStorage.getItem(SETTINGS_KEY)) }; }
-  catch { return { muted: false, volume: .55 }; }
+export function declineLegacy(){localStorage.setItem(CLAIM,'declined');emit({legacyPending:false})}
+export function saveCheckpoint(run,phase){
+  const validated=normalizeRun(run);if(!validated)throw new Error('Invalid solo checkpoint');
+  validated.checkpointId=`${validated.runId}:${validated.wave}:${phase}:${validated.shop?.sequence || 0}:${validated.buys}:${validated.level}`;
+  updateProfile(p=>({...p,checkpoint:{checkpointId:validated.checkpointId,phase,run:validated},balanceSamples:appendSample(p,validated),selectedCharacter:validated.character.id,selectedLoadouts:{...p.selectedLoadouts,[validated.character.id]:!!validated.useAlt},discoveredTools:[...new Set([...p.discoveredTools,...validated.weapons.map(w=>w.baseId)])]}));
+  return validated;
 }
-export function saveSettings(next) {
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-}
+export function recordRun(run){const result=completeRun(state.profile,run);updateProfile(result.save);return result}
+export function loadSettings(){return state.ownerId?state.profile.settings:{muted:false,volume:.55,...readable(AUDIO)}}
+export function saveSettings(next){if(state.ownerId && state.status!=='loading')updateProfile(p=>({...p,settings:next}));else localStorage.setItem(AUDIO,JSON.stringify(next))}
+window.addEventListener('online',()=>{if(state.ownerId)void retrySave()});
+window.addEventListener('storage',event=>{if(state.ownerId && event.key===key(state.ownerId)){const other=readable(event.key);if(other?.commitId!==state.commitId)emit({status:'conflict',conflict:{profile:migrateProfile(other.profile),revision:other.revision},error:'Another tab changed this profile; choose which copy to keep.'})}});

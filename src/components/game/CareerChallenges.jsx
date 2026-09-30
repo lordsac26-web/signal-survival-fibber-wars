@@ -1,0 +1,4 @@
+import { CHALLENGES } from '@/game/data/unlocks';
+export default function CareerChallenges({save}) {
+  return <section className="mt-8"><h2 className="text-xl font-bold uppercase text-game-warm">Career challenge badges</h2><p className="mt-2 text-sm text-game-muted">Non-character rewards. Every technician is already available.</p><div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{CHALLENGES.map(c=>{const done=(save.challenges || []).includes(c.id);return <article key={c.id} className="rounded-xl border border-game-signal/20 bg-game-panel p-4"><b>{c.name}</b><p className="mt-2 text-sm text-game-muted">{c.desc}</p><p className="mt-2 font-bold text-game-signal">{done?'Earned':`${c.progress(save)} / ${c.goal}`}</p></article>})}</div></section>;
+}
