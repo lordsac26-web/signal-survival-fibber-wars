@@ -11,8 +11,9 @@ export function updateSpriteAnimation(state,dx,dy,dt,definition){
 export function drawCharacterSprite(ctx,art,state,x,y){
   const d=art.definition,size=d.worldSize;
   const row=!state.moving && state.facing==='down'?d.idleRow:d.directions[state.facing];
-  ctx.imageSmoothingEnabled=false;
+  const previousSmoothing=ctx.imageSmoothingEnabled;ctx.imageSmoothingEnabled=false;
   // Player world/collision center is the foot anchor; rounding error is at most half a unit.
   ctx.drawImage(state.hurt>0?art.hurt:art.atlas,state.frame*d.cell,row,d.cell,d.cell,
     Math.round(x-size*d.anchorX),Math.round(y-size*d.anchorY),size,size);
+  ctx.imageSmoothingEnabled=previousSmoothing;
 }

@@ -9,6 +9,11 @@ export const RANGE_PROFILES={
   // Named exception: Full Trace may exceed normal 42–44% reach, max 60%.
   trace:{base:.40,cap:.60,reference:700}
 };
+export const SIGNATURE_RANGE_WEAPONS={
+  callback:{range:300,rangeProfile:'callback'},clause:{range:260,rangeProfile:'clause'},
+  deepclean:{range:260,rangeProfile:'deepclean'},frenzy:{range:120,rangeProfile:'frenzy'},
+  trace:{range:700,rangeProfile:'trace'},fortify:{range:340,pattern:'turret'},crew:{range:280,pattern:'turret'}
+};
 export function rangeProfile(weapon){
   if(weapon.rangeProfile)return weapon.rangeProfile;
   if(weapon.turret || weapon.pattern==='turret')return 'turret';

@@ -3,6 +3,7 @@ import { CHARACTERS } from '@/game/data/characters';
 import { WEAPON_ARCHETYPES } from '@/game/data/generation';
 import { CHALLENGES, ACHIEVEMENTS, LOADOUTS } from '@/game/data/unlocks';
 import CareerChallenges from '@/components/game/CareerChallenges';
+import OraclePortrait from '@/components/game/OraclePortrait';
 
 function Bar({ value, goal }) {
   return (
@@ -33,7 +34,7 @@ export default function GalleryScreen({ save, onBack }) {
             return (
               <div key={c.id} className="rounded-xl border border-white/10 bg-slate-900/80 p-4">
                 <div className="flex items-center gap-3">
-                  {done ? <RadioTower className="shrink-0 text-cyan-300" /> : <LockKeyhole className="shrink-0 text-slate-500" />}
+                  {c.id==='oracle'?<OraclePortrait name={c.name}/>:done ? <RadioTower className="shrink-0 text-cyan-300" /> : <LockKeyhole className="shrink-0 text-slate-500" />}
                   <div><b>{c.name}</b><p className="text-sm text-slate-400">{done ? `${c.passive} • ${c.special.name}` : ch.desc}</p></div>
                 </div>
                 {!done && <div className="mt-3"><Bar value={ch.progress(save)} goal={ch.goal} /></div>}

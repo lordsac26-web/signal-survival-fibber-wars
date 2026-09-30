@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import GameButton from '@/components/game/GameButton';
 import { STAT_INFO, formatStat, statBreakdown } from '@/game/data/stats';
+import { effectiveRange, rangeLabel } from '@/game/combat/effectiveRange';
 
 // The in-run character panel (Esc / Tab / clipboard button). Every row shows
 // the CURRENT value, a plain-language description of what the stat does, and —
@@ -63,7 +64,7 @@ export default function StatsScreen({ run, onClose }) {
                 <span className="text-2xl">{w.icon}</span>
                 <span>
                   <span className="block font-black leading-tight">{w.name}</span>
-                  <span className="block text-xs text-slate-400">{w.rarity} • {Math.round(w.damage)} dmg • {w.rate}s cooldown • {w.range} reach • {w.slotType}</span>
+                  <span className="block text-xs text-slate-400">{w.rarity} • {Math.round(w.damage)} dmg • {w.rate}s cooldown • {run.viewport?rangeLabel(effectiveRange(w,run,run.viewport),run.viewport):`${w.range} reach rating (viewport scaled)`} • {w.slotType}</span>
                 </span>
               </div>
             ))}

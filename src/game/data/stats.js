@@ -10,7 +10,7 @@ export const STAT_INFO = {
   damage: { label: 'Damage', kind: 'multiplier', desc: 'Hit damage = base × Damage × (crit ? 2 : 1) × (1 + 0.004 × Splice Quality); dirty foes additionally × (1 + 0.01 × Cleanliness).' },
   attackSpeed: { label: 'Attack Speed', kind: 'multiplier', desc: 'Tool interval = base seconds / Attack Speed. Pedestal and Frenzy multiply speed further; deployed turrets use their own fire interval.' },
   crit: { label: 'Crit Chance', kind: 'percent', desc: 'Chance for a hit to deal double damage; capped at 100%.' },
-  range: { label: 'Range', kind: 'multiplier', desc: 'Reach = base map units × Range. Projectile lifetime = reach / speed. Area-tool radius uses the same multiplier.' },
+  range: { label: 'Reach modifier', kind: 'multiplier', desc: 'Applied once to viewport-derived tool reach. Gear +0.03 adds 3 percentage points to the character factor (Oracle 1.35 → 1.38). Weapon reach ratings scale family/quality, not absolute distance. Normal ranged caps: 42% of the shorter visible side, Oracle 44%; melee 18%. Combat HUD shows actual world units. Flat bonuses, if present, add world units before the cap. Projectile distance freezes at launch; DPI never changes reach.' },
   knockback: { label: 'Knockback', kind: 'flat', desc: 'Critical hits move impairments away by 8 map units per point (plus rolled critical-knockback bonuses).' },
   pierce: { label: 'Pierce', kind: 'flat', desc: 'Normal shots penetrate round(Pierce) additional targets; inherently piercing pulses already penetrate all targets in their travel lifetime.' },
   armor: { label: 'Jacket Protection', kind: 'flat', desc: 'Contact damage = max(2, enemy damage − 1.5 × Armor) × (1 − min(40%, 0.3% × Signal Integrity)).' },

@@ -1,6 +1,7 @@
 import { RadioTower, Skull, Timer, Gauge, ClipboardList } from 'lucide-react';
 import { WEAPONS } from '@/game/data/combat';
 import ProgressMeters from '@/components/game/ProgressMeters';
+import RangeReadout from '@/components/game/RangeReadout';
 
 const weapon = value => typeof value === 'string' ? WEAPONS[value] : value;
 
@@ -42,7 +43,8 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, on
         )}
       </div>
     </div>
-    <div className="mt-3 flex justify-center gap-1">{Array.from({length:Math.max(slots,weapons.length)},(_,i)=>{const w=weapon(weapons[i]);return <div key={i} className="flex size-10 items-center justify-center rounded-lg border-2 border-white/20 bg-slate-950/75 text-xl" title={w?.name||'Empty tool slot'}>{w?.icon||'·'}</div>})}</div>
+    <div className="mt-3 flex justify-center gap-1">{Array.from({length:Math.max(slots,weapons.length)},(_,i)=>{const w=weapon(weapons[i]);return <div key={i} className="flex size-10 items-center justify-center rounded-lg border-2 border-white/20 bg-slate-950/75 text-xl" title={w?`${w.name}${hud.weaponRanges?.[i]!=null?` — ${hud.weaponRanges[i].toFixed(1)} world units`:''}`:'Empty tool slot'}>{w?.icon||'·'}</div>})}</div>
+    <RangeReadout hud={hud}/>
     <ProgressMeters hud={hud}/>
     {/* Deployable bar: structure counter (deployed/permit cap) + one slot per
         owned deployable with its cooldown + stack level. Clicking a slot

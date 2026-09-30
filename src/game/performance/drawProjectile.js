@@ -13,13 +13,14 @@ export function drawProjectile(ctx, shot) {
     ctx.fillStyle = '#fff4df';ctx.beginPath();ctx.arc(x - 2, y - 2, 3, 0, 7);ctx.fill();
     return;
   }
-  const length = shot.pierce || shot.pattern === 'beam' ? 21 : 13;
+  const length = Math.min(shot.traveled ?? Infinity,shot.pierce || shot.pattern === 'beam' ? 21 : 13);
+  const front = Math.min(4,shot.remaining ?? 4);
   const speed = Math.hypot(shot.vx, shot.vy) || 1;
   const dx = shot.vx / speed, dy = shot.vy / speed;
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#10232e';ctx.lineWidth = shot.pierce ? 9 : 7;
-  ctx.beginPath();ctx.moveTo(x - dx * length, y - dy * length);ctx.lineTo(x + dx * 4, y + dy * 4);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x - dx * length, y - dy * length);ctx.lineTo(Math.round(x + dx * front), Math.round(y + dy * front));ctx.stroke();
   ctx.strokeStyle = shot.color;ctx.lineWidth = shot.pierce ? 6 : 4;
-  ctx.beginPath();ctx.moveTo(x - dx * length, y - dy * length);ctx.lineTo(x + dx * 4, y + dy * 4);ctx.stroke();
-  ctx.fillStyle = '#ffffff';ctx.beginPath();ctx.arc(x + dx * 4, y + dy * 4, shot.pierce ? 3 : 2.5, 0, 7);ctx.fill();
+  ctx.beginPath();ctx.moveTo(x - dx * length, y - dy * length);ctx.lineTo(Math.round(x + dx * front), Math.round(y + dy * front));ctx.stroke();
+  ctx.fillStyle = '#ffffff';ctx.beginPath();ctx.arc(Math.round(x + dx * front), Math.round(y + dy * front), shot.pierce ? 3 : 2.5, 0, 7);ctx.fill();
 }
