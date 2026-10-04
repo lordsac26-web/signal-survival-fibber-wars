@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createSignalEngine } from '@/game/signalEngine';
-import { preloadCharacterSprite, preloadEnemySprite } from '@/game/art/spriteLoader';
+import { preloadCharacterSprite, preloadEnemySprite, preloadStructureSprite } from '@/game/art/spriteLoader';
 import GameHUD from '@/components/game/GameHUD';
 import TouchControls from '@/components/game/TouchControls';
 import SpecialButton from '@/components/game/SpecialButton';
@@ -60,14 +60,15 @@ export default function GameArena({ run, onFinish }) {
     // CHANGED: `paused` ref is now the 5th argument to createSignalEngine —
     // see signalEngine.js for what it does inside the loop.
     let disposed=false,clean=null;
-    // Character art (Oracle) and the Lag Sprite enemy art load in parallel;
-    // every run needs the Lag Sprite, so a failure blocks start with a retry.
-    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag')]).then(([art,lagArt])=>{
+    // Character art (Oracle), the Lag Sprite enemy art, and the Bucket-Truck
+    // turret art load in parallel; every run needs the Lag Sprite and the shop
+    // can grant the truck mid-run, so a failure blocks start with a retry.
+    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket')]).then(([art,lagArt,truckArt])=>{
       if(disposed)return;
       clean=createSignalEngine(canvas.current,run,input,{
         hud:setHud,reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,
         flash:t=>{setFlash(t);setTimeout(()=>setFlash(''),1400)}
-      },paused,art,lagArt);
+      },paused,art,lagArt,truckArt);
       setArtStatus('');
     }).catch(error=>{if(!disposed)setArtStatus(error.message)});
 

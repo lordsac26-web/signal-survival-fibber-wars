@@ -1,0 +1,51 @@
+{
+  "structureId": "bucket_truck_turret",
+  "tileWidth": 230,
+  "tileHeight": 190,
+  "rightEdgeAnchorX": 210,
+  "groundBaselineY": 174,
+  "frames": [
+    {
+      "name": "pose_a",
+      "x": 0,
+      "y": 0,
+      "w": 230,
+      "h": 190
+    },
+    {
+      "name": "pose_b",
+      "x": 230,
+      "y": 0,
+      "w": 230,
+      "h": 190
+    },
+    {
+      "name": "pose_c",
+      "x": 460,
+      "y": 0,
+      "w": 230,
+      "h": 190
+    }
+  ],
+  "animation": {
+    "type": "idle_cycle",
+    "order": [
+      "pose_a",
+      "pose_b",
+      "pose_c"
+    ],
+    "fps": 1.5,
+    "description": "The 3 source renders are near-duplicate poses of the same truck (not a real sweep/angle sequence) -- cycle slowly between them for a subtle idle \"settle\" rather than claiming a dramatic aim animation."
+  },
+  "source": "User-provided FIBERNET bucket-truck sheet (JPG, checkerboard background). Used the 3 large row-1 renders only; rows 2-4 (16 smaller variants) left unused.",
+  "cleanup": [
+    "Background removed via border flood-fill through grayscale pixels only.",
+    "Despeckle kept every connected component >=60px (not a single \"largest blob\"), so the boom-to-body connector was never at risk of being dropped -- verified all 3 frames keep the full truck+arm intact.",
+    "No per-frame rescaling applied: all 3 source renders are already the same real-world scale (verified visually), so resizing was skipped to avoid introducing distortion from unreliable auto-measurement.",
+    "Alignment anchors the sprite's rear-bumper edge (rightmost opaque pixel) to a fixed tile x, and the wheel-contact point (lowest opaque pixel) to a fixed tile y, in every frame."
+  ],
+  "notes": [
+    "Turret/structure sprite for the Bucket-Truck Boss signature + deployable -- static vehicle art, no walk cycle.",
+    "Honest limitation: the 3 renders are compositional variations, not a hand-drawn boom-sweep animation, so do not market this as a dynamic aim/tracking animation -- it is a mild idle cycle for visual life."
+  ]
+}

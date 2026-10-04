@@ -1,4 +1,4 @@
-import { characterSprite, enemySpriteDef } from '@/game/art/characterSprites';
+import { characterSprite, enemySpriteDef, structureSpriteDef } from '@/game/art/characterSprites';
 const cache=new Map();
 function image(url,width,height){return new Promise((resolve,reject)=>{
   const img=new globalThis.Image();
@@ -13,11 +13,11 @@ function hurtAtlas(atlas,width,height,tint){const hurt=document.createElement('c
 function preloadSprite(definition){
   if(!definition)return Promise.resolve(null);
   if(cache.has(definition))return cache.get(definition);
-  const atlasW=definition.atlasW ?? definition.width,atlasH=definition.atlasH ?? definition.height,portraitSize=definition.portraitSize||256;
+  const atlasW=definition.atlasW ?? definition.width,atlasH=definition.atlasH ?? definition.height,portraitSize=definition.portraitSize||256,portraitW=definition.portraitW||portraitSize,portraitH=definition.portraitH||portraitSize;
   const spec=definition.manifestSpec || {columns:definition.columns,rows:definition.rows,frameWidth:definition.cell,frameHeight:definition.cell,'anchor.y':definition.anchorY};
   const promise=Promise.all([
     image(definition.atlas,atlasW,atlasH),
-    image(definition.portrait,portraitSize,portraitSize),
+    image(definition.portrait,portraitW,portraitH),
     fetch(definition.manifest).then(r=>{if(!r.ok)throw new Error(`Sprite manifest HTTP ${r.status}`);return r.json()})
   ]).then(async([atlas,portrait,manifest])=>{
     if(!matches(manifest,spec))throw new Error('Sprite manifest does not match atlas');
@@ -30,3 +30,4 @@ function preloadSprite(definition){
 }
 export const preloadCharacterSprite=id=>preloadSprite(characterSprite(id));
 export const preloadEnemySprite=kind=>preloadSprite(enemySpriteDef(kind));
+export const preloadStructureSprite=id=>preloadSprite(structureSpriteDef(id));
