@@ -14,18 +14,20 @@ const file=path=>readFileSync(new URL('../../../public'+path,import.meta.url));
 const bytesOf=path=>file(path);
 
 test('actual Bucket-Truck public PNGs decode at exact sizes; local copies match uploaded bytes; manifest anchors verified',async()=>{
-  for(const [key,width,height] of [['atlas',690,190],['portrait',234,204]]){
+  for(const [key,width,height,local] of [['atlas',690,190,'atlas'],['icon',234,204,'portrait']]){
     const response=await fetch(def.sources[key],{signal:AbortSignal.timeout(30000)});assert.equal(response.status,200);
     const bytes=Buffer.from(await response.arrayBuffer()),decoded=decodePng(bytes);
     assert.equal(decoded.width,width);assert.equal(decoded.height,height);
-    assert.equal(createHash('sha256').update(bytesOf(def[key])).digest('hex'),createHash('sha256').update(bytes).digest('hex'));
+    assert.equal(createHash('sha256').update(bytesOf(def[local])).digest('hex'),createHash('sha256').update(bytes).digest('hex'));
     assert(decoded.rgba.some((v,i)=>i%4===3 && v===0));assert(decoded.rgba.some((v,i)=>i%4===3 && v>200));
     console.log('BUCKETTRUCK_IMAGE_EVIDENCE',JSON.stringify({key,http:response.status,width,height,bytes:bytes.length,decoded:true}));
   }
-  const m=JSON.parse(bytesOf(def.manifest));
+  const mResponse=await fetch(def.sources.manifest,{signal:AbortSignal.timeout(30000)});assert.equal(mResponse.status,200);
+  const mBytes=Buffer.from(await mResponse.arrayBuffer());
+  assert.equal(createHash('sha256').update(bytesOf(def.manifest)).digest('hex'),createHash('sha256').update(mBytes).digest('hex'));
+  const m=JSON.parse(mBytes);
   for(const [key,expected] of Object.entries(def.manifestSpec)){const actual=key.split('.').reduce((o,p)=>o?.[p],m);assert.equal(actual,expected,key)}
   assert.equal(m.frames.length,3);assert.deepEqual(m.frames.map(f=>f.x),[0,230,460]);
-  assert.equal(createHash('sha256').update(bytesOf(def.manifest)).digest('hex'),createHash('sha256').update(Buffer.from(JSON.stringify(m))).digest('hex'));
 });
 
 test('engine wiring references the real atlas for turretMount + the Boss signature, keeping placeholders elsewhere',()=>{
