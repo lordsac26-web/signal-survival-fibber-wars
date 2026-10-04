@@ -1,0 +1,122 @@
+{
+  "enemyId": "lag_sprite",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.90625
+  },
+  "movementAtlas": {
+    "columns": 6,
+    "rows": 2,
+    "layout": "row0=idle/front bob, row1=side walk"
+  },
+  "attackAtlas": {
+    "columns": 2,
+    "rows": 1,
+    "layout": "col0=front attack swipe, col1=side attack swipe"
+  },
+  "fps": 8,
+  "animations": {
+    "idle": [
+      {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 64,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 128,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 192,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 256,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 320,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      }
+    ],
+    "side": [
+      {
+        "x": 0,
+        "y": 64,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 64,
+        "y": 64,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 128,
+        "y": 64,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 192,
+        "y": 64,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 256,
+        "y": 64,
+        "w": 64,
+        "h": 64
+      },
+      {
+        "x": 320,
+        "y": 64,
+        "w": 64,
+        "h": 64
+      }
+    ],
+    "attack_front": [
+      {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      }
+    ],
+    "attack_side": [
+      {
+        "x": 64,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      }
+    ]
+  },
+  "source": "User-provided Lag Sprite sheet (JPG with checkerboard background removed via border flood-fill)",
+  "notes": [
+    "Background removed via flood-fill from image border through grayscale pixels only; eyes/highlights inside the body were preserved.",
+    "Single shared scale factor computed from the largest raw frame bounding box; all frames share this scale (no per-frame distortion).",
+    "Opaque foot baseline aligned to y=58 in every 64x64 cell, matching the Oracle anchor convention (x=.5, y=58/64).",
+    "Column 6 in both rows is a distinct attack-swipe pose, split into its own attack atlas rather than mixed into the walk/idle loop.",
+    "In-game animation smoothness and side-view facing direction need visual QA; not verified from metadata alone."
+  ]
+}

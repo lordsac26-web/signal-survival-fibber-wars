@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createSignalEngine } from '@/game/signalEngine';
-import { preloadCharacterSprite } from '@/game/art/spriteLoader';
+import { preloadCharacterSprite, preloadEnemySprite } from '@/game/art/spriteLoader';
 import GameHUD from '@/components/game/GameHUD';
 import TouchControls from '@/components/game/TouchControls';
 import SpecialButton from '@/components/game/SpecialButton';
@@ -27,7 +27,7 @@ export default function GameArena({ run, onFinish }) {
 
   const [hud, setHud] = useState(run);
   const [flash, setFlash] = useState('');
-  const [artStatus,setArtStatus]=useState(run.character.id==='oracle'?'loading':'');
+  const [artStatus,setArtStatus]=useState('loading');
   const [artAttempt,setArtAttempt]=useState(0);
 
   const toggleStats = () => setShowStats(current => {paused.current=!current;return !current});
@@ -60,13 +60,14 @@ export default function GameArena({ run, onFinish }) {
     // CHANGED: `paused` ref is now the 5th argument to createSignalEngine —
     // see signalEngine.js for what it does inside the loop.
     let disposed=false,clean=null;
-    if(run.character.id==='oracle')setArtStatus('loading');
-    preloadCharacterSprite(run.character.id).then(art=>{
+    // Character art (Oracle) and the Lag Sprite enemy art load in parallel;
+    // every run needs the Lag Sprite, so a failure blocks start with a retry.
+    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag')]).then(([art,lagArt])=>{
       if(disposed)return;
       clean=createSignalEngine(canvas.current,run,input,{
         hud:setHud,reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,
         flash:t=>{setFlash(t);setTimeout(()=>setFlash(''),1400)}
-      },paused,art);
+      },paused,art,lagArt);
       setArtStatus('');
     }).catch(error=>{if(!disposed)setArtStatus(error.message)});
 
@@ -80,7 +81,7 @@ export default function GameArena({ run, onFinish }) {
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-slate-950">
       <canvas ref={canvas} className="h-full w-full" />
-      {artStatus && <div className="absolute inset-0 z-30 flex items-center justify-center bg-game-bg/95 p-6 text-game-ink"><div role={artStatus==='loading'?'status':'alert'} className="max-w-lg text-center"><p>{artStatus==='loading'?'Loading Oracle movement atlas and portrait…':`Oracle art could not start: ${artStatus}`}</p>{artStatus!=='loading' && <button className="mt-4 min-h-11 rounded-lg bg-game-signal px-4 font-bold text-game-bg" onClick={()=>setArtAttempt(n=>n+1)}>Retry Oracle assets</button>}</div></div>}
+      {artStatus && <div className="absolute inset-0 z-30 flex items-center justify-center bg-game-bg/95 p-6 text-game-ink"><div role={artStatus==='loading'?'status':'alert'} className="max-w-lg text-center"><p>{artStatus==='loading'?'Loading character and enemy sprite assets…':`Sprite assets could not start: ${artStatus}`}</p>{artStatus!=='loading' && <button className="mt-4 min-h-11 rounded-lg bg-game-signal px-4 font-bold text-game-bg" onClick={()=>setArtAttempt(n=>n+1)}>Retry sprite assets</button>}</div></div>}
       <GameHUD
         hud={hud}
         wave={run.wave}

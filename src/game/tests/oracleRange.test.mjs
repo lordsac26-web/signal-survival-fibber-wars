@@ -41,7 +41,7 @@ test('Oracle roster id, existing portraits/guide/select surfaces, and preloaded 
   for(const p of ['components/game/CharacterPortrait.jsx','pages/FieldGuide.jsx','components/game/GalleryScreen.jsx'])assert.match(read(p),/OraclePortrait/);
   assert.match(read('components/game/CharacterCard.jsx'),/CharacterPortrait/);
   assert.match(read('components/game/OraclePortrait.jsx'),/characterSprite\('oracle'\)\.portrait/);
-  assert.match(read('components/game/GameArena.jsx'),/preloadCharacterSprite\(run.character.id\)/);assert.match(read('components/game/GameArena.jsx'),/paused,art/);assert.match(read('components/game/GameArena.jsx'),/Retry Oracle assets/);
+  assert.match(read('components/game/GameArena.jsx'),/preloadCharacterSprite\(run.character.id\)/);assert.match(read('components/game/GameArena.jsx'),/preloadEnemySprite\('lag'\)/);assert.match(read('components/game/GameArena.jsx'),/paused,art,lagArt/);assert.match(read('components/game/GameArena.jsx'),/Retry sprite assets/);
   const engine=read('game/signalEngine.js');assert.match(engine,/run.character.id==='oracle'/);assert.match(engine,/drawCharacterSprite\(ctx,characterArt,spriteState/);assert.match(engine,/p.hp-=dmg;if\(spriteState\)spriteState.hurt=.18/);
   assert.doesNotMatch(engine,/w\.range\*run\.range|t\.range\*run\.range|def\.range\*run\.range/);
 });
