@@ -22,6 +22,7 @@ function preloadSprite(definition){
   ]).then(async([atlas,portrait,manifest])=>{
     if(!matches(manifest,spec))throw new Error('Sprite manifest does not match atlas');
     const art={definition,atlas,portrait};
+    for(const [key,url,width,height] of definition.extras || [])art[key]=await image(url,width,height);
     if(definition.attackW)art.attack=await image(definition.attack,definition.attackW,definition.attackH);
     if(definition.hurtTint)art.hurt=hurtAtlas(atlas,atlasW,atlasH,definition.hurtTint);
     return art;

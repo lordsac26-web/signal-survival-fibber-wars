@@ -42,7 +42,7 @@ test('Oracle roster id, existing portraits/guide/select surfaces, and preloaded 
   assert.match(read('components/game/CharacterCard.jsx'),/CharacterPortrait/);
   assert.match(read('components/game/OraclePortrait.jsx'),/characterSprite\('oracle'\)\.portrait/);
   assert.match(read('components/game/GameArena.jsx'),/preloadCharacterSprite\(run.character.id\)/);assert.match(read('components/game/GameArena.jsx'),/preloadEnemySprite\('lag'\)/);assert.match(read('components/game/GameArena.jsx'),/paused,art,lagArt/);assert.match(read('components/game/GameArena.jsx'),/Retry sprite assets/);
-  const engine=read('game/signalEngine.js');assert.match(engine,/run.character.id==='oracle'/);assert.match(engine,/drawCharacterSprite\(ctx,characterArt,spriteState/);assert.match(engine,/p.hp-=dmg;if\(spriteState\)spriteState.hurt=.18/);
+  const engine=read('game/signalEngine.js');assert.match(engine,/run.character.id==='oracle'/);assert.match(engine,/drawCharacterSprite\(ctx,characterArt,spriteState/);assert.match(engine,/else damagePlayer\(e\.damage\)/);
   assert.doesNotMatch(engine,/w\.range\*run\.range|t\.range\*run\.range|def\.range\*run\.range/);
 });
 

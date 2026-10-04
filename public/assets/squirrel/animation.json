@@ -1,0 +1,12 @@
+{
+  "structureId": "squirrel_boss",
+  "frameWidth": 170,
+  "frameHeight": 170,
+  "anchor": { "x": 0.5, "y": 1 },
+  "baselineMarginPx": 6,
+  "idleFront": { "columns": 6, "rows": 1 },
+  "idleBack": { "columns": 6, "rows": 1 },
+  "walkSide": { "columns": 6, "rows": 1, "facing": "right" },
+  "attackAtlas": { "frameWidth": 220, "frameHeight": 200, "columns": 5, "rows": 1, "windupFrames": [0, 3], "releaseFrame": 4 },
+  "fps": 8
+}

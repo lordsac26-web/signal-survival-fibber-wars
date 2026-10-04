@@ -1,0 +1,11 @@
+{
+  "characterId": "dispatch_don",
+  "frameWidth": 130,
+  "frameHeight": 190,
+  "anchor": { "x": 0.5, "y": 0.9 },
+  "idleFront": { "columns": 9, "rows": 1, "breathingFrames": 7, "radioEarFrame": 7, "pointingFrame": 8 },
+  "idleBack": { "columns": 9, "rows": 1 },
+  "walkSide": { "columns": 9, "rows": 1, "facing": "right" },
+  "signalPoses": { "columns": 4, "rows": 1, "radioUp": [0, 1], "stopHand": [2, 3] },
+  "fps": 8
+}

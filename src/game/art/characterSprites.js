@@ -8,6 +8,13 @@ export const CHARACTER_SPRITES=Object.freeze({oracle:Object.freeze({
   anchorX:.5,anchorY:.90625,
   // Inspected supplied atlas: row 1 faces left, row 2 right, all seven columns usable.
   directions:{down:0,left:64,right:128,up:192},idleRow:256
+}),don:Object.freeze({
+  atlas:'/assets/don/idle-front.png',portrait:'/assets/don/portrait.png',manifest:'/assets/don/animation.json',hurtTint:'rgba(251,113,133,.6)',
+  extras:[['back','/assets/don/idle-back.png',1170,190],['walk','/assets/don/walk-side.png',1170,190],['signal','/assets/don/signal-poses.png',520,190]],
+  sources:{atlas:source+'cd24a6944_don_idle_front.png',portrait:source+'0a52d8d76_don-portrait.png',back:source+'b3e497e7f_don_idle_back.png',walk:source+'54be9d69f_don_walk_side.png',signal:source+'017a98330_don_signal_poses.png'},
+  atlasW:1170,atlasH:190,cellW:130,cellH:190,columns:9,rows:1,idleFps:5,walkFps:10,gestureHold:.8,signalFrameW:130,
+  worldSize:52,anchorX:.5,anchorY:.9,portraitW:127,portraitH:193,
+  manifestSpec:{frameWidth:130,frameHeight:190,'idleFront.columns':9,'idleBack.columns':9,'walkSide.columns':9,'walkSide.facing':'right','signalPoses.columns':4,fps:8}
 })});
 export const characterSprite=id=>CHARACTER_SPRITES[id] || null;
 // Lag Sprite enemy — same definition/manifest/anchor convention as the character sprites,
@@ -21,8 +28,17 @@ export const ENEMY_SPRITES=Object.freeze({lag:Object.freeze({
   anchorX:.5,anchorY:.90625,portraitSize:256,attackW:128,attackH:64,
   frontRow:0,sideRow:64,sideFaces:'right',attackFront:0,attackSide:64,
   manifestSpec:{frameWidth:64,frameHeight:64,'anchor.x':.5,'anchor.y':.90625,'movementAtlas.columns':6,'movementAtlas.rows':2,'attackAtlas.columns':2,'attackAtlas.rows':1,fps:8}
+}),squirrel:Object.freeze({
+  atlas:'/assets/squirrel/idle-front.png',attack:'/assets/squirrel/fec-attack.png',portrait:'/assets/squirrel/portrait.png',manifest:'/assets/squirrel/animation.json',
+  extras:[['back','/assets/squirrel/idle-back.png',1020,170],['walk','/assets/squirrel/walk-side.png',1020,170]],
+  sources:{atlas:source+'74fcd8572_boss_idle_front.png',attack:source+'cdaad81d2_boss_fec_attack.png',portrait:source+'f08b0630c_boss_portrait.png',back:source+'4dab873b1_boss_idle_back.png',walk:source+'56d978f24_boss_walk_side.png'},
+  atlasW:1020,atlasH:170,cell:170,columns:6,rows:1,idleFps:6,walkFps:10,worldSize:76,
+  attackW:1100,attackH:200,attackFrameW:220,attackFrameH:200,coneFrames:5,windup:.8,releaseHold:.25,
+  portraitW:147,portraitH:187,
+  manifestSpec:{frameWidth:170,frameHeight:170,'idleFront.columns':6,'idleBack.columns':6,'walkSide.columns':6,'walkSide.facing':'right','attackAtlas.frameWidth':220,'attackAtlas.frameHeight':200,'attackAtlas.columns':5,fps:8}
 })});
 export const enemySpriteDef=id=>ENEMY_SPRITES[id] || null;
+
 // Bucket-Truck turret — EXCLUSIVE to the shop's Bucket Truck Keys deployable
 // (turretMount). Per its manifest the 3 tiles are near-duplicate poses of the
 // same truck, NOT a boom sweep — rendered as a slow ~1.5s/frame idle cycle

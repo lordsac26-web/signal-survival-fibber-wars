@@ -60,15 +60,15 @@ export default function GameArena({ run, onFinish }) {
     // CHANGED: `paused` ref is now the 5th argument to createSignalEngine —
     // see signalEngine.js for what it does inside the loop.
     let disposed=false,clean=null;
-    // Character art (Oracle), the Lag Sprite enemy art, and the Bucket-Truck
-    // turret art load in parallel; every run needs the Lag Sprite and the shop
-    // can grant the truck mid-run, so a failure blocks start with a retry.
-    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket')]).then(([art,lagArt,truckArt])=>{
+    // Character art (Oracle or Dispatch Don), the Lag Sprite enemy art, the
+    // Bucket-Truck turret art, and the Squirrel boss art load in parallel;
+    // a failure blocks start with a retry.
+    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadEnemySprite('squirrel')]).then(([art,lagArt,truckArt,squirrelArt])=>{
       if(disposed)return;
       clean=createSignalEngine(canvas.current,run,input,{
         hud:setHud,reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,
         flash:t=>{setFlash(t);setTimeout(()=>setFlash(''),1400)}
-      },paused,art,lagArt,truckArt);
+      },paused,art,lagArt,truckArt,squirrelArt);
       setArtStatus('');
     }).catch(error=>{if(!disposed)setArtStatus(error.message)});
 

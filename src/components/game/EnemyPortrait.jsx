@@ -6,5 +6,5 @@ export default function EnemyPortrait({id,name}){
   const def=enemySpriteDef(id);
   if(!def)return null;
   if(failed)return <span role="alert" className="w-20 shrink-0 text-xs text-destructive">{name} portrait failed to load.</span>;
-  return <Image src={def.portrait} alt={`${name} — supplied pixel-art portrait`} fittingType="fit" className="size-20 shrink-0 object-contain" style={{imageRendering:'pixelated'}} width={256} height={256} onError={()=>setFailed(true)}/>;
+  return <Image src={def.portrait} alt={`${name} — supplied pixel-art portrait`} fittingType="fit" className="size-20 shrink-0 object-contain" style={{imageRendering:'pixelated'}} width={def.portraitW||256} height={def.portraitH||256} onError={()=>setFailed(true)}/>;
 }
