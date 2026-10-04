@@ -1,6 +1,6 @@
-# Bucket-Truck turret real-art integration
+# Bucket-Truck turret real-art integration (corrected: Keys deployable ONLY)
 
-Scope honored exactly: ONLY the Bucket-Truck Boss's turret-placement visual (his 'Aerial Closure' signature deploy, special id 'fortify' → signature turret wid `signature-bucket`) and the shop's Bucket Truck Keys deployable (id `bucket_keys` → structure `turretMount`) got the real art, plus the Field Guide/character-info picture for Bucket-Truck Boss. Saves, combat, turret hitbox/HP/damage/placement, the range fix, economy, all other characters/enemies/structures and their hard-hat/googly-eyes placeholders are untouched — the truck is the only structure drawn WITHOUT googly eyes, per the art.
+Correction applied: the truck art now renders EXCLUSIVELY for the shop's Bucket Truck Keys deployable (id `bucket_keys` → structure `turretMount`). The earlier build had also wired the Boss's 'Aerial Closure' signature turret (wid `signature-bucket`) to it and put the truck icon on the Boss's Field Guide character card — both are now decoupled. Saves, combat, turret hitbox/HP/damage/placement, the range fix, economy, all other characters/enemies/structures and their hard-hat/googly-eyes placeholders are untouched — the truck is the only structure drawn WITHOUT googly eyes, per the art.
 
 ## Static vs idle cycle — decision
 
@@ -19,15 +19,15 @@ New local asset copies (byte-identical to the public uploads; SHA-256 verified i
 
 New code:
 - `src/game/art/structureSprite.js` — `truckFrame()` (pure idle-cycle selector) + `drawTruckTurret()` (centered, ground-anchored, rounded, smoothing-off draw)
-- `src/components/game/StructurePortrait.jsx` — Field Guide picture via the shared Image component, explicit load-failure message
 - `src/game/tests/buckettruck.test.mjs` — 4 new tests
 
 Modified:
-- `src/game/art/characterSprites.js` — added `STRUCTURE_SPRITES.bucket` definition (atlas/icon/manifest local paths + public source URLs, tile 230×190, worldSize 64, anchorY 174, idleCycle 3, manifestSpec) + `structureSpriteDef()`; notes that the 3 tiles are near-duplicate poses, not a sweep
+- `src/game/art/characterSprites.js` — added `STRUCTURE_SPRITES.bucket` definition (atlas/icon/manifest local paths + public source URLs, tile 230×190, worldSize 64, anchorY 174, idleCycle 3, manifestSpec) + `structureSpriteDef()`; notes the art is exclusive to `turretMount` and that the 3 tiles are near-duplicate poses, not a sweep (the `signatureWid` field from the first build is REMOVED)
 - `src/game/art/spriteLoader.js` — loader now honors `portraitW`/`portraitH` (the icon is 234×204, not square; Oracle/Lag unaffected, they default to 256×256) and gained `preloadStructureSprite()`, reusing the exact same preload/validate path as characters and enemies
-- `src/game/signalEngine.js` — new optional `structureArt` argument; in the draw loops, `turretMount` structures and the `signature-bucket` turret draw the truck (via `truckDef.structureType` / `truckDef.signatureWid`), everything else keeps its placeholder; no gameplay changes
+- `src/game/signalEngine.js` — new optional `structureArt` argument; ONLY `turretMount` structures draw the truck (via `truckDef.structureType`); the turrets pool (Boss signature + weapon turrets) has no truck reference at all and keeps `drawTurretBody`; no gameplay changes
 - `src/components/game/GameArena.jsx` — preloads character + Lag Sprite + Bucket-Truck art in parallel before combat; failure blocks start with the existing visible retry button (honest failure, no silent placeholder fallback)
-- `src/pages/FieldGuide.jsx` — Characters tab now renders `StructurePortrait` for the Bucket-Truck Boss entry (icon, 234×204)
+- `src/pages/FieldGuide.jsx` — REVERTED: the Boss's Characters-tab card is back on the standard SVG portrait (the `StructurePortrait` import and its condition are removed)
+- DELETED `src/components/game/StructurePortrait.jsx` (no Field Guide entry remains that references the structure art; no deployable-item entry exists in the guide, so there was no item icon slot to add)
 
 ## Shop icon note
 
@@ -36,10 +36,10 @@ The shop deployable card (ShopOffer) has NO icon slot (it shows rarity, name, st
 ## Verification
 
 - Both public PNGs: HTTP 200, exact dimensions (690×190, 234×204), PNG-decoded with proper transparency; local copies SHA-256-identical to the uploads; manifest fetched raw (HTTP 200, byte-identical locally) and validated: structureId `bucket_truck_turret`, tileWidth 230, tileHeight 190, rightEdgeAnchorX 210, groundBaselineY 174, idle_cycle @ 1.5fps, 3 frames at x 0/230/460.
-- Engine wiring asserted in source: truck only for `turretMount` + `signature-bucket`; GameArena passes all three preloaded art sets.
-- Real-engine test: booted the actual engine twice — Bucket Boss with the special pressed → signature turret draws the truck, advancing from pose_a (sx 0) to pose_b (sx 230) as the idle cycle elapses; Rookie owning Bucket Truck Keys with the deploy flag → turretMount structure draws the truck.
+- Engine wiring asserted in source: the turrets pool (Boss signature + weapon turrets) has ZERO truck references and `signatureWid` is gone from the definition; GameArena passes all three preloaded art sets (the truck preload stays — the shop can grant the Keys mid-run).
+- Real-engine test: booted the actual engine twice — Bucket Boss with the special pressed → signature turret draws the placeholder (zero truck draws asserted); Rookie owning Bucket Truck Keys with the deploy flag → turretMount structure draws the truck, advancing from pose_a (sx 0) to pose_b (sx 230) as the idle cycle elapses.
 - `npm run test:solo`: 42 passed, 0 failed (38 prior + 4 new). `npm run build`: exit 0, dist contains the truck assets. `npm run lint`: exit 0.
 
 ## Not verified
 
-Live in-browser playback has NOT been verified: how the truck reads at 64px in real gameplay, the subtle idle wobble feel, and mobile rendering are unconfirmed in this environment. Use the Testing Agent: 'Play as Bucket-Truck Boss, press E to place the signature turret and verify a FIBERNET bucket truck appears with a very slow three-pose idle wobble, then buy Bucket Truck Keys in the shop, press Q, and verify the same truck appears; check the Field Guide Characters tab shows the truck icon on the Bucket-Truck Boss card.'
+Live in-browser playback has NOT been verified: how the truck reads at 64px in real gameplay, the subtle idle wobble feel, and mobile rendering are unconfirmed in this environment. Use the Testing Agent: 'Buy Bucket Truck Keys in the shop, press Q to deploy, and verify a FIBERNET bucket truck appears with a very slow three-pose idle wobble; then play as Bucket-Truck Boss, press E, and verify the signature sentry is the old stick-frame placeholder, NOT the truck; check the Field Guide Characters tab shows the Boss on his standard portrait.'

@@ -23,17 +23,17 @@ export const ENEMY_SPRITES=Object.freeze({lag:Object.freeze({
   manifestSpec:{frameWidth:64,frameHeight:64,'anchor.x':.5,'anchor.y':.90625,'movementAtlas.columns':6,'movementAtlas.rows':2,'attackAtlas.columns':2,'attackAtlas.rows':1,fps:8}
 })});
 export const enemySpriteDef=id=>ENEMY_SPRITES[id] || null;
-// Bucket-Truck turret (Bucket-Truck Boss's 'Aerial Closure' signature + the shop's
-// Bucket Truck Keys deployable → turretMount). Per its manifest the 3 tiles are
-// near-duplicate poses of the same truck, NOT a boom sweep — rendered as a slow
-// ~1.5s/frame idle cycle only, never presented as target tracking. The icon
-// (234×204) doubles as the Field Guide picture; no googly eyes: it is a literal truck.
+// Bucket-Truck turret — EXCLUSIVE to the shop's Bucket Truck Keys deployable
+// (turretMount). Per its manifest the 3 tiles are near-duplicate poses of the
+// same truck, NOT a boom sweep — rendered as a slow ~1.5s/frame idle cycle
+// only, never presented as target tracking. The Boss's signature sentry and
+// all other turrets keep their placeholders; no googly eyes on the truck.
 export const STRUCTURE_SPRITES=Object.freeze({bucket:Object.freeze({
   atlas:'/assets/buckettruck/turret.png',portrait:'/assets/buckettruck/icon.png',
   manifest:'/assets/buckettruck/animation.json',
   sources:{atlas:source+'53bcc4815_buckettruck-turret.png',icon:source+'8c553ef43_buckettruck-icon.png',manifest:source+'cb0ba0033_buckettruck-animation.json'},
   atlasW:690,atlasH:190,tileW:230,tileH:190,columns:3,rows:1,fps:1.5,idleCycle:3,worldSize:64,anchorY:174,portraitW:234,portraitH:204,
-  structureType:'turretMount',signatureWid:'signature-bucket',
+  structureType:'turretMount',
   manifestSpec:{structureId:'bucket_truck_turret',tileWidth:230,tileHeight:190,rightEdgeAnchorX:210,groundBaselineY:174,'animation.type':'idle_cycle','animation.fps':1.5}
 })});
 export const structureSpriteDef=id=>STRUCTURE_SPRITES[id] || null;

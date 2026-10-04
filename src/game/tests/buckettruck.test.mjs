@@ -30,20 +30,22 @@ test('actual Bucket-Truck public PNGs decode at exact sizes; local copies match 
   assert.equal(m.frames.length,3);assert.deepEqual(m.frames.map(f=>f.x),[0,230,460]);
 });
 
-test('engine wiring references the real atlas for turretMount + the Boss signature, keeping placeholders elsewhere',()=>{
+test('engine wiring: the truck is exclusive to the Keys turretMount; the Boss signature and other turrets keep placeholders',()=>{
   const read=p=>readFileSync(new URL('../../'+p,import.meta.url),'utf8');
   const engine=read('game/signalEngine.js');
+  // structures pool: turretMount draws the truck
   assert.match(engine,/drawTruckTurret\(ctx,truckArt,st\.born,x,y,grow\)/);assert.match(engine,/st\.type===truckDef\.structureType/);
-  assert.match(engine,/t\.wid===truckDef\.signatureWid/);assert.match(engine,/drawTruckTurret\(ctx,truckArt,t\.born,t\.x,t\.y,grow\)/);
-  assert.match(read('components/game/GameArena.jsx'),/preloadStructureSprite\('bucket'\)/);assert.match(read('components/game/GameArena.jsx'),/paused,art,lagArt,truckArt/);
-  assert.match(read('game/art/spriteLoader.js'),/export const preloadStructureSprite=id=>preloadSprite\(structureSpriteDef\(id\)\)/);
-  assert.match(read('game/art/spriteLoader.js'),/portraitW=definition\.portraitW\|\|portraitSize/);
-  assert.equal(def.structureType,'turretMount');assert.equal(def.signatureWid,'signature-bucket');
+  // turrets pool (signature/weapon turrets): NO truck reference at all
+  assert.doesNotMatch(engine,/signatureWid/);assert.doesNotMatch(engine,/signature-bucket/);
+  assert.match(engine,/if\(t\.mode==='helper'\)drawHelper\(ctx,Math\.round\(t\.x\),Math\.round\(t\.y\),t\.color\);else drawTurretBody/);
+  assert.equal(def.structureType,'turretMount');assert.equal(def.signatureWid,undefined);
   assert.equal(def.atlas,'/assets/buckettruck/turret.png');assert.equal(def.portrait,'/assets/buckettruck/icon.png');
-  // both scoped users of the truck art; other turrets/structures keep drawTurretBody
+  // the only scoped user of the truck art; other turrets/structures keep drawTurretBody
   assert.equal(DEPLOYABLES.find(d=>d.id==='bucket_keys').structure,'turretMount');
-  assert.equal(characterById('bucket').special.id,'fortify');assert.equal(characterById('bucket').signatureStructure,'turretMount');
-  assert.match(read('pages/FieldGuide.jsx'),/tab==='Characters' && structureSpriteDef\(e\.id\) && <StructurePortrait/);
+  assert.equal(characterById('bucket').special.id,'fortify');
+  // Field Guide no longer shows the truck portrait on the Boss's character card
+  const guide=read('pages/FieldGuide.jsx');
+  assert.doesNotMatch(guide,/StructurePortrait/);
 });
 
 test('slow idle cycle is a 3-pose wobble at 1.5fps; draw is centered, ground-anchored, rounded, smoothing restored',()=>{
@@ -63,7 +65,7 @@ test('slow idle cycle is a 3-pose wobble at 1.5fps; draw is centered, ground-anc
   assert.equal(ctx.imageSmoothingEnabled,true);
 });
 
-test('real engine draws the truck for the Boss signature and the Keys deployable, placeholders untouched otherwise',async()=>{
+test('real engine draws the truck ONLY for the Keys turretMount; the Boss signature keeps its placeholder',async()=>{
   const previous={Image:globalThis.Image,fetch:globalThis.fetch,document:globalThis.document,devicePixelRatio:globalThis.devicePixelRatio};
   globalThis.devicePixelRatio=1;
   globalThis.Image=class{set src(url){const bytes=file(url);this.naturalWidth=bytes.readUInt32BE(16);this.naturalHeight=bytes.readUInt32BE(20);this.onload()}async decode(){}};
@@ -86,16 +88,16 @@ test('real engine draws the truck for the Boss signature and the Keys deployable
       let now=performance.now();for(let i=0;i<44;i++)nextFrame(now+=20);
       const trucks=draws.filter(d=>d[0]===fakeArt.atlas);clean();Math.random=oldRandom;return trucks};
     try{
-      // Boss signature: 'fortify' places one signature-bucket sentry → truck art
+      // Boss signature: 'fortify' places one signature-bucket sentry → placeholder, NOT the truck
       const sig=createRun(characterById('bucket'),false,123);sig.weapons=[];sig.hp=sig.maxHp=10000;
       const sigTrucks=boot(sig,{current:{x:0,y:0,special:true}});
-      assert(sigTrucks.length>0,'signature turret never drew the truck');
-      assert(sigTrucks.some(d=>d[1]===0),'pose_a not drawn first');assert(sigTrucks.some(d=>d[1]===230),'idle cycle never advanced to pose_b');
+      assert.equal(sigTrucks.length,0,'signature turret must NOT draw the truck');
       // Shop deployable: Bucket Truck Keys → turretMount structure → truck art
       const dep=createRun(characterById('rookie'),false,123);dep.weapons=[];dep.dodge=0;dep.hp=dep.maxHp=10000;
       dep.deployables=[{structure:'turretMount',name:'Bucket Truck Keys',icon:'🔑',stacks:1}];
       const depTrucks=boot(dep,{current:{x:0,y:0,deploy:true}});
       assert(depTrucks.length>0,'turretMount structure never drew the truck');
+      assert(depTrucks.some(d=>d[1]===0),'pose_a not drawn first');assert(depTrucks.some(d=>d[1]===230),'idle cycle never advanced to pose_b');
     }finally{Math.random=oldRandom}
   }finally{Object.assign(globalThis,previous)}
 });
