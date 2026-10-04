@@ -4,7 +4,7 @@ import { guideEntries } from '@/game/data/reference';
 import OraclePortrait from '@/components/game/OraclePortrait';
 import DonPortrait from '@/components/game/DonPortrait';
 import EnemyPortrait from '@/components/game/EnemyPortrait';
-import { characterSprite, enemySpriteDef } from '@/game/art/characterSprites';
+import { enemySpriteDef } from '@/game/art/characterSprites';
 export default function FieldGuide(){
   const sections=useMemo(guideEntries,[]),[tab,setTab]=useState('Controls'),[query,setQuery]=useState('');
   const entries=sections[tab].filter(e=>`${e.title} ${e.body}`.toLowerCase().includes(query.toLowerCase()));
