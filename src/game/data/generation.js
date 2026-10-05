@@ -1,4 +1,5 @@
 import { DEPLOYABLES } from '@/game/data/structures';
+import { TUNING } from '@/game/data/tuning';
 
 export const WEAPON_ARCHETYPES=[
 ['cleaver','Fiber Cleaver','melee','#fde047',24,.7,92,'✂'],['splicer','Fusion Splicer','nova','#c084fc',31,.92,120,'⚡'],['otdr','OTDR','pierce','#22d3ee',34,1.25,520,'⌁'],['vfl','Visual Fault Locator','beam','#ef4444',9,.28,390,'↗'],['power','Optical Power Meter','projectile','#38bdf8',22,.8,330,'▣'],['stripper','Fiber Stripper','projectile','#fb923c',8,.18,145,'≋'],['cleaner','One-Click Cleaner','cone','#34d399',15,.72,155,'◉'],['cutters','Kevlar Cutters','melee','#f472b6',42,1.05,105,'✕'],['tray','Splice Tray Sentry','turret','#f59e0b',13,3.2,300,'▤',{life:6,cap:3,fire:.45,mode:'pellet'}],['closure','Closure Cannon','turret','#f97316',46,4.5,420,'◎',{life:7,cap:2,fire:1.5,mode:'mortar'}],['cable','Launch Cable Nest','turret','#22d3ee',26,3.8,520,'⌇',{life:8,cap:2,fire:1,mode:'pulse'}],['fanout','Fan-Out Splitter','turret','#a3e635',9,3.4,230,'≡',{life:5,cap:3,fire:.8,mode:'spread'}],['jumper','Patch Cord Whip','chain','#a3e635',18,.55,210,'∿'],['midspan','Midspan Access Tool','pierce','#fb7185',29,.9,280,'⌇'],['blaster','Buffer Tube Blaster','cone','#60a5fa',17,.48,230,'◖'],['deadzone','Dead Zone Eliminator','beamSweep','#e879f9',25,.7,360,'⌁'],['switch','Optical Switch Snapper','chain','#2dd4bf',21,.6,260,'⌘'],['bell','Fairy Bell','orbiting','#f9a8d4',16,.42,170,'♢'],['rocket','Loose-Tube Launcher','thrown','#f97316',38,1.4,350,'◉'],['dowel','Loader-Dowel','projectile','#a8a29e',48,1.6,300,'▮']
@@ -11,22 +12,25 @@ export const PASSIVE_ITEM_TABLE=['Fusion Splice Protectors','Heat Shrinks','Buff
 export const SPECIAL_EFFECTS=['Repairs restore Jacket Integrity','Enemies occasionally drop bonus Signal','Gain a brief speed boost when hit','Critical hits knock impairments backward','Turrets inherit extra Splice Quality','First hit each wave is politely declined'];
 export function seeded(seed){let s=(seed>>>0)||1;return()=>((s=Math.imul(1664525,s)+1013904223>>>0)/4294967296)}
 const one=(a,r)=>a[(r()*a.length)|0];
-function rarity(r,luck=0){const bonus=Math.min(20,Math.max(0,luck)*.2);let roll=r()*100;for(const [name,v] of Object.entries(RARITY)){const weight=v.weight+(name==='Common'?-bonus:name==='Rare'?bonus*.5:name==='Epic'?bonus*.35:bonus*.15);roll-=weight;if(roll<=0)return name}return'Legendary'}
+// Wave/level-gated tiers: Legendary cannot roll before TUNING.legendaryWave
+// (about level 10); Epic weight grows with progress, capped so late runs still
+// land mostly Rare/Common. Luck shifts weight Common → better tiers.
+function rarity(r,luck=0,wave=1){const bonus=Math.min(20,Math.max(0,luck)*.2),w=Math.max(1,wave|0);let roll=r()*100;for(const [name,v] of Object.entries(RARITY)){let weight=v.weight+(name==='Common'?-bonus:name==='Rare'?bonus*.5:name==='Epic'?bonus*.35:bonus*.15);if(name==='Epic')weight+=Math.min(TUNING.epicWaveCap,w*TUNING.epicWaveGain);if(name==='Legendary'&&w<TUNING.legendaryWave)weight=0;roll-=weight;if(roll<=0)return name}return'Legendary'}
 function mods(r,rar,pool=STAT_MOD_POOL){const info=RARITY[rar],out=[];for(let i=0;i<info.rolls;i++){const m=one(pool,r),v=(m[2]+r()*(m[3]-m[2]))*info.power;out.push({stat:m[0],label:m[1],value:+v.toFixed(m[2]<.01?3:m[2]<1?2:0)})}return out}
-export function createGenerator(seed){
+export function createGenerator(seed,wave=1){
   const r=seeded(seed);
   return {
     weapon(luck=0,pool=WEAPON_ARCHETYPES,forcedRarity=null){
-      const a=one(pool,r),rar=forcedRarity || rarity(r,luck),m=mods(r,rar),power=RARITY[rar].power;
+      const a=one(pool,r),rar=forcedRarity || rarity(r,luck,wave),m=mods(r,rar),power=RARITY[rar].power;
       const melee=['melee','chain','nova','orbiting'].includes(a[2]);
       return {id:`w-${(r()*1e9)|0}`,baseId:a[0],turret:a[8]||null,heal:a[0]==='cleaner'?2:0,name:`${one(PUN_PREFIXES,r)} ${a[1]} ${one(PUN_SUFFIXES,r)}`,archetype:a[1],pattern:a[2],slotType:melee?'melee':'ranged',family:a[0]==='splicer'?'spark':melee?'melee':a[0]==='cleaner'?'squirt':['beam','pierce','beamSweep'].includes(a[2])?'laser':'snip',color:a[3],damage:a[4]*power,rate:a[5],range:a[6],icon:a[7],rarity:rar,mods:m,cost:Math.round(14+power*10+m.length*3),desc:`${rar} ${a[2]} tool • ${m.map(x=>`+${x.value} ${x.label}`).join(', ')}`};
     },
     passive(luck=0,pool=STAT_MOD_POOL){
-      const rar=rarity(r,luck),m=mods(r,rar,pool);
+      const rar=rarity(r,luck,wave),m=mods(r,rar,pool);
       return {id:`p-${(r()*1e9)|0}`,name:one(PASSIVE_ITEM_TABLE,r),icon:'◆',rarity:rar,mods:m,special:r()<.28?one(SPECIAL_EFFECTS,r):null,cost:Math.round(12+RARITY[rar].power*9+m.length*3),desc:m.map(x=>`+${x.value} ${x.label}`).join(', ')};
     },
     deployable(luck=0){
-      const d=one(DEPLOYABLES,r),rar=rarity(r,luck);
+      const d=one(DEPLOYABLES,r),rar=rarity(r,luck,wave);
       return {id:`d-${(r()*1e9)|0}`,name:d.name,icon:d.icon,deploy:true,structure:d.structure,rarity:rar,mods:[],cost:Math.round(d.cost*RARITY[rar].power),desc:d.desc};
     }
   };

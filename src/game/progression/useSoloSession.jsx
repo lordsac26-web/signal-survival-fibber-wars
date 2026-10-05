@@ -4,7 +4,7 @@ import { saveCheckpoint, recordRun, updateProfile } from '@/game/storage';
 import { createRun, normalizeRun, rebuildStats } from '@/game/progression/runRules';
 import { enterShop, shopTransaction } from '@/game/shop/shopRules';
 import { createGenerator } from '@/game/data/generation';
-export const upgradeChoices=run=>{const g=createGenerator(run.seed+run.level*3571+17);return [g.passive(run.luck),g.passive(run.luck),g.passive(run.luck)]};
+export const upgradeChoices=run=>{const g=createGenerator(run.seed+run.level*3571+17,run.level);return [g.passive(run.luck),g.passive(run.luck),g.passive(run.luck)]};
 export default function useSoloSession(profile){
   const [screen,setScreen]=useState('menu'),[run,setRun]=useState(null),[newUnlocks,setUnlocks]=useState([]);
   const current=useRef(null),phase=useRef('menu');

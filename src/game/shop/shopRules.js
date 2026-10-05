@@ -4,7 +4,7 @@ import { TUNING } from '@/game/data/tuning';
 import { allowedWeapon, legalLoadout, normalizeWeapon, rebuildStats } from '@/game/progression/runRules';
 export const premiumTargets=run=>run.weapons.filter(w=>w.rarity==='Epic' || (w.rarity==='Legendary' && (w.overclockRank || 0)<TUNING.overclockRankCap));
 function freshOffer(run,sequence){
-  const seed=(run.seed+run.wave*7919+sequence*104729)>>>0,r=seeded(seed),gen=createGenerator(seed+31),chance=r();
+  const seed=(run.seed+run.wave*7919+sequence*104729)>>>0,r=seeded(seed),gen=createGenerator(seed+31,run.wave),chance=r();
   let item;
   if(chance<TUNING.deployOfferChance){
     const candidates=DEPLOYABLES.filter(d=>['turretMount','barricade'].includes(d.structure) && d.structure!==run.character.signatureStructure && ((run.deployables || []).find(o=>o.structure===d.structure)?.stacks || 0)<TUNING.deployRankCap);
@@ -24,6 +24,9 @@ function freshOffer(run,sequence){
     const synergy=run.character.id==='veteran'?pool.concat(pool.filter(a=>(['melee','chain','nova','orbiting'].includes(a[2])?'melee':'ranged')===weakerFamily)):pool;
     item=r()<.55?gen.weapon(run.luck,synergy):gen.passive(run.luck,passivePool);
   }
+  // Brotato-style tier pricing: every offer's cost scales with the wave so
+  // the raw Signal flood in later waves can't trivially clear the shelf.
+  item.cost=Math.round(item.cost*(1+TUNING.priceWaveScale*(run.wave-1)));
   return {...item,id:`${run.runId}:offer:${run.wave}:${sequence}:${item.id}`};
 }
 export function enterShop(run){

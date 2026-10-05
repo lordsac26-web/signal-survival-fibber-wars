@@ -3,12 +3,14 @@
 // ordinary spawn pool can never pick it.
 //
 // Number rationale: enemies scale HP by (1 + 0.19 × (wave − 1)); at wave 20
-// that is ×4.61, so 420 base HP ≈ 1,936 effective HP — about 3.5× a wave-20
-// Attenuation Apparition (~553 HP), i.e. a focused 20–30s kill that cannot be
+// that is ×4.61, so 520 base HP ≈ 2,397 effective HP — about 3.6× a wave-20
+// Attenuation Apparition (~669 HP), i.e. a focused 20–30s kill that cannot be
 // face-tanked (22 contact damage) and cannot be instakilled (boss flag).
+// Speed 95 keeps the boss a genuine chase threat and lets it actually escape
+// between FEC casts, without outrunning any player build.
 export const SQUIRREL=Object.freeze({
   id:'squirrel',name:'Fiber-Nibbling Squirrel',color:'#b4763f',
-  hp:420,speed:80,damage:22,r:26,value:30,
+  hp:520,speed:95,damage:22,r:26,value:30,
   // FEC: 55°-total cone locked in aim at windup start; 7 pellets at 290 units/s
   // cross the 340-unit reach in ~1.2s, so strafing sideways during the 0.8s
   // tail-fluffing windup cleanly dodges it. 5s cooldown between casts.

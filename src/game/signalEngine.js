@@ -90,7 +90,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  function nearestVisitor(e){if(!e.active)return;const d=Math.hypot(e.x-queryX,e.y-queryY);if(d<nearestDist){nearestBest=e;nearestDist=d}}
  function nearest(range){queryX=p.x;queryY=p.y;nearestBest=null;nearestDist=range;grid.visit(p.x,p.y,range,nearestVisitor);return nearestBest}
  function nearestAt(x,y,range){queryX=x;queryY=y;nearestBest=null;nearestDist=range;grid.visit(x,y,range,nearestVisitor);return nearestBest}
- function spawnEnemy(kind){const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||TYPES[(Math.random()*Math.min(TYPES.length,2+(run.wave/2|0)))|0]],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;e.hp=base.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage;e.r=base.r;e.value=base.value;e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
+ function spawnEnemy(kind){const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||TYPES[(Math.random()*Math.min(TYPES.length,2+(run.wave/2|0)))|0]],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;e.hp=base.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage;e.r=base.r;e.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
  if(e.kind==='lag'&&lagArt){e.art=lagArt;e.anim=createLagAnimation()}}
  // SQUIRREL BOSS: spawns at the wave-20 gate (then every 10 waves). Phase 1
  // chases the player; at <=50% HP it flees, keeps other impairments between
@@ -99,7 +99,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  function spawnBoss(){if(!sqArt||!SQUIRREL)return;const e=enemies.acquire();if(!e)return;
   const edge=(Math.random()*4)|0,pad=60;e.kind=SQUIRREL.id;
   e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;
-  e.hp=SQUIRREL.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=SQUIRREL.speed*(1+(run.wave-1)*.025);e.damage=SQUIRREL.damage;e.r=SQUIRREL.r;e.value=SQUIRREL.value;e.color=SQUIRREL.color;e.elite=true;e.boss=true;e.dirty=false;e.sound='boss';e.lastShot=-1;e.sprite=null;e.art=null;e.anim=null;
+  e.hp=SQUIRREL.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=SQUIRREL.speed*(1+(run.wave-1)*.025);e.damage=SQUIRREL.damage;e.r=SQUIRREL.r;e.value=Math.round(SQUIRREL.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=SQUIRREL.color;e.elite=true;e.boss=true;e.dirty=false;e.sound='boss';e.lastShot=-1;e.sprite=null;e.art=null;e.anim=null;
   e.sq={...createSquirrelAnimation(),art:sqArt,phase:1,castCd:2,wind:0,cast:0,aim:0};
   cb.flash(SQUIRREL.intro);addShake(6)}
  function fireCone(e){const c=SQUIRREL.cone,step=c.pellets>1?c.half*2/(c.pellets-1):0;
