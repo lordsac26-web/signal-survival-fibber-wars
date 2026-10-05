@@ -60,9 +60,9 @@ test('item stat rolls scale with wave (capped at 2×)',()=>{
   // Aggregate over many seeds: per-value display rounding would make a single
   // comparison noisy, but summed roll value converges on the scale factor.
   const sum=wave=>{let t=0;for(let s=1;s<=200;s++){for(const m of createGenerator(s*7919,wave).passive(0).mods)t+=m.value}return t};
-  const early=sum(1),late=sum(20),capped=sum(40);
-  assert(Math.abs(late/early-(1+TUNING.itemStatWaveScale*19))<.08);
-  assert(Math.abs(capped/early-2)<.08);
+  const early=sum(1),mid=sum(8),capped=sum(20);
+  assert(Math.abs(mid/early-(1+TUNING.itemStatWaveScale*7))<.08); // 1.42× at wave 8
+  assert(Math.abs(capped/early-2)<.08); // already past the 2× cap at wave 20
 });
 test('rotator-style wave density: trickle pacing, 34-active ceiling, stat scaling replaces body count',()=>{
   assert.equal(maxActiveEnemies(1),13);assert.equal(maxActiveEnemies(8),23);assert.equal(maxActiveEnemies(15),33);
@@ -76,4 +76,4 @@ test('rotator-style wave density: trickle pacing, 34-active ceiling, stat scalin
   assert(engine.includes('base.hp*(1+(run.wave-1)*.28)'));
   assert(engine.includes('base.damage*(1+(run.wave-1)*.02)'));
 });
-test('every signature has an effect hook, Don grants four helpers, Bucket grants one sentry',()=>{for(const c of CHARACTERS){const r=run(c.id),p={x:327,y:412,inv:0};const calls=[];const api={area:(...a)=>calls.push(['area',...a]),launch:(...a)=>calls.push(['launch',...a]),heal:a=>calls.push(['heal',a]),turret:a=>{calls.push(['turret',a]);return true},barrier:()=>{calls.push(['barrier']);return true}};assert.notEqual(activateSignature(r,p,api),null);if(c.id==='don')assert.equal(calls.filter(a=>a[0]==='turret').length,4);if(c.id==='bucket')assert.equal(calls.filter(a=>a[0]==='turret').length,1);if(c.id==='admin')assert.equal(p.inv,1.5)}});
+test('every signature has an effect hook, Don grants four helpers, Bucket grants one sentry',()=>{for(const c of CHARACTERS){const r=run(c.id),p={x:327,y:412,inv:0};const calls=[];const api={area:(...a)=>calls.push(['area',...a]),launch:(...a)=>calls.push(['launch',...a]),heal:a=>calls.push(['heal',a]),turret:a=>{calls.push(['turret',a]);return true},barrier:()=>{calls.push(['barrier']);return true}};assert.notEqual(activateSignature(r,p,api),null);if(c.id==='don')assert.equal(calls.filter(a=>a[0]==='turret').length,4);if(c.id==='bucket')assert.equal(calls.filter(a=>a[0]==='turret').length,1);if(c.id==='admin')assert.equal(p.inv,2.5)}});

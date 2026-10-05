@@ -204,7 +204,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
 spawn-=dt;if(spawn<=0){const outage=specialTimer>0&&run.character.special.id==='outage';spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)*(outage?0:1))spawnEnemy();spawn=spawnInterval(run.wave)*(outage?2.2:1)}grid.clear();
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active)grid.insert(e)}
   structuresUpdate(dt); // mounts fire + pedestal buff, uses the freshly built enemy grid
-  for(let i=0;i<run.weapons.length;i++){cooldowns[i]-=dt;const w=weaponOf(run.weapons[i]);if(w&&cooldowns[i]<=0){attack(w);cooldowns[i]=w.rate/(run.attackSpeed*(1+pedestalBuff)*((run.character.special.id==='frenzy'&&specialTimer>0)?2.5:1))}}
+  for(let i=0;i<run.weapons.length;i++){cooldowns[i]-=dt;const w=weaponOf(run.weapons[i]);if(w&&cooldowns[i]<=0){attack(w);cooldowns[i]=w.rate/(run.attackSpeed*(1+pedestalBuff)*(specialTimer>0?(run.character.special.id==='frenzy'?2.5:run.character.special.id==='deadline'?1.35:1):1))}}
   turretsUpdate(dt);
   for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(!s.active)continue;const ended=advanceProjectile(s,dt);queryShot=s;grid.visit((s.prevX+s.x)/2,(s.prevY+s.y)/2,Math.hypot(s.x-s.prevX,s.y-s.prevY)/2+s.r+34,shotVisitor);if(!s.active)continue;if(s.boom || ended){if(s.mortar)explode(s.x,s.y,s.damage,s.color,Math.min(55,s.maxReach*.25),s);shots.release(s)}}
   // Enemy projectiles (FEC pellets): travel, then one hit on the player each;
