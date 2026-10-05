@@ -13,8 +13,8 @@ export const STAT_INFO = {
   range: { label: 'Reach modifier', kind: 'multiplier', desc: 'Applied once to viewport-derived tool reach. Gear +0.03 adds 3 percentage points to the character factor (Oracle 1.35 → 1.38). Weapon reach ratings scale family/quality, not absolute distance. Normal ranged caps: 42% of the shorter visible side, Oracle 44%; melee 18%. Combat HUD shows actual world units. Flat bonuses, if present, add world units before the cap. Projectile distance freezes at launch; DPI never changes reach.' },
   knockback: { label: 'Knockback', kind: 'flat', desc: 'Critical hits move impairments away by 8 map units per point (plus rolled critical-knockback bonuses).' },
   pierce: { label: 'Pierce', kind: 'flat', desc: 'Normal shots penetrate round(Pierce) additional targets; inherently piercing pulses already penetrate all targets in their travel lifetime.' },
-  armor: { label: 'Jacket Protection', kind: 'flat', desc: 'Contact damage = max(2, enemy damage − 1.5 × Armor) × (1 − min(40%, 0.3% × Signal Integrity)).' },
-  dodge: { label: 'Dodge', kind: 'percent', desc: 'Chance to take zero contact damage (capped at 60%).' },
+  armor: { label: 'Jacket Protection', kind: 'flat', desc: 'Contact damage = max(25% of the incoming hit, max(2, enemy damage − 1.5 × Armor)) × (1 − min(40%, 0.3% × Signal Integrity)). Armor can never reduce a hit below a quarter of its pre-armor damage.' },
+  dodge: { label: 'Dodge', kind: 'percent', desc: 'Chance to take zero contact damage (capped at 50%).' },
   speed: { label: 'Move Speed', kind: 'velocity', desc: 'Map units per second. Base speed × product(1 + each gear bonus); diagonal movement is normalized. Temporary sprint/hit boosts multiply this further.' },
   harvesting: { label: 'Harvesting', kind: 'flat', desc: 'Bonus Signal granted at the end of each wave.' },
   engineering: { label: 'Engineering', kind: 'flat', desc: 'Turret/helper base damage × (1 + Engineering/100). Auto-sentry HP +2 and life +0.04s per point; purchased structures life +0.06s per point. Placement cap = 6 + floor(Engineering/10).' },
@@ -31,6 +31,14 @@ export function formatStat(kind, v = 0) {
   return +v.toFixed(2);
 }
 
+// Percent-first character stat lines (declutter pass): movement speed reads as
+// a percent of the Rookie baseline first, with the raw units/s secondary.
+export const SPEED_REFERENCE = 250;
+export function charStatText(key, value) {
+  if (key === 'speed') return `${Math.round(value / SPEED_REFERENCE * 100)}% movement (${+value.toFixed(2)} units/s)`;
+  return formatStat(STAT_INFO[key]?.kind || 'flat', value);
+}
+
 // Breakdown of "base character stat + what your tools/items added" for the
 // in-run stats panel. Multiplier stats store the item contribution as an added
 // fraction (damage/range/attack speed add these fractions, while movement
@@ -42,7 +50,7 @@ export function statBreakdown(run, key) {
   let items = 0;
   for (const it of [...(run.weapons || []),...(run.items || [])]) for (const m of it.mods || []) if (m.stat === key) items += m.value;
   const pct = info.kind === 'multiplier' || info.kind === 'percent';
-  const capped = (key === 'dodge' && base + items > .6) ? ' • capped at 60%' : (key === 'crit' && base + items > 1) ? ' • capped at 100%' : '';
+  const capped = (key === 'dodge' && base + items > .5) ? ' • capped at 50%' : (key === 'crit' && base + items > 1) ? ' • capped at 100%' : '';
   return {
     items,
     text: key === 'speed'

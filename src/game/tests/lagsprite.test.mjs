@@ -35,7 +35,7 @@ test('actual Lag Sprite public PNGs decode; local assets match exact uploaded by
 
 test('Lag Sprite is melee-only, keeps its stats, and the wiring references real assets not placeholders',()=>{
   // stats untouched; melee-only: contact damage, no projectile/pattern fields
-  assert.deepEqual({...ENEMIES.lag,flavor:undefined},{name:'Lag Sprite',color:'#fbbf24',hp:24,speed:64,damage:10,r:13,value:2,eyes:2,sound:'lag',counter:ENEMIES.lag.counter,flavor:undefined});
+  assert.deepEqual({...ENEMIES.lag,flavor:undefined},{name:'Lag Sprite',color:'#fbbf24',hp:24,speed:64,damage:11,r:13,value:2,eyes:2,sound:'lag',counter:ENEMIES.lag.counter,flavor:undefined});
   assert(!('pattern' in ENEMIES.lag));assert(!('projectile' in ENEMIES.lag));
   const read=p=>readFileSync(new URL('../../'+p,import.meta.url),'utf8');
   const engine=read('game/signalEngine.js');

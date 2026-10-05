@@ -74,6 +74,7 @@ test('rotator-style wave density: trickle pacing, 34-active ceiling, stat scalin
   assert(engine.includes('maxActiveEnemies(run.wave)'));
   assert(engine.includes('spawnEnemy(null,true)'));
   assert(engine.includes('base.hp*(1+(run.wave-1)*.28)'));
-  assert(engine.includes('base.damage*(1+(run.wave-1)*.02)'));
+  assert(engine.includes('base.damage*(1+(run.wave-1)*.05)'));
+  assert(engine.includes('Math.ceil(dmg*.25)'));assert.equal(TUNING.dodgeCap,.5);
 });
 test('every signature has an effect hook, Don grants four helpers, Bucket grants one sentry',()=>{for(const c of CHARACTERS){const r=run(c.id),p={x:327,y:412,inv:0};const calls=[];const api={area:(...a)=>calls.push(['area',...a]),launch:(...a)=>calls.push(['launch',...a]),heal:a=>calls.push(['heal',a]),turret:a=>{calls.push(['turret',a]);return true},barrier:()=>{calls.push(['barrier']);return true}};assert.notEqual(activateSignature(r,p,api),null);if(c.id==='don')assert.equal(calls.filter(a=>a[0]==='turret').length,4);if(c.id==='bucket')assert.equal(calls.filter(a=>a[0]==='turret').length,1);if(c.id==='admin')assert.equal(p.inv,2.5)}});
