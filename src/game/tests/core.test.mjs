@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { CHARACTERS, characterById } from '@/game/data/characters';
 import { createRun, normalizeRun, legalLoadout, rebuildStats, allowedWeapon } from '@/game/progression/runRules';
 import { freshProfile, migrateProfile, completeRun } from '@/game/progression/profileModel';
-import { enterShop, shopTransaction, premiumPreview } from '@/game/shop/shopRules';
+import { enterShop, shopTransaction, premiumPreview, premiumTargets, cloneOverclockCap } from '@/game/shop/shopRules';
+import { unlockMet } from '@/game/data/unlocks';
 import { createGenerator } from '@/game/data/generation';
 import { TUNING, signalForLevel, spawnInterval, spawnDoubleChance, maxActiveEnemies } from '@/game/data/tuning';
 import { readFileSync } from 'node:fs';
@@ -14,7 +15,7 @@ import { validateProfile } from 'profileValidation';
 const run=(id='rookie')=>({...createRun(characterById(id),false,123456,`test-${id}`),signal:10000});
 const shop=()=>enterShop(run());
 const weapon=(id,pattern='projectile',rarity='Common')=>({id,baseId:'power',name:id,pattern,rarity,damage:30,rate:1,range:300,mods:[],slotType:pattern==='melee'?'melee':'ranged'});
-test('all 11 characters selectable; starting and alternate kits obey restrictions',()=>{assert.equal(CHARACTERS.length,11);assert.equal(migrateProfile({unlocked:['rookie']}).unlocked.length,11);for(const c of CHARACTERS){for(const alt of [false,true]){const r=createRun(c,alt,12,`kit-${c.id}`);assert(legalLoadout(c,r.weapons));assert(r.specialUnlocked);validateProfile({...freshProfile(),checkpoint:{phase:'ready',run:r}},'owner')}}});
+test('13 technicians on the roster; 11 immediately selectable; kits obey restrictions',()=>{assert.equal(CHARACTERS.length,13);assert.equal(migrateProfile({unlocked:['rookie']}).unlocked.length,11);for(const c of CHARACTERS){for(const alt of [false,true]){const r=createRun(c,alt,12,`kit-${c.id}`);assert(legalLoadout(c,r.weapons));assert(r.specialUnlocked);validateProfile({...freshProfile(),checkpoint:{phase:'ready',run:r}},'owner')}}});
 test('legacy career preserved and Dispatch ids migrate',()=>{const p=migrateProfile({version:3,runs:12,totalKills:345,highWave:9,unlocked:['rookie','veteran'],selectedCharacter:'dispatch',highWaveByCharacter:{dispatch:9},loadouts:['dispatch:alt']});assert.equal(p.runs,12);assert(p.challenges.includes('veteran'));assert.equal(p.totalKills,345);assert.equal(p.selectedCharacter,'don');assert.equal(p.highWaveByCharacter.don,9);assert(p.loadouts.includes('don:alt'));assert.equal(characterById('dispatch').name,'Dispatch Don')});
 test('completion run id is idempotent; death removes checkpoint not career',()=>{const r={...run(),hp:0,kills:20,earnedSignal:70};const a=completeRun(freshProfile(),r).save,b=completeRun(a,r).save;assert.equal(b.runs,1);assert.equal(b.totalKills,20);assert.equal(b.bestSignal,70);assert.equal(b.checkpoint,null)});
 test('load sanitizes forbidden weapons, family limits and old deploy ranks',()=>{const r=run('frenzy');const next=normalizeRun({...r,weapons:[...r.weapons,weapon('illegal')],deployables:[{structure:'barricade',stacks:4}]});assert(next.weapons.every(w=>allowedWeapon(next.character,w)));assert.equal(next.deployables[0].stacks,2)});
@@ -30,6 +31,39 @@ test('small percentage rolls display correctly, not as zero percent',()=>{assert
 test('positive Luck decreases Common frequency',()=>{const a=createGenerator(111),b=createGenerator(111);let ac=0,bc=0;for(let i=0;i<10000;i++){if(a.weapon(0).rarity==='Common')ac++;if(b.weapon(100).rarity==='Common')bc++}assert(bc<ac-1000)});
 test('fresh offer rates sampled; forbidden tools never offered; premium eligibility enforced',()=>{let deploy=0,premium=0,n=0;for(let wave=1;wave<=5000;wave++){const r=enterShop({...run(),wave,weapons:[weapon('epic','projectile','Epic')]});for(const i of r.shop.offers){n++;if(i.deploy || i.turret)deploy++;if(i.premium)premium++}}console.log('OFFER_AUDIT',JSON.stringify({freshSlots:n,deploy,deployPercent:deploy/n*100,premium,premiumPercent:premium/n*100}));assert(deploy/n>.014 && deploy/n<.026);assert(premium/n>.006 && premium/n<.014);for(const id of ['frenzy','oracle'])for(let wave=1;wave<=300;wave++){const r=enterShop({...run(id),wave});assert(r.shop.offers.every(i=>!i.baseId || allowedWeapon(r.character,i)));assert(r.shop.offers.every(i=>!i.premium))}});
 test('XP reduction, rising thresholds and spawn supply estimate are explicit',()=>{assert.equal(TUNING.xpPickupFactor,.65);for(let l=1;l<100;l++)assert(signalForLevel(l)>signalForLevel(l-1));const audit=[1,2,3].map(supplyEstimate);console.log('SPAWN_SUPPLY_ESTIMATE_NOT_PLAYTEST',JSON.stringify(audit));assert.equal(audit[0].newOrdinaryXp,+(audit[0].oldOrdinaryXp*.65).toFixed(2))});
+test('new technicians: kits, unlock gates, signature timers and engine wiring',()=>{
+  assert.equal(CHARACTERS.length,13);
+  const clone=characterById('clone'),isr=characterById('isr');
+  assert.equal(clone.stats.cleanliness,-35);assert.equal(clone.stats.speed,275);
+  assert(!unlockMet({deaths:0,squirrelDefeated:false},clone));assert(unlockMet({deaths:5},clone));
+  assert(!unlockMet({squirrelDefeated:false},isr));assert(unlockMet({squirrelDefeated:true},isr));
+  for(const c of [clone,isr]) for(const alt of [false,true]){const r=createRun(c,alt,12,`kit2-${c.id}`);assert(legalLoadout(c,r.weapons));validateProfile({...freshProfile(),checkpoint:{phase:'ready',run:r}},'owner')}
+  assert.equal(activateSignature({...run('clone'),character:clone},{},{}),8);
+  assert.equal(activateSignature({...run('isr'),character:isr},{},{}),8);
+  const engine=readFileSync(new URL('../signalEngine.js',import.meta.url),'utf8');
+  assert(engine.includes("'outage'?.5:1"));assert(engine.includes("cash'?2:1"));assert(engine.includes('outage?2.2:1'));
+  const audio=readFileSync(new URL('../audio.js',import.meta.url),'utf8');
+  assert(audio.includes('cash:()=>'));assert(audio.includes('whistle:()=>'));
+});
+test('Contractor Clone: Rare rarity cap everywhere, Rare overclock to rank 3, roster gating',()=>{
+  const g=createGenerator(77,1,'Rare');for(let i=0;i<200;i++)assert(['Common','Rare'].includes(g.weapon(0).rarity));
+  const clone={...run('clone'),weapons:[weapon('rare','projectile','Rare')]};
+  assert.equal(premiumTargets(clone).length,1);
+  assert.equal(premiumPreview(premiumTargets(clone)[0],cloneOverclockCap(clone)).overclockRank,1);
+  const ranked={...weapon('rare','projectile','Rare'),overclockRank:3};
+  assert(!premiumTargets({...clone,weapons:[ranked]}).length);
+  const rookie={...run(),weapons:[weapon('rare','projectile','Rare')]};assert(!premiumTargets(rookie).length);
+  assert(/Clone Overclocked/.test(premiumPreview(weapon('r2','projectile','Rare')).name));
+});
+test('item stat rolls scale with wave (capped at 2×)',()=>{
+  assert.equal(TUNING.itemStatWaveScale,.06);
+  // Aggregate over many seeds: per-value display rounding would make a single
+  // comparison noisy, but summed roll value converges on the scale factor.
+  const sum=wave=>{let t=0;for(let s=1;s<=200;s++){for(const m of createGenerator(s*7919,wave).passive(0).mods)t+=m.value}return t};
+  const early=sum(1),late=sum(20),capped=sum(40);
+  assert(Math.abs(late/early-(1+TUNING.itemStatWaveScale*19))<.08);
+  assert(Math.abs(capped/early-2)<.08);
+});
 test('rotator-style wave density: trickle pacing, 34-active ceiling, stat scaling replaces body count',()=>{
   assert.equal(maxActiveEnemies(1),13);assert.equal(maxActiveEnemies(8),23);assert.equal(maxActiveEnemies(15),33);
   assert.equal(maxActiveEnemies(20),34);assert.equal(maxActiveEnemies(40),34);

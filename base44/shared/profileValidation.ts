@@ -1,5 +1,5 @@
 // Server boundary, not a simulation or anti-cheat claim. Mirrors roster equip rules.
-const ids=['rookie','nomad','veteran','oracle','frenzy','cleaner','bucket','don','admin','patty','deadline'];
+const ids=['rookie','nomad','veteran','oracle','frenzy','cleaner','bucket','don','admin','patty','deadline','clone','isr'];
 const patterns={cleaver:'melee',splicer:'nova',otdr:'pierce',vfl:'beam',power:'projectile',stripper:'projectile',cleaner:'cone',cutters:'melee',tray:'turret',closure:'turret',cable:'turret',fanout:'turret',jumper:'chain',midspan:'pierce',blaster:'cone',deadzone:'beamSweep',switch:'chain',bell:'orbiting',rocket:'thrown',dowel:'projectile'};
 const melee=w=>['melee','chain','nova','orbiting'].includes(w.pattern);
 const rename=id=>['dispatch','dave','dispatch_dave'].includes(id)?'don':id;

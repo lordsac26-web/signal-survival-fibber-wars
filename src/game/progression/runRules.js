@@ -9,9 +9,9 @@ export function legalLoadout(c, weapons) {
   if (weapons.some(w => !allowedWeapon(c, w))) return false;
   return !c.familyCap || ['melee','ranged'].every(k => weapons.filter(w => weaponSlot(w) === k).length <= c.familyCap);
 }
-export function normalizeWeapon(w, index = 0) {
+export function normalizeWeapon(w, index = 0, rankCap = TUNING.overclockRankCap) {
   const obj = typeof w === 'string' ? {...WEAPONS[w],baseId:w} : {...w};
-  return {...obj,id:obj.id || `legacy-tool-${index}-${obj.baseId}`,slotType:weaponSlot(obj),rarity:obj.rarity || 'Common',mods:obj.mods || [],overclockRank:Math.min(TUNING.overclockRankCap,obj.overclockRank || 0)};
+  return {...obj,id:obj.id || `legacy-tool-${index}-${obj.baseId}`,slotType:weaponSlot(obj),rarity:obj.rarity || 'Common',mods:obj.mods || [],overclockRank:Math.min(rankCap,obj.overclockRank || 0)};
 }
 export function rebuildStats(run) {
   let next = {...run,...run.character.stats,cleaningKillsHeal:0,bonusSignal:0,hitSpeedBoost:0,critKnockback:0,turretQuality:0,firstHitBlocked:0,spliceExplosion:0};
@@ -25,9 +25,10 @@ export function normalizeRun(raw) {
   if (!raw) return null;
   const c = characterById(raw.character?.id || raw.characterId);
   if (!c || !raw.runId || raw.hp <= 0 || !Number.isInteger(raw.wave) || raw.wave < 1) return null;
+  const rankCap = c.id === 'clone' ? TUNING.cloneOverclockCap : TUNING.overclockRankCap;
   const weapons = [];
-  for (const value of raw.weapons || []) {const w=normalizeWeapon(value,weapons.length);if(WEAPON_ARCHETYPES.some(a=>a[0]===w.baseId && a[2]===w.pattern) && allowedWeapon(c,w) && legalLoadout(c,[...weapons,w])) weapons.push(w)}
-  if (!weapons.length) weapons.push(...c.start.map((id,i)=>normalizeWeapon({...WEAPONS[id],baseId:id,id:`${raw.runId}-starter-${i}`})));
+  for (const value of raw.weapons || []) {const w=normalizeWeapon(value,weapons.length,rankCap);if(WEAPON_ARCHETYPES.some(a=>a[0]===w.baseId && a[2]===w.pattern) && allowedWeapon(c,w) && legalLoadout(c,[...weapons,w])) weapons.push(w)}
+  if (!weapons.length) weapons.push(...c.start.map((id,i)=>normalizeWeapon({...WEAPONS[id],baseId:id,id:`${raw.runId}-starter-${i}`},i,rankCap)));
   const items = (raw.items || []).filter(i=>!i.baseId && !i.deploy && !i.premium);
   const next = {...raw,signal:raw.signal || 0,xp:raw.xp || 0,level:raw.level || 0,kills:raw.kills || 0,earnedSignal:raw.earnedSignal ?? raw.signal ?? 0,character:c,weapons,items,specialUnlocked:true,deployables:(raw.deployables || []).filter(d=>d.structure!==c.signatureStructure).map(d=>({...d,stacks:Math.min(TUNING.deployRankCap,d.stacks || 1)})),lockedIds:(raw.lockedIds || []).slice(0,TUNING.maxLocks)};
   if(next.shop) next.shop={...next.shop,offers:(next.shop.offers || []).map(i=>!i || !i.baseId || allowedWeapon(c,i) ? i : null)};

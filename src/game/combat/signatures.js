@@ -12,6 +12,8 @@ export function activateSignature(run,p,api){
     case 'barrier':return api.barrier()?0:null;
     case 'sprint':return 5;
     case 'deadline':return 4;
+    case 'cash':return 8;   // double Signal on every drop while the timer runs
+    case 'outage':return 8; // −50% player damage + slowed spawns while it runs
     default:return null;
   }
 }

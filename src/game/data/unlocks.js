@@ -26,6 +26,14 @@ export const ACHIEVEMENTS = [
 
 // Alternate starting toolkits, one per character (altStart/altUnlock live in
 // characters.js so the balance numbers stay with the character data).
+// Character gating (new): a technician with an `unlock` spec stays locked
+// until the lifetime metric meets the goal. 'squirrel' reads the
+// squirrelDefeated career flag (set when a run clears a boss wave); other
+// metrics are plain profile counters. Reads metrics only — never the unlocked
+// list — so migrated saves cannot accidentally pre-unlock gated technicians.
+export const unlockMet = (p, c) => !c.unlock ||
+  (c.unlock.metric === 'squirrel' ? !!p.squirrelDefeated : (p[c.unlock.metric] || 0) >= c.unlock.goal);
+
 export const LOADOUTS = CHARACTERS.filter(c => c.altStart).map(c => ({
   id: `${c.id}:alt`,
   charId: c.id,
