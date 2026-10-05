@@ -1,4 +1,6 @@
-// Playtest targets, not guaranteed outcomes. Spawn density is unchanged.
+// Playtest targets, not guaranteed outcomes. Wave density follows the
+// "rotator-style" pacing: a LOW cap on simultaneous actives with a steady
+// trickle of spawns, and per-wave HP/damage scaling instead of body count.
 // Economy follow-up: shop prices now scale with the wave (Brotato-style tier
 // growth), kill Signal scales mildly, Legendary loot is gated behind the
 // level-10 mark, and level thresholds steepen late to slow power-creep.
@@ -13,5 +15,11 @@ export const TUNING = Object.freeze({
 });
 export const signalForLevel = level => TUNING.levelBase + level * TUNING.levelLinear + level * level * TUNING.levelQuadratic;
 export const waveDuration = wave => Math.min(90, 20 + (wave - 1) * 4);
-export const spawnInterval = wave => Math.max(.14, .72 - wave * .035);
-export const spawnDoubleChance = wave => Math.min(.75, wave * .05);
+// Trickle pacing (was a flood: interval floor .14s, double chance up to .75).
+// Spawn attempts slow as waves rise and the double-spawn chance tops out low.
+export const spawnInterval = wave => Math.max(.32, .72 - wave * .022);
+export const spawnDoubleChance = wave => Math.min(.4, wave * .03);
+// Simultaneous-actives cap — the readability ceiling. Roughly linear early
+// (12 + 1.4/wave) and hard-capped at 34 so late waves stay legible; ordinary
+// spawn attempts that would exceed it are skipped, the boss never is.
+export const maxActiveEnemies = wave => Math.min(34, Math.floor(12 + wave * 1.4));

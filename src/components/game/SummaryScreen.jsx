@@ -6,7 +6,7 @@ export default function SummaryScreen({ run, newUnlocks = [], onMenu, onRetry })
     <main className="game-grid flex min-h-screen items-center justify-center p-5 text-white">
       <section className="w-full max-w-xl rounded-3xl border-2 border-rose-400/30 bg-slate-950/75 p-7 text-center shadow-2xl sm:p-10">
         <p className="font-black uppercase tracking-[.3em] text-rose-300">Shift Terminated</p>
-        <h1 className="mt-2 text-4xl font-black uppercase sm:text-5xl">Truck Rolled.</h1>
+        <h1 className="mt-2 text-3xl font-black uppercase sm:text-5xl">Truck Rolled.</h1>
         <p className="mt-3 text-slate-300">Dispatch says “great effort” in a tone that suggests otherwise.</p>
         {newUnlocks.length > 0 && (
           <div className="mt-5 space-y-2">

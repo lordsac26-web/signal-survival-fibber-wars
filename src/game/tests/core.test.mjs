@@ -5,7 +5,8 @@ import { createRun, normalizeRun, legalLoadout, rebuildStats, allowedWeapon } fr
 import { freshProfile, migrateProfile, completeRun } from '@/game/progression/profileModel';
 import { enterShop, shopTransaction, premiumPreview } from '@/game/shop/shopRules';
 import { createGenerator } from '@/game/data/generation';
-import { TUNING, signalForLevel } from '@/game/data/tuning';
+import { TUNING, signalForLevel, spawnInterval, spawnDoubleChance, maxActiveEnemies } from '@/game/data/tuning';
+import { readFileSync } from 'node:fs';
 import { formatStat, itemDeltas } from '@/game/data/stats';
 import { supplyEstimate } from '@/game/data/balanceAudit';
 import { activateSignature } from '@/game/combat/signatures';
@@ -29,4 +30,16 @@ test('small percentage rolls display correctly, not as zero percent',()=>{assert
 test('positive Luck decreases Common frequency',()=>{const a=createGenerator(111),b=createGenerator(111);let ac=0,bc=0;for(let i=0;i<10000;i++){if(a.weapon(0).rarity==='Common')ac++;if(b.weapon(100).rarity==='Common')bc++}assert(bc<ac-1000)});
 test('fresh offer rates sampled; forbidden tools never offered; premium eligibility enforced',()=>{let deploy=0,premium=0,n=0;for(let wave=1;wave<=5000;wave++){const r=enterShop({...run(),wave,weapons:[weapon('epic','projectile','Epic')]});for(const i of r.shop.offers){n++;if(i.deploy || i.turret)deploy++;if(i.premium)premium++}}console.log('OFFER_AUDIT',JSON.stringify({freshSlots:n,deploy,deployPercent:deploy/n*100,premium,premiumPercent:premium/n*100}));assert(deploy/n>.014 && deploy/n<.026);assert(premium/n>.006 && premium/n<.014);for(const id of ['frenzy','oracle'])for(let wave=1;wave<=300;wave++){const r=enterShop({...run(id),wave});assert(r.shop.offers.every(i=>!i.baseId || allowedWeapon(r.character,i)));assert(r.shop.offers.every(i=>!i.premium))}});
 test('XP reduction, rising thresholds and spawn supply estimate are explicit',()=>{assert.equal(TUNING.xpPickupFactor,.65);for(let l=1;l<100;l++)assert(signalForLevel(l)>signalForLevel(l-1));const audit=[1,2,3].map(supplyEstimate);console.log('SPAWN_SUPPLY_ESTIMATE_NOT_PLAYTEST',JSON.stringify(audit));assert.equal(audit[0].newOrdinaryXp,+(audit[0].oldOrdinaryXp*.65).toFixed(2))});
+test('rotator-style wave density: trickle pacing, 34-active ceiling, stat scaling replaces body count',()=>{
+  assert.equal(maxActiveEnemies(1),13);assert.equal(maxActiveEnemies(8),23);assert.equal(maxActiveEnemies(15),33);
+  assert.equal(maxActiveEnemies(20),34);assert.equal(maxActiveEnemies(40),34);
+  for(let w=2;w<=40;w++)assert(maxActiveEnemies(w)>=maxActiveEnemies(w-1));
+  assert.equal(spawnInterval(20),.32);assert(Math.abs(spawnInterval(1)-.698)<1e-9);assert(spawnInterval(8)<spawnInterval(1));
+  assert.equal(spawnDoubleChance(20),.4);assert.equal(spawnDoubleChance(1),.03);
+  const engine=readFileSync(new URL('../signalEngine.js',import.meta.url),'utf8');
+  assert(engine.includes('maxActiveEnemies(run.wave)'));
+  assert(engine.includes('spawnEnemy(null,true)'));
+  assert(engine.includes('base.hp*(1+(run.wave-1)*.28)'));
+  assert(engine.includes('base.damage*(1+(run.wave-1)*.02)'));
+});
 test('every signature has an effect hook, Don grants four helpers, Bucket grants one sentry',()=>{for(const c of CHARACTERS){const r=run(c.id),p={x:327,y:412,inv:0};const calls=[];const api={area:(...a)=>calls.push(['area',...a]),launch:(...a)=>calls.push(['launch',...a]),heal:a=>calls.push(['heal',a]),turret:a=>{calls.push(['turret',a]);return true},barrier:()=>{calls.push(['barrier']);return true}};assert.notEqual(activateSignature(r,p,api),null);if(c.id==='don')assert.equal(calls.filter(a=>a[0]==='turret').length,4);if(c.id==='bucket')assert.equal(calls.filter(a=>a[0]==='turret').length,1);if(c.id==='admin')assert.equal(p.inv,1.5)}});

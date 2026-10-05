@@ -5,7 +5,7 @@ import SpatialHash from '@/game/performance/SpatialHash';
 import { enemySprite } from '@/game/performance/spriteAtlas';
 import { drawProjectile } from '@/game/performance/drawProjectile';
 import { sfx } from '@/game/audio';
-import { TUNING, signalForLevel, waveDuration, spawnInterval, spawnDoubleChance } from '@/game/data/tuning';
+import { TUNING, signalForLevel, waveDuration, spawnInterval, spawnDoubleChance, maxActiveEnemies } from '@/game/data/tuning';
 import { activateSignature } from '@/game/combat/signatures';
 import { drawHelper } from '@/game/performance/drawHelper';
 import { effectiveRange, updateVisibleViewport, withinReach, areaCanHit } from '@/game/combat/effectiveRange';
@@ -90,7 +90,11 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  function nearestVisitor(e){if(!e.active)return;const d=Math.hypot(e.x-queryX,e.y-queryY);if(d<nearestDist){nearestBest=e;nearestDist=d}}
  function nearest(range){queryX=p.x;queryY=p.y;nearestBest=null;nearestDist=range;grid.visit(p.x,p.y,range,nearestVisitor);return nearestBest}
  function nearestAt(x,y,range){queryX=x;queryY=y;nearestBest=null;nearestDist=range;grid.visit(x,y,range,nearestVisitor);return nearestBest}
- function spawnEnemy(kind){const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||TYPES[(Math.random()*Math.min(TYPES.length,2+(run.wave/2|0)))|0]],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;e.hp=base.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage;e.r=base.r;e.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
+ function activeFoeCount(){let n=0;for(let i=0;i<enemies.items.length;i++)if(enemies.items[i].active)n++;return n}
+ function spawnEnemy(kind,force){if(!force&&activeFoeCount()>=maxActiveEnemies(run.wave))return;const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||TYPES[(Math.random()*Math.min(TYPES.length,2+(run.wave/2|0)))|0]],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;// DENSITY REBALANCE: fewer simultaneous bodies (see maxActiveEnemies) are
+// compensated with steeper per-wave HP scaling (.19 → .28) plus a new
+// contact-damage scale. The boss keeps its own literal .19 scaling untouched.
+e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage*(1+(run.wave-1)*.02);e.r=base.r;e.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
  if(e.kind==='lag'&&lagArt){e.art=lagArt;e.anim=createLagAnimation()}}
  // SQUIRREL BOSS: spawns at the wave-20 gate (then every 10 waves). Phase 1
  // chases the player; at <=50% HP it flees, keeps other impairments between
@@ -257,7 +261,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
   for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;ctx.fillStyle=n.crit?'#fde047':'#fff';ctx.font=n.crit?'bold 18px Chivo':'bold 13px Chivo';ctx.fillText(n.value,Math.round(n.x),Math.round(n.y))}
   const px=Math.round(p.x),py=Math.round(p.y);
   if(spriteState){if(run.character.id==='oracle')drawCharacterSprite(ctx,characterArt,spriteState,p.x,p.y);else drawDonSprite(ctx,characterArt,spriteState,p.x,p.y)}else {ctx.fillStyle=run.character.color;ctx.beginPath();ctx.arc(px,py,p.r,0,7);ctx.fill();ctx.fillStyle=run.character.vest;ctx.fillRect(px-14,py+2,28,16);ctx.fillStyle=run.character.belt;ctx.fillRect(px-15,py+11,30,5);ctx.fillStyle=run.character.color;ctx.fillRect(px-20,py-17,40,8);ctx.fillStyle='#fff';ctx.fillRect(px-8,py-5,6,7);ctx.fillRect(px+3,py-5,6,7);}if(specialTimer>0){ctx.strokeStyle='#fde047';ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,py,25+Math.sin(performance.now()*.02)*5,0,7);ctx.stroke()}}
- function key(e){if(e.key==='F9'){stress=!stress;if(stress){for(let i=0;i<500;i++)spawnEnemy()}cb.flash(stress?'STRESS MODE: 500 IMPAIRMENTS':'STRESS MODE OFF')}} window.addEventListener('keydown',key);resize();sfx('wave');if(run.wave%5===0)sfx('boss');
+ function key(e){if(e.key==='F9'){stress=!stress;if(stress){for(let i=0;i<500;i++)spawnEnemy(null,true)}cb.flash(stress?'STRESS MODE: 500 IMPAIRMENTS':'STRESS MODE OFF')}} window.addEventListener('keydown',key);resize();sfx('wave');if(run.wave%5===0)sfx('boss');
  function frame(now){
   if(paused.current){last=now;if(!over)raf=requestAnimationFrame(frame);return}
   let delta=Math.min(MAX_DT,(now-last)/1000);last=now;

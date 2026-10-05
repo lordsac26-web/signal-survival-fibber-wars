@@ -24,7 +24,7 @@ export default function StatsScreen({ run, onClose }) {
             <h1 className="text-3xl font-black uppercase sm:text-4xl" style={{ color: c.color }}>{c.name}</h1>
             <p className="mt-1 text-sm font-semibold text-slate-300">{c.tag}</p>
           </div>
-          <button onClick={onClose} className="rounded-xl border-2 border-white/20 bg-slate-900 p-2 hover:bg-slate-800" title="Resume (Esc / Tab)">
+          <button onClick={onClose} className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border-2 border-white/20 bg-slate-900 p-2 hover:bg-slate-800" title="Resume (Esc / Tab)">
             <X className="size-6" />
           </button>
         </header>
