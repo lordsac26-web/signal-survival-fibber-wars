@@ -5,7 +5,7 @@ import { decodePng } from './pngDecode.mjs';
 import { ENEMIES } from '@/game/data/combat.js';
 import { SQUIRREL, bossWave } from '@/game/data/bosses.js';
 import { characterSprite, enemySpriteDef } from '@/game/art/characterSprites.js';
-import { createSquirrelAnimation, updateSquirrelAnimation, squirrelFrame, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation.js';
+import { createSquirrelAnimation, updateSquirrelAnimation, squirrelFrame, squirrelRelease, FEC_POP, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation.js';
 import { createDonAnimation, updateDonAnimation, donFrame } from '@/game/art/donSpriteAnimation.js';
 import { guideEntries } from '@/game/data/reference.js';
 
@@ -72,11 +72,19 @@ test('squirrel FEC telegraph frames progress from windup to the release frame',(
   const art=SQ_ART(),s=createSquirrelAnimation();
   s.wind=.8;s.cast=1.05; // telegraph start → frame 0 (tail begins fluffing)
   assert.equal(squirrelFrame(art,s).sx,0);
-  s.wind=.3;s.cast=.55; // mid-windup → frame 2
+  s.wind=.5;s.cast=.75; // early-mid windup (0.3s in) → frame 2 (fluffing fast)
   assert.equal(squirrelFrame(art,s).sx,2*220);
+  s.wind=.3;s.cast=.55; // final 45% of the telegraph → frame 3 held (fully puffed)
+  assert.equal(squirrelFrame(art,s).sx,3*220);
   s.wind=0;s.cast=.25; // engine fired the cone → frame 4 release, held
   const f=squirrelFrame(art,s);
   assert.equal(f.sx,4*220);assert.ok(f.attack);
+  // release pop: fires with the cone, decays over ~0.3s, scales the frame
+  assert.equal(s.pop,0);
+  squirrelRelease(s);assert.equal(s.pop,FEC_POP);
+  assert.equal(f.frameW,220); // pop scales at draw time, frame data unchanged
+  updateSquirrelAnimation(s,0,0,.15,art.definition);assert.equal(s.pop,FEC_POP-.15*3.3);
+  updateSquirrelAnimation(s,0,0,1,art.definition);assert.equal(s.pop,0);
   s.cast=0; // back to locomotion
   updateSquirrelAnimation(s,-1,0,.05,art.definition);
   const walk=squirrelFrame(art,s);

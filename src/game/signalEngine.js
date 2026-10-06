@@ -16,7 +16,7 @@ import { createLagAnimation, updateLagAnimation, drawLagSprite } from '@/game/ar
 import { drawTruckTurret } from '@/game/art/structureSprite';
 import { structureSpriteDef } from '@/game/art/characterSprites';
 import { SQUIRREL, bossWave } from '@/game/data/bosses';
-import { createSquirrelAnimation, updateSquirrelAnimation, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation';
+import { createSquirrelAnimation, updateSquirrelAnimation, squirrelRelease, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation';
 import { createDonAnimation, updateDonAnimation, drawDonSprite } from '@/game/art/donSpriteAnimation';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
@@ -116,7 +116,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
  function squirrelUpdate(e,dt){const s=e.sq,d=SQUIRREL,wasWind=s.wind>0;
   if(s.phase===1&&e.hp<=e.max*.5){s.phase=2;s.castCd=1.2;cb.flash(SQUIRREL.phaseFlash);addShake(6)}
   s.cast=Math.max(0,s.cast-dt);s.wind=Math.max(0,s.wind-dt);s.castCd-=dt;
-  if(wasWind&&!s.wind)fireCone(e);
+  if(wasWind&&!s.wind){fireCone(e);squirrelRelease(s)}
   if(s.phase===2&&s.wind<=0&&s.cast<=0&&s.castCd<=0&&distance(p,e)<d.cone.range*.95){s.wind=d.cone.windup;s.cast=d.cone.windup+.25;s.castCd=d.cone.cooldown;s.aim=Math.atan2(p.y-e.y,p.x-e.x);sfx('boss')}
   let a;
   if(s.phase===2){ // flee the player, biased toward the nearest crowd to hide behind
