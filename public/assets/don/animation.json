@@ -6,6 +6,8 @@
   "idleFront": { "columns": 9, "rows": 1, "breathingFrames": 7, "radioEarFrame": 7, "pointingFrame": 8 },
   "idleBack": { "columns": 9, "rows": 1 },
   "walkSide": { "columns": 9, "rows": 1, "facing": "right" },
+  "walkLeft": { "columns": 8, "rows": 1, "frameWidth": 140, "frameHeight": 190, "facing": "left" },
   "signalPoses": { "columns": 4, "rows": 1, "radioUp": [0, 1], "stopHand": [2, 3] },
+  "crew": { "columns": 4, "rows": 2, "frameWidth": 256, "frameHeight": 186, "sequence": "escalate-to-field-crew", "sequenceFrames": 8 },
   "fps": 8
 }

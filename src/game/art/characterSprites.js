@@ -10,11 +10,12 @@ export const CHARACTER_SPRITES=Object.freeze({oracle:Object.freeze({
   directions:{down:0,left:64,right:128,up:192},idleRow:256
 }),don:Object.freeze({
   atlas:'/assets/don/idle-front.png',portrait:'/assets/don/portrait.png',manifest:'/assets/don/animation.json',hurtTint:'rgba(251,113,133,.6)',
-  extras:[['back','/assets/don/idle-back.png',1170,190],['walk','/assets/don/walk-side.png',1170,190],['signal','/assets/don/signal-poses.png',520,190]],
+  extras:[['back','/assets/don/idle-back.png',1170,190],['walk','/assets/don/walk-side.png',1170,190],['signal','/assets/don/signal-poses.png',520,190],['walkLeft','/assets/don/walk-left.png',1120,190],['crew','/assets/don/crew.png',1024,372]],
   sources:{atlas:source+'cd24a6944_don_idle_front.png',portrait:source+'0a52d8d76_don-portrait.png',back:source+'b3e497e7f_don_idle_back.png',walk:source+'54be9d69f_don_walk_side.png',signal:source+'017a98330_don_signal_poses.png'},
   atlasW:1170,atlasH:190,cellW:130,cellH:190,columns:9,rows:1,idleFps:5,walkFps:10,gestureHold:.8,signalFrameW:130,
+  walkLeftColumns:8,walkLeftFrameW:140,crewFrameW:256,crewFrameH:186,
   worldSize:52,anchorX:.5,anchorY:.9,portraitW:127,portraitH:193,
-  manifestSpec:{frameWidth:130,frameHeight:190,'idleFront.columns':9,'idleBack.columns':9,'walkSide.columns':9,'walkSide.facing':'right','signalPoses.columns':4,fps:8}
+  manifestSpec:{frameWidth:130,frameHeight:190,'idleFront.columns':9,'idleBack.columns':9,'walkSide.columns':9,'walkSide.facing':'right','signalPoses.columns':4,'walkLeft.columns':8,'walkLeft.frameWidth':140,'walkLeft.frameHeight':190,'crew.columns':4,'crew.rows':2,'crew.frameWidth':256,'crew.frameHeight':186,fps:8}
 })});
 export const characterSprite=id=>CHARACTER_SPRITES[id] || null;
 // Lag Sprite enemy — same definition/manifest/anchor convention as the character sprites,

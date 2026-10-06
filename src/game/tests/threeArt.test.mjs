@@ -95,14 +95,34 @@ test('squirrel draw uses NEAREST smoothing and restores it',()=>{
   assert.equal(log[log.length-1],true);
 });
 
-test('dispatch don frames: signal pose on special, mirrored walk, idle gesture variety',()=>{
-  const def=characterSprite('don'),art={definition:def,atlas:{},back:{},walk:{},signal:{},hurt:{}};
+test('don crew + walk-left atlases: sliced locally at exact dims, background keyed',async()=>{
+  for(const [local,w,h] of [['don/walk-left.png',1120,190],['don/crew.png',1024,372]]){
+    const bytes=await readFile(new URL(`../../../public/assets/${local}`,import.meta.url));
+    const d=decodePng(bytes);
+    assert.equal(d.width,w,`${local} width`);assert.equal(d.height,h,`${local} height`);
+    assert.equal(d.rgba[3],0,`${local} background must be keyed transparent`);
+    let opaque=0;for(let i=3;i<d.rgba.length;i+=4)if(d.rgba[i])opaque++;
+    assert.ok(opaque>w*h*.08,`${local} should hold most of the sprite content`);
+  }
+});
+
+test('dispatch don frames: crew sequence on special, true left walk, mirrored right walk',()=>{
+  const def=characterSprite('don'),art={definition:def,atlas:{},back:{},walk:{},walkLeft:{},signal:{},crew:{},hurt:{}};
   const s=createDonAnimation();
-  s.signal=1; // 'Escalate to Field Crew' active → radio-up signal frame 0
-  assert.deepEqual([donFrame(art,s).image,donFrame(art,s).sx],[art.signal,0]);
+  s.signal=1; // 'Escalate to Field Crew' active → crew pose 0 (radio call-in)
+  assert.deepEqual([donFrame(art,s).image,donFrame(art,s).sx,donFrame(art,s).sy],[art.crew,0,0]);
+  s.crewClock=1.2; // pose 1: first sidekick arrives
+  assert.deepEqual([donFrame(art,s).sx,donFrame(art,s).sy],[def.crewFrameW,0]);
+  s.crewClock=4.5; // row 2: directing poses
+  assert.deepEqual([donFrame(art,s).sx,donFrame(art,s).sy],[0,def.crewFrameH]);
+  s.crewClock=99; // holds the final commanding pose
+  assert.deepEqual([donFrame(art,s).sx,donFrame(art,s).sy],[3*def.crewFrameW,def.crewFrameH]);
   s.signal=0;
-  updateDonAnimation(s,-1,0,.05,def); // moving left → mirrored side walk
+  updateDonAnimation(s,-1,0,.05,def); // moving left → true left-facing walk, unmirrored
   let f=donFrame(art,s);
+  assert.equal(f.image,art.walkLeft);assert.ok(!f.mirror);
+  updateDonAnimation(s,1,0,.05,def); // moving right → right-facing walk, mirrored
+  f=donFrame(art,s);
   assert.equal(f.image,art.walk);assert.ok(f.mirror);
   updateDonAnimation(s,0,0,3,def); // idle long enough to reach the gesture beats
   const idle=donFrame(art,s);
