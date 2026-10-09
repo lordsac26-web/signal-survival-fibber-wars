@@ -21,7 +21,7 @@ function tech(id,portraitW,portraitH,idle,walk,walkLeft,attack,special){
     attackColumns:attack.frames,attackCellW:attack.cellW,attackCellH:attack.cellH,
     specialColumns:special.frames,specialCellW:special.cellW,specialCellH:special.cellH,
     idleBreathFrames:6,idleFps:5,walkFps:10,attackFps:12,specialFps:3,
-    attackDuration:.4,gestureHold:.8,
+    attackDuration:.4,gestureHold:.8,muzzle:attack.muzzle,
     worldSize:52,anchorX:.5,anchorY:.9,portraitW,portraitH,
     manifestSpec:{
       frameWidth:idle.cellW,frameHeight:idle.cellH,
@@ -30,7 +30,8 @@ function tech(id,portraitW,portraitH,idle,walk,walkLeft,attack,special){
       'walkLeft.columns':walkLeft.frames,'walkLeft.facing':'left',
       'attack.columns':attack.frames,
       'special.columns':special.frames,
-      fps:8
+      fps:8,
+      ...(attack.muzzle?{'muzzle.x':attack.muzzle.x,'muzzle.y':attack.muzzle.y}:{})
     }
   });
 }
@@ -66,11 +67,11 @@ don:Object.freeze(tech('don',94,136,
   {atlasW:1912,atlasH:117,cellW:239,cellH:117,frames:8}
 )),
 nomad:Object.freeze(tech('nomad',76,140,
-  {atlasW:675,atlasH:128,cellW:75,cellH:128,frames:9},
-  {atlasW:738,atlasH:136,cellW:82,cellH:136,frames:9},
-  {atlasW:684,atlasH:136,cellW:76,cellH:136,frames:9},
-  {atlasW:1496,atlasH:136,cellW:136,cellH:136,frames:11},
-  {atlasW:1560,atlasH:123,cellW:156,cellH:123,frames:10}
+  {atlasW:684,atlasH:138,cellW:76,cellH:138,frames:9},
+  {atlasW:648,atlasH:138,cellW:72,cellH:138,frames:9},
+  {atlasW:648,atlasH:138,cellW:72,cellH:138,frames:9},
+  {atlasW:984,atlasH:138,cellW:164,cellH:138,frames:6,muzzle:{x:1,y:96,cellW:164,cellH:138}},
+  {atlasW:1584,atlasH:138,cellW:198,cellH:138,frames:8}
 ))
 });
 export const characterSprite=id=>CHARACTER_SPRITES[id]||null;
