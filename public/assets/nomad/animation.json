@@ -1,0 +1,40 @@
+{
+  "characterId": "nomad",
+  "frameWidth": 75,
+  "frameHeight": 128,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.9
+  },
+  "idleFront": {
+    "columns": 9,
+    "rows": 1
+  },
+  "walkSide": {
+    "columns": 9,
+    "rows": 1,
+    "frameWidth": 82,
+    "frameHeight": 136,
+    "facing": "right"
+  },
+  "walkLeft": {
+    "columns": 9,
+    "rows": 1,
+    "frameWidth": 76,
+    "frameHeight": 136,
+    "facing": "left"
+  },
+  "attack": {
+    "columns": 11,
+    "rows": 1,
+    "frameWidth": 136,
+    "frameHeight": 136
+  },
+  "special": {
+    "columns": 10,
+    "rows": 1,
+    "frameWidth": 156,
+    "frameHeight": 123
+  },
+  "fps": 8
+}

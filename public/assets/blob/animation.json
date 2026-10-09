@@ -1,0 +1,40 @@
+{
+  "characterId": "dirty_connector_blob",
+  "frameWidth": 91,
+  "frameHeight": 92,
+  "anchor": {
+    "x": 0.5,
+    "y": 0.9
+  },
+  "idleFront": {
+    "columns": 10,
+    "rows": 1
+  },
+  "walkSide": {
+    "columns": 9,
+    "rows": 1,
+    "frameWidth": 88,
+    "frameHeight": 82,
+    "facing": "right"
+  },
+  "walkLeft": {
+    "columns": 9,
+    "rows": 1,
+    "frameWidth": 83,
+    "frameHeight": 81,
+    "facing": "left"
+  },
+  "attack": {
+    "columns": 9,
+    "rows": 1,
+    "frameWidth": 139,
+    "frameHeight": 86
+  },
+  "special": {
+    "columns": 7,
+    "rows": 1,
+    "frameWidth": 276,
+    "frameHeight": 115
+  },
+  "fps": 8
+}

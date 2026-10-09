@@ -1,7 +1,7 @@
 {
-  "characterId": "dispatch_don",
-  "frameWidth": 88,
-  "frameHeight": 124,
+  "characterId": "veteran",
+  "frameWidth": 75,
+  "frameHeight": 120,
   "anchor": {
     "x": 0.5,
     "y": 0.9
@@ -13,28 +13,28 @@
   "walkSide": {
     "columns": 8,
     "rows": 1,
-    "frameWidth": 76,
-    "frameHeight": 122,
+    "frameWidth": 68,
+    "frameHeight": 113,
     "facing": "right"
   },
   "walkLeft": {
     "columns": 8,
     "rows": 1,
-    "frameWidth": 77,
-    "frameHeight": 120,
+    "frameWidth": 68,
+    "frameHeight": 113,
     "facing": "left"
   },
   "attack": {
-    "columns": 8,
+    "columns": 6,
     "rows": 1,
-    "frameWidth": 111,
-    "frameHeight": 114
+    "frameWidth": 132,
+    "frameHeight": 124
   },
   "special": {
-    "columns": 8,
+    "columns": 7,
     "rows": 1,
-    "frameWidth": 239,
-    "frameHeight": 117
+    "frameWidth": 277,
+    "frameHeight": 119
   },
   "fps": 8
 }
