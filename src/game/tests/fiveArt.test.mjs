@@ -26,7 +26,8 @@ test('every new atlas exists at the exact measured dimensions with transparent b
         assert.ok(opaque>exp.w*exp.h*.05,`${charId} portrait should have content`);
         continue;
       }
-      const bytes=await readFile(new URL(`../../../public/assets/${charId}/${rowName==='idle'?'idle-front':rowName}.png`,import.meta.url));
+      const fileMap={idle:'idle-front',walk:'walk-side',walkLeft:'walk-left',attack:'attack',special:'special'};
+      const bytes=await readFile(new URL(`../../../public/assets/${charId}/${fileMap[rowName]}.png`,import.meta.url));
       const d=decodePng(bytes);
       assert.equal(d.width,exp.w,`${charId} ${rowName} atlas width`);
       assert.equal(d.height,exp.h,`${charId} ${rowName} atlas height`);
