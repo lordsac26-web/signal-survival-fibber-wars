@@ -1,23 +1,80 @@
-// Stable ids verified against characters.js (oracle) and combat.js ENEMIES (lag). Local files are byte-identical public uploads.
+// Stable ids verified against characters.js and combat.js ENEMIES. Local files
+// are processed transparent atlases (background keyed, frames repacked).
 const source='https://base44.app/api/apps/6aab67049cd04a621f2adf4f/files/mp/public/6aab67049cd04a621f2adf4f/';
-export const CHARACTER_SPRITES=Object.freeze({oracle:Object.freeze({
+
+// ── Shared helper: builds a technician sprite definition from measured atlas data.
+// Each character has: idle-front (atlas), walk-side, walk-left (true art),
+// attack, special — all as horizontally tiled, foot-aligned, equal-cell strips.
+function tech(id,portraitW,portraitH,idle,walk,walkLeft,attack,special){
+  const extras=[
+    ['walk',`/assets/${id}/walk-side.png`,walk.atlasW,walk.atlasH],
+    ['walkLeft',`/assets/${id}/walk-left.png`,walkLeft.atlasW,walkLeft.atlasH],
+    ['attack',`/assets/${id}/attack.png`,attack.atlasW,attack.atlasH],
+    ['special',`/assets/${id}/special.png`,special.atlasW,special.atlasH]
+  ];
+  return Object.freeze({
+    atlas:`/assets/${id}/idle-front.png`,portrait:`/assets/${id}/portrait.png`,manifest:`/assets/${id}/animation.json`,hurtTint:'rgba(251,113,133,.6)',
+    extras,
+    atlasW:idle.atlasW,atlasH:idle.atlasH,cellW:idle.cellW,cellH:idle.cellH,columns:idle.frames,
+    walkColumns:walk.frames,walkCellW:walk.cellW,walkCellH:walk.cellH,
+    walkLeftColumns:walkLeft.frames,walkLeftCellW:walkLeft.cellW,walkLeftCellH:walkLeft.cellH,
+    attackColumns:attack.frames,attackCellW:attack.cellW,attackCellH:attack.cellH,
+    specialColumns:special.frames,specialCellW:special.cellW,specialCellH:special.cellH,
+    idleBreathFrames:6,idleFps:5,walkFps:10,attackFps:12,specialFps:3,
+    attackDuration:.4,gestureHold:.8,
+    worldSize:52,anchorX:.5,anchorY:.9,portraitW,portraitH,
+    manifestSpec:{
+      frameWidth:idle.cellW,frameHeight:idle.cellH,
+      'idleFront.columns':idle.frames,
+      'walkSide.columns':walk.frames,'walkSide.facing':'right',
+      'walkLeft.columns':walkLeft.frames,'walkLeft.facing':'left',
+      'attack.columns':attack.frames,
+      'special.columns':special.frames,
+      fps:8
+    }
+  });
+}
+
+export const CHARACTER_SPRITES=Object.freeze({
+oracle:Object.freeze({
   atlas:'/assets/oracle/movement.png',portrait:'/assets/oracle/portrait.png',hurtTint:'rgba(251,113,133,.6)',
   manifest:'/assets/oracle/animation.json',
   sources:{atlas:source+'6000b350b_oracle-movement.png',portrait:source+'ddab5b16f_oracle-portrait.png',manifest:source+'e3ac4cbf8_oracle-animation.json'},
   width:448,height:320,cell:64,columns:7,rows:5,fps:8,worldSize:48,
   anchorX:.5,anchorY:.90625,
-  // Inspected supplied atlas: row 1 faces left, row 2 right, all seven columns usable.
   directions:{down:0,left:64,right:128,up:192},idleRow:256
-}),don:Object.freeze({
-  atlas:'/assets/don/idle-front.png',portrait:'/assets/don/portrait.png',manifest:'/assets/don/animation.json',hurtTint:'rgba(251,113,133,.6)',
-  extras:[['back','/assets/don/idle-back.png',1170,190],['walk','/assets/don/walk-side.png',1170,190],['signal','/assets/don/signal-poses.png',520,190],['walkLeft','/assets/don/walk-left.png',1120,190],['crew','/assets/don/crew.png',1024,372]],
-  sources:{atlas:source+'cd24a6944_don_idle_front.png',portrait:source+'0a52d8d76_don-portrait.png',back:source+'b3e497e7f_don_idle_back.png',walk:source+'54be9d69f_don_walk_side.png',signal:source+'017a98330_don_signal_poses.png'},
-  atlasW:1170,atlasH:190,cellW:130,cellH:190,columns:9,rows:1,idleFps:5,walkFps:10,gestureHold:.8,signalFrameW:130,
-  walkLeftColumns:8,walkLeftFrameW:140,crewFrameW:256,crewFrameH:186,
-  worldSize:52,anchorX:.5,anchorY:.9,portraitW:127,portraitH:193,
-  manifestSpec:{frameWidth:130,frameHeight:190,'idleFront.columns':9,'idleBack.columns':9,'walkSide.columns':9,'walkSide.facing':'right','signalPoses.columns':4,'walkLeft.columns':8,'walkLeft.frameWidth':140,'walkLeft.frameHeight':190,'crew.columns':4,'crew.rows':2,'crew.frameWidth':256,'crew.frameHeight':186,fps:8}
-})});
-export const characterSprite=id=>CHARACTER_SPRITES[id] || null;
+}),
+veteran:Object.freeze(tech('veteran',78,132,
+  {atlasW:675,atlasH:120,cellW:75,cellH:120,frames:9},
+  {atlasW:544,atlasH:113,cellW:68,cellH:113,frames:8},
+  {atlasW:544,atlasH:113,cellW:68,cellH:113,frames:8},
+  {atlasW:792,atlasH:124,cellW:132,cellH:124,frames:6},
+  {atlasW:1939,atlasH:119,cellW:277,cellH:119,frames:7}
+)),
+clone:Object.freeze(tech('clone',74,124,
+  {atlasW:648,atlasH:112,cellW:72,cellH:112,frames:9},
+  {atlasW:504,atlasH:114,cellW:63,cellH:114,frames:8},
+  {atlasW:520,atlasH:115,cellW:65,cellH:115,frames:8},
+  {atlasW:720,atlasH:112,cellW:120,cellH:112,frames:6},
+  {atlasW:1448,atlasH:114,cellW:181,cellH:114,frames:8}
+)),
+don:Object.freeze(tech('don',94,136,
+  {atlasW:792,atlasH:124,cellW:88,cellH:124,frames:9},
+  {atlasW:608,atlasH:122,cellW:76,cellH:122,frames:8},
+  {atlasW:616,atlasH:120,cellW:77,cellH:120,frames:8},
+  {atlasW:888,atlasH:114,cellW:111,cellH:114,frames:8},
+  {atlasW:1912,atlasH:117,cellW:239,cellH:117,frames:8}
+)),
+nomad:Object.freeze(tech('nomad',76,140,
+  {atlasW:675,atlasH:128,cellW:75,cellH:128,frames:9},
+  {atlasW:738,atlasH:136,cellW:82,cellH:136,frames:9},
+  {atlasW:684,atlasH:136,cellW:76,cellH:136,frames:9},
+  {atlasW:1496,atlasH:136,cellW:136,cellH:136,frames:11},
+  {atlasW:1560,atlasH:123,cellW:156,cellH:123,frames:10}
+))
+});
+export const characterSprite=id=>CHARACTER_SPRITES[id]||null;
+
 // Lag Sprite enemy — same definition/manifest/anchor convention as the character sprites,
 // plus an attack atlas. Pixel-inspected: front row is camera-facing (symmetric highlights);
 // side-row highlights sit right → the side row faces RIGHT, so left movement mirrors it.
@@ -29,7 +86,19 @@ export const ENEMY_SPRITES=Object.freeze({lag:Object.freeze({
   anchorX:.5,anchorY:.90625,portraitSize:256,attackW:128,attackH:64,
   frontRow:0,sideRow:64,sideFaces:'right',attackFront:0,attackSide:64,
   manifestSpec:{frameWidth:64,frameHeight:64,'anchor.x':.5,'anchor.y':.90625,'movementAtlas.columns':6,'movementAtlas.rows':2,'attackAtlas.columns':2,'attackAtlas.rows':1,fps:8}
-}),squirrel:Object.freeze({
+}),
+// Dirty-Connector Blob — processed from a 1024×683 magenta-bg sheet.
+// 5 rows: idle(10), walk-right(9), walk-left(9), attack(9, frames 3-4 emit
+// brown spit), special(7, golden enrage ring). Row-5 merged ring box split
+// by scanning for low-content columns within the wide region.
+dirty:Object.freeze(tech('blob',90,98,
+  {atlasW:910,atlasH:92,cellW:91,cellH:92,frames:10},
+  {atlasW:792,atlasH:82,cellW:88,cellH:82,frames:9},
+  {atlasW:747,atlasH:81,cellW:83,cellH:81,frames:9},
+  {atlasW:1251,atlasH:86,cellW:139,cellH:86,frames:9},
+  {atlasW:1932,atlasH:115,cellW:276,cellH:115,frames:7}
+)),
+squirrel:Object.freeze({
   atlas:'/assets/squirrel/idle-front.png',attack:'/assets/squirrel/fec-attack.png',portrait:'/assets/squirrel/portrait.png',manifest:'/assets/squirrel/animation.json',
   extras:[['back','/assets/squirrel/idle-back.png',1020,170],['walk','/assets/squirrel/walk-side.png',1020,170]],
   sources:{atlas:source+'74fcd8572_boss_idle_front.png',attack:source+'cdaad81d2_boss_fec_attack.png',portrait:source+'f08b0630c_boss_portrait.png',back:source+'4dab873b1_boss_idle_back.png',walk:source+'56d978f24_boss_walk_side.png'},
@@ -38,7 +107,7 @@ export const ENEMY_SPRITES=Object.freeze({lag:Object.freeze({
   portraitW:147,portraitH:187,
   manifestSpec:{frameWidth:170,frameHeight:170,'idleFront.columns':6,'idleBack.columns':6,'walkSide.columns':6,'walkSide.facing':'right','attackAtlas.frameWidth':220,'attackAtlas.frameHeight':200,'attackAtlas.columns':5,fps:8}
 })});
-export const enemySpriteDef=id=>ENEMY_SPRITES[id] || null;
+export const enemySpriteDef=id=>ENEMY_SPRITES[id]||null;
 
 // Bucket-Truck turret — EXCLUSIVE to the shop's Bucket Truck Keys deployable
 // (turretMount). Per its manifest the 3 tiles are near-duplicate poses of the
@@ -53,4 +122,4 @@ export const STRUCTURE_SPRITES=Object.freeze({bucket:Object.freeze({
   structureType:'turretMount',
   manifestSpec:{structureId:'bucket_truck_turret',tileWidth:230,tileHeight:190,rightEdgeAnchorX:210,groundBaselineY:174,'animation.type':'idle_cycle','animation.fps':1.5}
 })});
-export const structureSpriteDef=id=>STRUCTURE_SPRITES[id] || null;
+export const structureSpriteDef=id=>STRUCTURE_SPRITES[id]||null;

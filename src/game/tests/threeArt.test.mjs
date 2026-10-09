@@ -6,7 +6,6 @@ import { ENEMIES } from '@/game/data/combat.js';
 import { SQUIRREL, bossWave } from '@/game/data/bosses.js';
 import { characterSprite, enemySpriteDef } from '@/game/art/characterSprites.js';
 import { createSquirrelAnimation, updateSquirrelAnimation, squirrelFrame, squirrelRelease, FEC_POP, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation.js';
-import { createDonAnimation, updateDonAnimation, donFrame } from '@/game/art/donSpriteAnimation.js';
 import { guideEntries } from '@/game/data/reference.js';
 
 const BASE='https://base44.app/api/apps/6aab67049cd04a621f2adf4f/files/mp/public/6aab67049cd04a621f2adf4f/';
@@ -17,11 +16,6 @@ const ASSETS=[
   ['squirrel/walk-side.png','56d978f24_boss_walk_side.png',1020,170],
   ['squirrel/fec-attack.png','cdaad81d2_boss_fec_attack.png',1100,200],
   ['squirrel/portrait.png','f08b0630c_boss_portrait.png',147,187],
-  ['don/idle-front.png','cd24a6944_don_idle_front.png',1170,190],
-  ['don/idle-back.png','b3e497e7f_don_idle_back.png',1170,190],
-  ['don/walk-side.png','54be9d69f_don_walk_side.png',1170,190],
-  ['don/signal-poses.png','017a98330_don_signal_poses.png',520,190],
-  ['don/portrait.png','0a52d8d76_don_portrait.png',127,193],
   ['landing/hero.jpg','0f35c9358_source.jpg',1168,784]
 ];
 
@@ -103,59 +97,24 @@ test('squirrel draw uses NEAREST smoothing and restores it',()=>{
   assert.equal(log[log.length-1],true);
 });
 
-test('don crew + walk-left atlases: sliced locally at exact dims, background keyed',async()=>{
-  for(const [local,w,h] of [['don/walk-left.png',1120,190],['don/crew.png',1024,372]]){
-    const bytes=await readFile(new URL(`../../../public/assets/${local}`,import.meta.url));
-    const d=decodePng(bytes);
-    assert.equal(d.width,w,`${local} width`);assert.equal(d.height,h,`${local} height`);
-    assert.equal(d.rgba[3],0,`${local} background must be keyed transparent`);
-    let opaque=0;for(let i=3;i<d.rgba.length;i+=4)if(d.rgba[i])opaque++;
-    assert.ok(opaque>w*h*.08,`${local} should hold most of the sprite content`);
-  }
-});
-
-test('dispatch don frames: crew sequence on special, true left walk, mirrored right walk',()=>{
-  const def=characterSprite('don'),art={definition:def,atlas:{},back:{},walk:{},walkLeft:{},signal:{},crew:{},hurt:{}};
-  const s=createDonAnimation();
-  s.signal=1; // 'Escalate to Field Crew' active → crew pose 0 (radio call-in)
-  assert.deepEqual([donFrame(art,s).image,donFrame(art,s).sx,donFrame(art,s).sy],[art.crew,0,0]);
-  s.crewClock=1.2; // pose 1: first sidekick arrives
-  assert.deepEqual([donFrame(art,s).sx,donFrame(art,s).sy],[def.crewFrameW,0]);
-  s.crewClock=4.5; // row 2: directing poses
-  assert.deepEqual([donFrame(art,s).sx,donFrame(art,s).sy],[0,def.crewFrameH]);
-  s.crewClock=99; // holds the final commanding pose
-  assert.deepEqual([donFrame(art,s).sx,donFrame(art,s).sy],[3*def.crewFrameW,def.crewFrameH]);
-  s.signal=0;
-  updateDonAnimation(s,-1,0,.05,def); // moving left → true left-facing walk, unmirrored
-  let f=donFrame(art,s);
-  assert.equal(f.image,art.walkLeft);assert.ok(!f.mirror);
-  updateDonAnimation(s,1,0,.05,def); // moving right → right-facing walk, mirrored
-  f=donFrame(art,s);
-  assert.equal(f.image,art.walk);assert.ok(f.mirror);
-  updateDonAnimation(s,0,0,3,def); // idle long enough to reach the gesture beats
-  const idle=donFrame(art,s);
-  assert.ok([art.atlas,art.signal].includes(idle.image));
-  assert.ok([0,7*130,8*130,2*130].includes(idle.sx));
-  updateDonAnimation(s,0,-1,.05,def); // moving up, then stopping → back view idle
-  updateDonAnimation(s,0,0,.01,def);
-  const t=donFrame(art,s);
-  assert.ok(t.image===art.back||t.image===art.atlas);
-});
-
-test('wiring: engine has boss phases + FEC cone + don branch; placeholders replaced',async()=>{
+test('wiring: engine has boss phases + FEC cone + tech sprite branch; placeholders replaced',async()=>{
   const engine=await readFile(new URL('../../game/signalEngine.js',import.meta.url),'utf8');
   for(const needle of ['spawnBoss','squirrelUpdate','fireCone','foeShots','drawSquirrelSprite','bossWave(run.wave)','e.hp<=e.max*.5','damagePlayer(s.damage)'])assert.ok(engine.includes(needle),`engine missing ${needle}`);
-  assert.ok(engine.includes("charId==='don'")&&engine.includes('drawDonSprite')&&engine.includes('updateDonAnimation'),'engine must branch to the real Don sprite');
+  assert.ok(engine.includes('drawTechSprite')&&engine.includes('updateTechAnimation')&&engine.includes('techChars'),'engine must branch to tech sprite animation');
+  assert.ok(engine.includes('drawTechEnemy')&&engine.includes('blobArtDef'),'engine must draw blob enemy with tech animation');
+  assert.ok(engine.includes('clauseFired')&&engine.includes("special.id==='clause'"),'engine must have Veteran charge-up burst logic');
   const portrait=await readFile(new URL('../../components/game/CharacterPortrait.jsx',import.meta.url),'utf8');
   assert.ok(!portrait.includes('M75 38V55H64'),'Don SVG placeholder special-case must be gone');
   assert.ok(portrait.includes('DonPortrait'),'Don must render the real portrait');
   const arena=await readFile(new URL('../../components/game/GameArena.jsx',import.meta.url),'utf8');
   assert.ok(arena.includes("preloadEnemySprite('squirrel')")&&arena.includes('squirrelArt'),'GameArena must preload and pass the boss art');
+  assert.ok(arena.includes("preloadEnemySprite('dirty')")&&arena.includes('blobArt'),'GameArena must preload and pass the blob art');
   const home=await readFile(new URL('../../pages/Home.jsx',import.meta.url),'utf8');
   assert.ok(home.includes('/assets/landing/hero.jpg'),'landing page must render the new hero background');
   assert.ok(home.includes('bg-gradient-to-t from-game-bg'),'landing page needs a dark overlay for legibility');
   const guide=await readFile(new URL('../../pages/FieldGuide.jsx',import.meta.url),'utf8');
   assert.ok(guide.includes('DonPortrait'),"Field Guide must use Don's real portrait");
+  assert.ok(guide.includes('VeteranPortrait')&&guide.includes('ClonePortrait')&&guide.includes('NomadPortrait'),'Field Guide must use new character portraits');
   const bosses=guideEntries().Bosses;
   assert.equal(bosses.length,1);
   assert.ok(bosses[0].title.includes('Squirrel')&&bosses[0].body.includes('55')&&bosses[0].body.includes('FEC'));
