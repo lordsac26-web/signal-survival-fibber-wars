@@ -1,40 +1,48 @@
 {
   "characterId": "nomad",
-  "frameWidth": 75,
-  "frameHeight": 128,
+  "frameWidth": 76,
+  "frameHeight": 138,
   "anchor": {
     "x": 0.5,
     "y": 0.9
   },
+  "fps": 8,
   "idleFront": {
     "columns": 9,
-    "rows": 1
+    "rows": 1,
+    "frameWidth": 76,
+    "frameHeight": 138
   },
   "walkSide": {
     "columns": 9,
     "rows": 1,
-    "frameWidth": 82,
-    "frameHeight": 136,
+    "frameWidth": 72,
+    "frameHeight": 138,
     "facing": "right"
   },
   "walkLeft": {
     "columns": 9,
     "rows": 1,
-    "frameWidth": 76,
-    "frameHeight": 136,
+    "frameWidth": 72,
+    "frameHeight": 138,
     "facing": "left"
   },
   "attack": {
-    "columns": 11,
+    "columns": 6,
     "rows": 1,
-    "frameWidth": 136,
-    "frameHeight": 136
+    "frameWidth": 164,
+    "frameHeight": 138
   },
   "special": {
-    "columns": 10,
+    "columns": 8,
     "rows": 1,
-    "frameWidth": 156,
-    "frameHeight": 123
+    "frameWidth": 198,
+    "frameHeight": 138
   },
-  "fps": 8
+  "muzzle": {
+    "x": 1,
+    "y": 96,
+    "cellW": 164,
+    "cellH": 138
+  }
 }
