@@ -1,0 +1,57 @@
+{
+ "structureId": "pedestal_turret",
+ "facing": "right",
+ "baseline": {
+  "deploy": 109,
+  "rotate": 96,
+  "fire": 99,
+  "retract": 104
+ },
+ "anchorX": {
+  "deploy": 31,
+  "rotate": 38,
+  "fire": 37,
+  "retract": 28
+ },
+ "strips": {
+  "deploy": {
+   "file": "deploy.png",
+   "width": 729,
+   "height": 111,
+   "cellW": 81,
+   "cellH": 111,
+   "columns": 9
+  },
+  "rotate": {
+   "file": "rotate.png",
+   "width": 616,
+   "height": 98,
+   "cellW": 77,
+   "cellH": 98,
+   "columns": 8
+  },
+  "fire": {
+   "file": "fire.png",
+   "width": 553,
+   "height": 101,
+   "cellW": 79,
+   "cellH": 101,
+   "columns": 7
+  },
+  "retract": {
+   "file": "retract.png",
+   "width": 639,
+   "height": 106,
+   "cellW": 71,
+   "cellH": 106,
+   "columns": 9
+  }
+ },
+ "muzzle": {
+  "x": 35,
+  "y": 49,
+  "group": 6
+ },
+ "worldSize": 56,
+ "beam": "procedural"
+}
