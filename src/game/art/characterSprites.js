@@ -144,7 +144,7 @@ pedestal_turret:Object.freeze({
     fire:{cellW:79,cellH:101,columns:7,baselineY:99,anchorX:37},
     retract:{cellW:71,cellH:106,columns:9,baselineY:104,anchorX:28}
   },
-  muzzle:{x:35,y:49},worldSize:56,structureType:'turretMount',
+  muzzle:{x:35,y:49},worldSize:56,portraitW:73,portraitH:106,structureType:'turretMount',
   manifestSpec:{structureId:'pedestal_turret','strips.deploy.cellW':81,'strips.deploy.cellH':111,'strips.deploy.columns':9,'strips.rotate.cellW':77,'strips.rotate.cellH':98,'strips.rotate.columns':8,'strips.fire.cellW':79,'strips.fire.cellH':101,'strips.fire.columns':7,'strips.retract.cellW':71,'strips.retract.cellH':106,'strips.retract.columns':9}
 })
 });
