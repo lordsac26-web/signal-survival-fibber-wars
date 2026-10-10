@@ -115,12 +115,37 @@ export const enemySpriteDef=id=>ENEMY_SPRITES[id]||null;
 // same truck, NOT a boom sweep — rendered as a slow ~1.5s/frame idle cycle
 // only, never presented as target tracking. The Boss's signature sentry and
 // all other turrets keep their placeholders; no googly eyes on the truck.
-export const STRUCTURE_SPRITES=Object.freeze({bucket:Object.freeze({
+export const STRUCTURE_SPRITES=Object.freeze({
+bucket:Object.freeze({
   atlas:'/assets/buckettruck/turret.png',portrait:'/assets/buckettruck/icon.png',
   manifest:'/assets/buckettruck/animation.json',
   sources:{atlas:source+'53bcc4815_buckettruck-turret.png',icon:source+'8c553ef43_buckettruck-icon.png',manifest:source+'cb0ba0033_buckettruck-animation.json'},
   atlasW:690,atlasH:190,tileW:230,tileH:190,columns:3,rows:1,fps:1.5,idleCycle:3,worldSize:64,anchorY:174,portraitW:234,portraitH:204,
   structureType:'turretMount',
   manifestSpec:{structureId:'bucket_truck_turret',tileWidth:230,tileHeight:190,rightEdgeAnchorX:210,groundBaselineY:174,'animation.type':'idle_cycle','animation.fps':1.5}
-})});
+}),
+// Pedestal Turret — multi-strip animated turret from a 1024×683 magenta-bg sheet.
+// 4 strips: deploy(9f), rotate/aim(8f), fire(7f), retract(9f). Each strip is
+// foot-aligned (baselineY) and center-anchored (anchorX). Muzzle offset is
+// relative to the fire strip's anchor. worldSize scales the pedestal to ~56px.
+pedestal_turret:Object.freeze({
+  atlas:'/assets/turret/deploy.png',portrait:'/assets/turret/icon.png',
+  manifest:'/assets/turret/animation.json',
+  sources:{atlas:source+'d47806fb3_turret.png',icon:source+'d47806fb3_turret.png',manifest:source+'d47806fb3_turret.png'},
+  extras:[
+    ['rotate','/assets/turret/rotate.png',616,98],
+    ['fire','/assets/turret/fire.png',553,101],
+    ['retract','/assets/turret/retract.png',639,106]
+  ],
+  atlasW:729,atlasH:111, // deploy strip
+  strips:{
+    deploy:{cellW:81,cellH:111,columns:9,baselineY:109,anchorX:31},
+    rotate:{cellW:77,cellH:98,columns:8,baselineY:96,anchorX:38},
+    fire:{cellW:79,cellH:101,columns:7,baselineY:99,anchorX:37},
+    retract:{cellW:71,cellH:106,columns:9,baselineY:104,anchorX:28}
+  },
+  muzzle:{x:35,y:49},worldSize:56,structureType:'turretMount',
+  manifestSpec:{structureId:'pedestal_turret','strips.deploy.cellW':81,'strips.deploy.cellH':111,'strips.deploy.columns':9,'strips.rotate.cellW':77,'strips.rotate.cellH':98,'strips.rotate.columns':8,'strips.fire.cellW':79,'strips.fire.cellH':101,'strips.fire.columns':7,'strips.retract.cellW':71,'strips.retract.cellH':106,'strips.retract.columns':9}
+})
+});
 export const structureSpriteDef=id=>STRUCTURE_SPRITES[id]||null;

@@ -13,7 +13,7 @@ import { SIGNATURE_RANGE_WEAPONS } from '@/game/combat/rangeConfig';
 import { advanceProjectile, projectileCanHit } from '@/game/combat/projectileTravel';
 import { createSpriteAnimation, updateSpriteAnimation, drawCharacterSprite } from '@/game/art/spriteAnimation';
 import { createLagAnimation, updateLagAnimation, drawLagSprite } from '@/game/art/enemySpriteAnimation';
-import { drawTruckTurret } from '@/game/art/structureSprite';
+import { drawTruckTurret, drawPedestalTurret } from '@/game/art/structureSprite';
 import { structureSpriteDef } from '@/game/art/characterSprites';
 import { SQUIRREL, bossWave } from '@/game/data/bosses';
 import { createSquirrelAnimation, updateSquirrelAnimation, squirrelRelease, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation';
@@ -38,7 +38,7 @@ const weaponOf=w=>typeof w==='string'?WEAPONS[w]:w;
 // structures (Q key) live in the `structures` pool. Both integrate with the
 // enemy spatial hash for targeting, and structure-vs-enemy steering is a small
 // per-enemy loop over the (tiny) active-structure list — no repathing, no O(n²).
-export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null){
+export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null){
  const ctx=canvas.getContext('2d',{alpha:false}),grid=new SpatialHash(96),charId=run.character.id;
  let dpr=Math.min(devicePixelRatio||1,2);
  if(run.character.id==='oracle'&&!characterArt)throw new Error('Oracle art must be preloaded before combat');
@@ -47,6 +47,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  const lagArt=enemyArt&&enemyArt.definition?enemyArt:null;
  const blobArtDef=blobArt&&blobArt.definition?blobArt:null;
  const truckArt=structureArt&&structureArt.definition?structureArt:null,truckDef=truckArt?structureSpriteDef('bucket'):null;
+ const pedArt=pedestalArt&&pedestalArt.definition?pedestalArt:null;
  const viewport={width:1100,height:800},signatureWeapon=SIGNATURE_RANGE_WEAPONS[run.character.special.id];
  const areaFx={life:0,x:0,y:0,reach:0,angle:0,half:Math.PI,color:'#fff',limit:Infinity,originX:0,originY:0};
  const enemies=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,r:10,lastShot:-1}));
@@ -263,7 +264,7 @@ spawn-=dt;if(spawn<=0){const outage=specialTimer>0&&run.character.special.id==='
   // structures (under enemies): pop-in scale, fade out during the last 1.5s of life
   for(let i=0;i<structures.items.length;i++){const st=structures.items[i];if(!st.active)continue;const def=STRUCTURES[st.type];if(!def)continue;const x=Math.round(st.x),y=Math.round(st.y),grow=Math.min(1,st.born*4);
    ctx.globalAlpha=(st.life<1.5?Math.max(.2,st.life/1.5):1)*(.4+.6*grow);
-   if(def.kind==='turret'){if(truckArt&&st.type===truckDef.structureType)drawTruckTurret(ctx,truckArt,st.born,x,y,grow);else drawTurretBody(x,y,def.color,st.lookA,13*grow+3)}
+   if(def.kind==='turret'){if(pedArt)drawPedestalTurret(ctx,pedArt,st,x,y,grow);else if(truckArt&&st.type===truckDef.structureType)drawTruckTurret(ctx,truckArt,st.born,x,y,grow);else drawTurretBody(x,y,def.color,st.lookA,13*grow+3)}
    else if(def.kind==='block'){ctx.fillStyle='#fb923c';ctx.fillRect(x-st.r,y-8,st.r*2,16);ctx.fillStyle='#fff';for(let k=0;k<4;k++)ctx.fillRect(x-st.r+6+k*12,y-8,5,16);drawHardHat(x,y-14);drawEyes(x,y-2,st.lookA)}
    else if(def.kind==='trap'){ctx.fillStyle='#525252';ctx.fillRect(x-14,y-8,28,14);ctx.fillStyle='#ef4444';for(let k=0;k<5;k++){ctx.fillRect(x-12+k*6,y-8,3,6);ctx.fillRect(x-9+k*6,y-2,3,6)}drawHardHat(x,y-16);drawEyes(x,y-4,st.lookA)}
    else if(def.kind==='slow'){ctx.fillStyle='rgba(34,211,238,.12)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.strokeStyle='rgba(103,232,249,.55)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,st.r*.66*grow,0,4.6);ctx.stroke();drawEyes(x,y,st.lookA)}
