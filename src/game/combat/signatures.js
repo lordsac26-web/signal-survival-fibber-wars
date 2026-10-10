@@ -2,7 +2,7 @@
 export function activateSignature(run,p,api){
   switch(run.character.special.id){
     case 'callback':api.area(300,80,'#67e8f9');return 0;
-    case 'clause':return 3; // 2.5s charge-up then burst fired by engine; 0.5s recovery
+    case 'clause':return 3; // 2.5s Knowledge Dump charge-up, split burst fired by engine; 0.5s recovery
     case 'trace':for(let i=0;i<12;i++)api.launch({damage:90,range:700,rangeProfile:'trace',pattern:'pierce',color:'#22d3ee'},i*Math.PI/6);return 0;
     case 'deepclean':api.heal(45);api.area(260,55,'#34d399');return 0;
     case 'fortify':return api.turret({mode:'pellet',index:0,life:8,damage:30,range:340,fire:.4,color:'#facc15'})?0:null;

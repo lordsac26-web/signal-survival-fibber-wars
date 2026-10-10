@@ -10,7 +10,7 @@ const EXPECTED={
   veteran:{idle:{w:675,h:120,cols:9},walk:{w:544,h:113,cols:8},walkLeft:{w:544,h:113,cols:8},attack:{w:792,h:124,cols:6},special:{w:1939,h:119,cols:7},portrait:{w:78,h:132}},
   clone:{idle:{w:648,h:112,cols:9},walk:{w:504,h:114,cols:8},walkLeft:{w:520,h:115,cols:8},attack:{w:720,h:112,cols:6},special:{w:1448,h:114,cols:8},portrait:{w:74,h:124}},
   don:{idle:{w:792,h:124,cols:9},walk:{w:608,h:122,cols:8},walkLeft:{w:616,h:120,cols:8},attack:{w:888,h:114,cols:8},special:{w:1912,h:117,cols:8},portrait:{w:94,h:136}},
-  nomad:{idle:{w:675,h:128,cols:9},walk:{w:738,h:136,cols:9},walkLeft:{w:684,h:136,cols:9},attack:{w:1496,h:136,cols:11},special:{w:1560,h:123,cols:10},portrait:{w:76,h:140}},
+  nomad:{idle:{w:684,h:138,cols:9},walk:{w:648,h:138,cols:9},walkLeft:{w:648,h:138,cols:9},attack:{w:984,h:138,cols:6},special:{w:1584,h:138,cols:8},portrait:{w:76,h:140}},
   blob:{idle:{w:910,h:92,cols:10},walk:{w:792,h:82,cols:9},walkLeft:{w:747,h:81,cols:9},attack:{w:1251,h:86,cols:9},special:{w:1932,h:115,cols:7},portrait:{w:90,h:98}}
 };
 
