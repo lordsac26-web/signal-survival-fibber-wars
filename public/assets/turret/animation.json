@@ -1,49 +1,49 @@
 {
- "structureId": "pedestal_turret",
- "facing": "right",
- "source": "https://base44.app/api/apps/6aab67049cd04a621f2adf4f/files/mp/public/6aab67049cd04a621f2adf4f/d47806fb3_turret.png",
- "baseline": {
-  "deploy": 109,
-  "rotate": 96,
-  "fire": 99,
-  "retract": 104
- },
- "anchorX": {
-  "deploy": 31,
-  "rotate": 38,
-  "fire": 37,
-  "retract": 28
- },
- "strips": {
-  "deploy": {
-   "file": "deploy.png",
-   "cellW": 81,
-   "cellH": 111,
-   "columns": 9
+  "structureId": "pedestal_turret",
+  "facing": "right",
+  "source": "https://base44.app/api/apps/6aab67049cd04a621f2adf4f/files/mp/public/6aab67049cd04a621f2adf4f/d47806fb3_turret.png",
+  "baseline": {
+    "deploy": 109,
+    "rotate": 96,
+    "fire": 99,
+    "retract": 104
   },
-  "rotate": {
-   "file": "rotate.png",
-   "cellW": 77,
-   "cellH": 98,
-   "columns": 8
+  "anchorX": {
+    "deploy": 31,
+    "rotate": 38,
+    "fire": 37,
+    "retract": 28
   },
-  "fire": {
-   "file": "fire.png",
-   "cellW": 79,
-   "cellH": 101,
-   "columns": 7
+  "strips": {
+    "deploy": {
+      "file": "deploy.png",
+      "cellW": 81,
+      "cellH": 111,
+      "columns": 9
+    },
+    "rotate": {
+      "file": "rotate.png",
+      "cellW": 77,
+      "cellH": 98,
+      "columns": 8
+    },
+    "fire": {
+      "file": "fire.png",
+      "cellW": 79,
+      "cellH": 101,
+      "columns": 7
+    },
+    "retract": {
+      "file": "retract.png",
+      "cellW": 71,
+      "cellH": 106,
+      "columns": 9
+    }
   },
-  "retract": {
-   "file": "retract.png",
-   "cellW": 71,
-   "cellH": 106,
-   "columns": 9
-  }
- },
- "muzzle": {
-  "x": 35,
-  "y": 49
- },
- "worldSize": 56,
- "beam": "procedural"
+  "muzzle": {
+    "x": 35,
+    "y": 49
+  },
+  "worldSize": 56,
+  "beam": "procedural"
 }
