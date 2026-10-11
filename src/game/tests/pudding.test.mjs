@@ -128,8 +128,9 @@ test('contact melee strip plays on the ordinary contact tick without extra damag
   assert.match(engine,/if\(e\.kind==='packet'\)\{e\.anim\.melee=\.34;e\.anim\.facing=p\.x<e\.x\?'left':'right'\}else e\.anim\.attack=\.35\}/);
   const d=enemySpriteDef('packet');
   assert.equal(d.attackColumns,4);assert.equal(d.attackFps,12);
-  const s=createPuddingAnimation();s.melee=1/3;updatePuddingAnimation(s,0,0,1/12,d);
-  assert.equal(s.frame,1); // extend pose inside the 12fps strip
+  const s=createPuddingAnimation();s.melee=1/3;
+  const frames=[];for(let k=0;k<4;k++){updatePuddingAnimation(s,0,0,1/13,d);frames.push(s.frame)} // ~12fps over the 1/3s strip
+  assert.deepEqual(frames,[0,1,2,3]); // neutral → extend → impact → recover
 });
 
 test('movement cycle: 10 frames (row 4 + row 6), idle frame 0, left is mirrored, anchors drive the draw',()=>{
@@ -137,27 +138,34 @@ test('movement cycle: 10 frames (row 4 + row 6), idle frame 0, left is mirrored,
   updatePuddingAnimation(s,1,0,1/d.fps,d);assert.equal(s.frame,1);assert.equal(s.facing,'right');
   updatePuddingAnimation(s,-1,0,1/d.fps,d);assert.equal(s.frame,2);assert.equal(s.facing,'left');
   updatePuddingAnimation(s,0,0,10,d);assert.equal(s.frame,0); // stationary → idle frame 0
-  updatePuddingAnimation(s,0,1,1/d.fps,d);assert.equal(s.frame,1);assert.equal(s.facing,'left'); // vertical keeps facing
-  for(let i=0;i<10;i++){
-    updatePuddingAnimation(s,1,0,1/d.fps,d);
-    const f=(i+1)%10,frame=puddingFrame({definition:d,atlas:{},attack:{},charge:{},drop:{}},s);
-    assert.equal(frame.ax,d.moveAnchors[f][0]); // measured anchor drives the draw math
+  updatePuddingAnimation(s,0,1,1/(d.fps/2),d);assert.equal(s.frame,1);assert.equal(s.facing,'left'); // vertical keeps facing
+  // full 10-frame cycle at 9fps: frames 1..9 then wrap to 0 (dt=1/8 keeps the math exact)
+  const seq=[];for(let i=0;i<20;i++){updatePuddingAnimation(s,1,0,1/8,d);seq.push(s.frame)}
+  assert.deepEqual(seq.slice(0,10),[1,2,3,4,5,6,7,8,9,0]);
+  // every movement frame draws from its measured anchor + body top; frames 4-9 sit on row B
+  const fake={definition:d,atlas:{},attack:{},charge:{},drop:{}};
+  for(let f=0;f<10;f++){
+    s.frame=f;s.facing='right';
+    const frame=puddingFrame(fake,s);
+    assert.equal(frame.ax,d.moveAnchors[f][0]);
     assert.equal(frame.bodyTop,d.moveBodyTops[f]);
-    assert.equal(frame.mirror,s.facing==='left');
+    assert.equal(frame.mirror,false);
+    assert.equal(frame.sy,f<4?0:d.cellH);
   }
   // movement frames 4-9 come from row B (sy = cellH)
-  const frame=puddingFrame({definition:d,atlas:{},attack:{},charge:{},drop:{}},s);
-  s.frame=5;const rowB=puddingFrame({definition:d,atlas:{},attack:{},charge:{},drop:{}},s);
-  assert.equal(rowB.sy,d.cellH);assert.equal(frame.sy,0);
+  s.clock=0;s.frame=5;const rowB=puddingFrame({definition:d,atlas:{},attack:{},charge:{},drop:{}},s);
+  assert.equal(rowB.sy,d.cellH);
+  s.frame=0;const rowA=puddingFrame({definition:d,atlas:{},attack:{},charge:{},drop:{}},s);
+  assert.equal(rowA.sy,0);
 });
 
 test('telegraph/drop frame selection plays the right strips with render-only shake',()=>{
   const d=enemySpriteDef('packet'),s=createPuddingAnimation();
-  s.telegraph=true;updatePuddingAnimation(s,0,0,.5,d); // 0.5s in → charge frame 4
-  assert.equal(s.frame,4%d.chargeColumns);
+  s.telegraph=true;updatePuddingAnimation(s,0,0,.5,d); // 0.5s in → charge frame 4 % 4 = 0
+  assert.equal(s.frame,0);
   const c=puddingFrame({definition:d,charge:{},drop:{}},s);
-  assert.equal(c.image,undefined); // art wiring passes the real charge image in-game; here check geometry fields
-  s.teleClock=0;s.frame=0;
+  assert.equal(c.sx,0);assert.equal(c.ay,d.chargeAnchors[0][1]); // charge strip geometry
+  s.teleClock=0;s.frame=0;s.telegraph=false;
   s.dropT=.25;updatePuddingAnimation(s,0,0,.125,d);
   assert.equal(s.frame,1); // first 2 drop poses play as the release flash
 });
@@ -170,5 +178,5 @@ test('Field Guide entry: full warning + technical detail for the pudding and its
   assert(entry.detail.includes('ONE shared clock'));assert(entry.detail.includes('Cleanliness'));
   assert(entry.detail.includes('40'));assert(entry.detail.includes('no puddle at all'));
   assert(entry.detail.includes('1s rooted'));
-  assert.equal(ENEMY_SPRITES.pudding.portrait,'/assets/pudding/portrait.png'); // guide portrait path is live
+  assert.equal(ENEMY_SPRITES.packet.portrait,'/assets/pudding/portrait.png'); // guide portrait path is live
 });
