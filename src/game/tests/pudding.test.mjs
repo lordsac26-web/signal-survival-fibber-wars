@@ -139,8 +139,8 @@ test('movement cycle: 10 frames (row 4 + row 6), idle frame 0, left is mirrored,
   updatePuddingAnimation(s,-1,0,1/d.fps,d);assert.equal(s.frame,2);assert.equal(s.facing,'left');
   updatePuddingAnimation(s,0,0,10,d);assert.equal(s.frame,0); // stationary → idle frame 0
   updatePuddingAnimation(s,0,1,1/(d.fps/2),d);assert.equal(s.frame,1);assert.equal(s.facing,'left'); // vertical keeps facing
-  // full 10-frame cycle at 9fps: frames 1..9 then wrap to 0 (dt=1/8 keeps the math exact)
-  const seq=[];for(let i=0;i<20;i++){updatePuddingAnimation(s,1,0,1/8,d);seq.push(s.frame)}
+  // Full 10-frame cycle at 9fps: frames 1..9 then wrap to 0.
+  const seq=[];for(let i=0;i<20;i++){updatePuddingAnimation(s,1,0,1/d.fps,d);seq.push(s.frame)}
   assert.deepEqual(seq.slice(0,10),[1,2,3,4,5,6,7,8,9,0]);
   // every movement frame draws from its measured anchor + body top; frames 4-9 sit on row B
   const fake={definition:d,atlas:{},attack:{},charge:{},drop:{}};

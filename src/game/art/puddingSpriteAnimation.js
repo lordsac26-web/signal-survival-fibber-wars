@@ -25,7 +25,7 @@ export function updatePuddingAnimation(state,dx,dy,dt,def){
  if(state.motionAxis!==motionAxis){state.motionAxis=motionAxis;state.clock=0}
  if(motionAxis==='horizontal')state.facing=dx<0?'left':'right';
  state.clock+=dt;
- state.frame=Math.floor(state.clock*(motionAxis==='vertical'?def.fps/2:def.fps)+1e-8)%def.columns;
+ state.frame=Math.floor(state.clock*(motionAxis==='vertical'?def.fps/2:def.fps)+1e-6)%def.columns;
 }
 
 // Pure frame selection so wiring is testable without a canvas.
