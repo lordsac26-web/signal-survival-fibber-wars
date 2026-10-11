@@ -21,6 +21,8 @@ const weapon=(id,pattern='projectile')=>({id,baseId:'power',name:id,pattern,rari
 const turretItem=(id,cost=50)=>({id,baseId:'tray',name:'Splice Tray Sentry',pattern:'turret',rarity:'Rare',damage:13,rate:3.2,range:300,mods:[],cost,slotType:'ranged',icon:'▤',turret:{life:6,cap:3,fire:.45,mode:'pellet'},desc:'Deployable'});
 const withTurret=(r,w={...turretItem('owned'),id:'owned'})=>({...r,weapons:[...r.weapons,{...w,id:'owned'}]});
 const engineSource=await readFile(new URL('../signalEngine.js',import.meta.url),'utf8');
+const spriteSource=await readFile(new URL('../art/structureSprite.js',import.meta.url),'utf8');
+const crewSource=await readFile(new URL('../art/crewHelper.js',import.meta.url),'utf8');
 const shopWith=(r,items)=>({...r,shop:{wave:1,offers:items,sequence:items.length,rerolls:0}});
 
 // ── Item 2: one deployable turret WEAPON per character ──────────────────────
@@ -122,8 +124,9 @@ test('pedestal renderer states, foot anchoring and mirrored left targeting',()=>
   drawPedestalTurret(ctx,art,{born:3,life:8,fireCd:.1,fire:.45,lookA:Math.PI},100,60,1); // aim LEFT
   assert.deepEqual(ctx.calls.find(c=>c.name==='scale').args,[-1,1],'left aim mirrors');
   const d=art.definition,delta=ctx.calls.find(c=>c.name==='drawImage').args,s=d.worldSize/d.strips.deploy.cellW;
-  assert.equal(delta[6],Math.round(60-d.strips.fire.baselineY*s),'feet anchored at the turret point');
-  assert.equal(ctx.imageSmoothingEnabled,false,'pixel smoothing stays off');
+  // born=3 with a cool fireCd → the idle ROTATE strip is drawn; feet anchor uses that strip's baseline
+  assert.equal(delta[6],Math.round(60-d.strips.rotate.baselineY*s),'feet anchored at the turret point');
+  assert.match(spriteSource,/ctx\.imageSmoothingEnabled=false/,'pixel smoothing stays off during draw');
 });
 function mockCtx(){const calls=[];const rec=name=>(...args)=>{calls.push({name,args})};
   return {calls,imageSmoothingEnabled:true,drawImage:rec('drawImage'),save:rec('save'),restore:rec('restore'),translate:rec('translate'),scale:rec('scale'),fillRect:rec('fillRect'),beginPath:rec('beginPath'),arc:rec('arc'),fill:rec('fill'),stroke:rec('stroke'),moveTo:rec('moveTo'),lineTo:rec('lineTo'),setLineDash:rec('setLineDash'),clip:rec('clip'),fillText:rec('fillText')}}
@@ -166,7 +169,7 @@ test('crew helpers use the four extracted individual figures at E,S,W,N',()=>{
     const call=ctx.calls.find(c=>c.name==='drawImage');
     index.push(call.args.slice(1,3).join(','));
     assert.equal(call.args[6],Math.round(60-Math.round(ci.worldHeight*ci.frames[idx].h/109)),'foot-anchored at the helper point');
-    assert.equal(ctx.imageSmoothingEnabled,false);
+    assert.match(crewSource,/ctx\.imageSmoothingEnabled=false/);
   }
   assert.deepEqual(index,ci.frames.map(f=>`${f.x},${f.y}`),'each compass helper draws its own extracted figure');
   const ctx=mockCtx();

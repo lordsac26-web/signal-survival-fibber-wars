@@ -38,7 +38,9 @@ test('arena: header → canvas region → footer are flow siblings in a fixed co
 test('header: GameHUD is a flow <header>, not an overlay; boss bar/tools/range all live inside it', async () => {
   const s = await read('components/game/GameHUD.jsx');
   assert.match(s, /return <header className="pointer-events-none w-full shrink-0 border-b-2/);
-  assert.doesNotMatch(s, /absolute/); // zero absolute positioning in the header
+  // No PAGE-level overlay positioning in the header (intra-slot absolute — a
+  // cooldown ring inside a fixed-size slot button — is fine and expected).
+  assert.doesNotMatch(s, /absolute inset-x-0|inset-0 top-0|absolute top-0/);
   assert.match(s, /<BossBar boss=\{hud\.boss\}\/>/);
   assert.match(s, /<RangeReadout hud=\{hud\}\/>/);
   assert.doesNotMatch(s, /ProgressMeters/); // XP/earned-signal text moved to the footer
@@ -53,8 +55,11 @@ test('footer: XP readout, flash and Special/Deploy buttons live below the canvas
   for (const piece of ['ProgressMeters', 'SpecialButton', 'DeployButton', 'aria-live']) assert.ok(f.includes(piece), `footer keeps: ${piece}`);
   const sp = await read('components/game/SpecialButton.jsx');
   const dp = await read('components/game/DeployButton.jsx');
-  assert.doesNotMatch(sp, /absolute|bottom-\d+|right-\d+/);
-  assert.doesNotMatch(dp, /absolute|bottom-\d+|left-\d+/);
+  // Root elements are flow buttons (intra-button absolute rings are fine).
+  assert.match(sp, /className="flex size-16/);
+  assert.doesNotMatch(sp, /className="absolute|bottom-\d+|right-\d+|md:bottom|md:left/);
+  assert.match(dp, /className="flex size-16/);
+  assert.doesNotMatch(dp, /className="absolute bottom|bottom-40|bottom-6|left-5|left-6|md:bottom|md:left/);
   // Touch targets stay ≥64px in the footer (mobile readability preserved).
   assert.match(sp, /size-16/); assert.match(dp, /size-16/);
 });
