@@ -52,7 +52,7 @@ export function drawPuddingSprite(ctx,art,state,x,y){
  if(state.telegraph){ // cyan pulse ring on the exact drop spot (cosmetic telegraph)
   const p=state.teleClock/PUDDING.telegraph;
   ctx.save();ctx.globalAlpha=.25+.35*Math.min(1,p);ctx.strokeStyle='#67e8f9';ctx.lineWidth=2;ctx.setLineDash([6,5]);
-  ctx.beginPath();ctx.arc(Math.round(x),Math.round(y),PUDDING.radius,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore();
+  ctx.beginPath();ctx.arc(Math.round(state.dropX??x),Math.round(state.dropY??y),PUDDING.radius,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore();
  }
  ctx.imageSmoothingEnabled=prev;
 }

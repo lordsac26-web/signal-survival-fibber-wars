@@ -30,7 +30,7 @@ export function stepPuddingState(s,dt,{dist,visible,playerAlive,x=0,y=0}={}){
  s.castCd=Math.max(0,s.castCd-dt);
  if(s.phase==='telegraph'){
   s.t-=dt;
-  if(s.t<=0){s.phase='chase';s.castCd=PUDDING.cooldown;return 'drop'} // chase resumes immediately
+  if(s.t<=1e-8){s.phase='chase';s.castCd=PUDDING.cooldown;return 'drop'} // chase resumes immediately
   return 'rooted';
  }
  if(playerAlive&&s.castCd<=0&&visible&&dist<=PUDDING.triggerRange){s.phase='telegraph';s.t=PUDDING.telegraph;s.dropX=x;s.dropY=y;return 'start'}

@@ -34,7 +34,7 @@ test('exact one-second telegraph, one pulse, 12s cooldown from fire, stagger and
  const s=ready();assert.equal(s.phase,'charge');
  for(let i=0;i<59;i++)assert.equal(stepJitter(s,1/60,near),null);
  assert.equal(s.phase,'charge');assert.equal(stepJitter(s,1/60,near),'fire');assert.equal(s.cooldown,12);
- assert(jitterPulseHits(s,76,0));assert(!jitterPulseHits(s,76.001,0));assert(!jitterPulseHits(s,50,.1));
+ assert.equal(JITTER.radius,91.2);assert(jitterPulseHits(s,JITTER.radius-.001,0));assert(jitterPulseHits(s,JITTER.radius,0));assert(!jitterPulseHits(s,JITTER.radius+.001,0));assert(!jitterPulseHits(s,50,.1));
  let fires=1;for(let i=0;i<719;i++)if(stepJitter(s,1/60,near)==='fire')fires++;
  assert.equal(fires,1);assert.equal(s.phase,'chase');assert(s.cooldown>0);
  assert.equal(stepJitter(s,1/60,near),'charge');assert.equal(s.phase,'charge');

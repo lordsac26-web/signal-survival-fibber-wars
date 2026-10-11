@@ -113,11 +113,11 @@ test('engine wiring: shared tick clock, single slow multiplier, ticks respect in
   assert.match(engine,/puddleSlowMul=Math\.min\(puddleSlowMul,1-PUDDING\.slow\)/);
   assert.match(engine,/run\.speed\*boost\*puddleSlowMul\*dt/); // movement honors the slow
   assert.match(engine,/damagePlayer\(PUDDING\.tickDamage\*\(1-puddleMitigation\(run\.cleanliness\)\)\)/);
-  assert.match(engine,/if\(inP&&p\.inv<=0\)damagePlayer/); // ticks respect brief invulnerability, never grant it
+  assert.match(engine,/if\(inP&&p\.inv<=0\)\{const before=p\.hp;damagePlayer/); // ticks respect brief invulnerability, never grant it
   const goo=engine.indexOf('PACKET-LOSS PUDDING ground goo'),structures=engine.indexOf('// structures (under enemies)');
   assert(goo>-1&&structures>-1&&goo<structures,'puddles draw in the ground layer');
   assert.match(engine,/if\(e\.pud&&e\.pud\.phase!=='chase'\)spd=0/); // rooted during telegraph
-  assert.match(engine,/d\.life<=0\)\{puddles\.release\(d\);continue\}/); // exact-lifetime expiry
+  assert.match(engine,/d\.life<=1e-8\)\{puddles\.release\(d\);continue\}/); // exact-lifetime expiry
   assert.match(read('components/game/GameArena.jsx'),/preloadEnemySprite\('packet'\)/);
   assert.match(read('components/game/GameArena.jsx'),/pedestalArt,puddingArt,jitterArt\)/);
   assert.match(engine,/puddingArt=null,jitterArt=null\)\{/); // engine signature takes the pudding art in slot order

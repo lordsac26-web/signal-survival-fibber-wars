@@ -5,6 +5,7 @@
 // attackFace: which side the ATTACK pose faces (left/right-only firing
 // sheets); set by the engine toward the current target with a dead-zone.
 // Movement facing (side) stays independent and unchanged during attacks.
+import { knowledgeDumpFrame } from '@/game/combat/knowledgeDump';
 export const createTechAnimation=()=>({side:'right',vert:'down',frame:0,clock:0,moving:false,hurt:0,special:0,attack:0,vfxClock:0,attackFace:'right'});
 export function updateTechAnimation(state,dx,dy,dt,definition){
   state.hurt=Math.max(0,state.hurt-dt);
@@ -36,6 +37,7 @@ export function updateTechAnimation(state,dx,dy,dt,definition){
 export function techFrame(art,state){
   const d=art.definition;
   if(state.special>0){
+    if(d.knowledgeDump)return {image:art.special,sx:knowledgeDumpFrame(state.special)*d.specialCellW,sy:0,frameW:d.specialCellW,frameH:d.specialCellH,mirror:false};
     // Definition-driven: characters with specialActivationFrames play their
     // solo activation strip ONCE from the moment of activation, then return
     // to normal idle/walk/attack for the rest of the timer (sustained visuals

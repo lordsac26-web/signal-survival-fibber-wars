@@ -84,7 +84,7 @@ test('techSpriteAnimation: idle, walk, walk-left, attack, and special frame sele
     assert.equal(attackFrame.image,'attack');
     // Special: plays special frames (Don's timer counts DOWN from 8: a fresh
     // activation is 8; 1 would mean the activation already finished)
-    s.attack=0;s.special=charId==='don'?8:1;s.vfxClock=0;
+    s.attack=0;s.special=charId==='don'?8:charId==='veteran'?3:1;s.vfxClock=0;
     const specialFrame=techFrame(art,s);
     assert.equal(specialFrame.image,'special');
     assert.equal(specialFrame.sx,0);
@@ -145,8 +145,8 @@ test('audio engine has new sound cues',async()=>{
   assert.ok(audio.includes('burst:'),'audio must have burst sound');
 });
 
-test('signatures: Veteran returns 3s charge-up, Nomad heals 40 HP',async()=>{
+test('signatures: Veteran returns 3s semantic total (2.5s charge + .5s recovery), Nomad heals 40 HP',async()=>{
   const sig=await readFile(new URL('../../game/combat/signatures.js',import.meta.url),'utf8');
-  assert.ok(sig.includes("case 'clause':return 3"),"Veteran special must return 3s duration");
+  assert.ok(sig.includes("case 'clause':return KNOWLEDGE_DUMP.total"),"Veteran uses the shared charge/impact/recovery timeline");
   assert.ok(sig.includes("case 'sprint':api.heal(40)"),'Nomad special must heal 40 HP');
 });

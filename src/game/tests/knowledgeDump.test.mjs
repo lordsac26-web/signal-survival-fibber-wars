@@ -55,10 +55,10 @@ test('balance: wave-20 Squirrel survives a representative mid-game burst through
   assert.ok(crowded.shares[0]*1.08<bossHp);
 });
 
-test('balance: unchanged invariants — 3s charge, 260 burst radius, 30s cooldown',()=>{
-  assert.ok(signatures.includes("case 'clause':return 3"),'charge duration stays 3s');
+test('balance: semantic 2.5s charge / 0.5s recovery, 260 burst radius, 30s cooldown',()=>{
+   assert.ok(signatures.includes("case 'clause':return KNOWLEDGE_DUMP.total"),'one shared timeline');
   assert.ok(engine.includes('CLAUSE_RADIUS=260'),'burst radius stays 260');
-  assert.ok(characters.includes("special:{id:'clause',name:'Knowledge Dump',desc:'Charges 2.5s, then dumps 30x his total weapon damage, split between every impairment in range. Bosses take half.',cooldown:30}"),'cooldown stays 30s and the new description ships');
+  assert.ok(characters.includes("special:{id:'clause',name:'Knowledge Dump',desc:'Charges 2.5s, bursts on the middle explosion pose, then recovers for 0.5s. Dumps 30x his total weapon damage, split between every impairment in range. Bosses take half.',cooldown:30}"),'cooldown stays 30s and the new description ships');
 });
 
 test('rename is complete: no Grandfather Clause strings remain anywhere in src',async()=>{

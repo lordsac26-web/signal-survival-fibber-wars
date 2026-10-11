@@ -11,7 +11,7 @@ function tech(id,portraitW,portraitH,idle,walk,walkLeft,attack,special){
     ['walk',`/assets/${id}/walk-side.png`,walk.atlasW,walk.atlasH],
     ['walkLeft',`/assets/${id}/walk-left.png`,walkLeft.atlasW,walkLeft.atlasH],
     ['attack',`/assets/${id}/attack.png`,attack.atlasW,attack.atlasH],
-    ['special',`/assets/${id}/special.png`,special.atlasW,special.atlasH]
+    ['special',special.path||`/assets/${id}/special.png`,special.atlasW,special.atlasH]
   ];
   return Object.freeze({
     atlas:`/assets/${id}/idle-front.png`,portrait:`/assets/${id}/portrait.png`,manifest:`/assets/${id}/animation.json`,hurtTint:'rgba(251,113,133,.6)',
@@ -23,6 +23,7 @@ function tech(id,portraitW,portraitH,idle,walk,walkLeft,attack,special){
     specialColumns:special.frames,specialCellW:special.cellW,specialCellH:special.cellH,
     idleBreathFrames:6,idleFps:5,walkFps:10,attackFps:12,specialFps:3,
     attackDuration:.4,gestureHold:.8,muzzle:attack.muzzle,
+    ...(special.knowledgeDump?{knowledgeDump:true}:{}),
     worldSize:52,anchorX:.5,anchorY:.9,portraitW,portraitH,
     manifestSpec:{
       frameWidth:idle.cellW,frameHeight:idle.cellH,
@@ -52,7 +53,7 @@ veteran:Object.freeze(tech('veteran',78,132,
   {atlasW:544,atlasH:113,cellW:68,cellH:113,frames:8},
   {atlasW:544,atlasH:113,cellW:68,cellH:113,frames:8},
   {atlasW:792,atlasH:124,cellW:132,cellH:124,frames:6,muzzle:{x:131,y:36}},
-  {atlasW:1939,atlasH:119,cellW:277,cellH:119,frames:7}
+  {atlasW:1939,atlasH:119,cellW:277,cellH:119,frames:7,path:'/assets/veteran/knowledge-dump.png',knowledgeDump:true}
 )),
 clone:Object.freeze(tech('clone',74,124,
   {atlasW:648,atlasH:112,cellW:72,cellH:112,frames:9},
@@ -111,7 +112,7 @@ export const ENEMY_SPRITES=Object.freeze({jitter:jitterSpriteDefinition,lag:Obje
 packet:Object.freeze({
   atlas:'/assets/pudding/movement.png',portrait:'/assets/pudding/portrait.png',manifest:'/assets/pudding/animation.json',
   sources:{sheet:'https://media.base44.com/images/public/6aab67049cd04a621f2adf4f/de7a595cf_6764.jpg'},
-  extras:[['charge','/assets/pudding/charge.png',688,118],['drop','/assets/pudding/drop.png',880,124],['puddle','/assets/pudding/puddle.png',432,76]],
+  extras:[['charge','/assets/pudding/charge.png',688,118],['drop','/assets/pudding/drop.png',880,124],['puddle','/assets/pudding/puddle.png',432,76],['groundPuddle','/assets/pudding/puddle-final.png',216,76]],
   atlasW:1020,atlasH:212,cellW:170,cellH:106,columns:10,moveAColumns:4,moveBColumns:6,fps:9,worldSize:54,
   moveAnchors:[[85,104],[85,104],[85,104],[85,104],[93,104],[89,104],[92,104],[85,104],[85,104],[85,104]],
   moveBodyTops:[11,11,10,11,6,5,3,5,15,13],

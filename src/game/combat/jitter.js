@@ -1,4 +1,4 @@
-export const JITTER=Object.freeze({telegraph:1,recovery:.45,cooldown:12,initialMin:10,initialMax:15,radius:76,damage:12,activationRange:130,spawnWeight:.5});
+export const JITTER=Object.freeze({telegraph:1,recovery:.45,cooldown:12,initialMin:10,initialMax:15,radius:76*1.20,damage:12,activationRange:130,spawnWeight:.5});
 export const createJitterState=(random=Math.random)=>({phase:'chase',remaining:0,cooldown:JITTER.initialMin+random()*(JITTER.initialMax-JITTER.initialMin),clock:0,melee:0,facing:'right'});
 export function stepJitter(s,dt,{alive=true,playerAlive=true,dist=Infinity,visible=false,targetDx=0}={}){
  if(!alive){s.phase='dead';s.remaining=0;return null}
