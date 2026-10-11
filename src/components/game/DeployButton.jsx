@@ -11,7 +11,7 @@ export default function DeployButton({ hud, input }) {
       onPointerDown={() => { input.current.deploy = true; }}
       disabled={sel.cd > 0}
       title={`${sel.name} — place (Q), switch (C)`}
-      className="absolute bottom-40 left-5 z-20 flex size-20 cursor-pointer flex-col items-center justify-center rounded-full border-4 border-amber-100 bg-slate-900 text-center font-black uppercase text-amber-200 shadow-[0_6px_0_#b45309] disabled:cursor-not-allowed disabled:border-slate-600 disabled:bg-slate-800 disabled:text-slate-500 md:bottom-6 md:left-6 md:size-24"
+      className="flex size-16 shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-4 border-amber-100 bg-slate-900 text-center font-black uppercase text-amber-200 shadow-[0_6px_0_#b45309] disabled:cursor-not-allowed disabled:border-slate-600 disabled:bg-slate-800 disabled:text-slate-500 sm:size-20"
     >
       <span className="text-2xl leading-none">{sel.icon}</span>
       {sel.cd > 0

@@ -1,6 +1,5 @@
 import { RadioTower, Skull, Timer, Gauge, ClipboardList } from 'lucide-react';
 import { WEAPONS } from '@/game/data/combat';
-import ProgressMeters from '@/components/game/ProgressMeters';
 import BossBar from '@/components/game/BossBar';
 import RangeReadout from '@/components/game/RangeReadout';
 
@@ -11,7 +10,11 @@ const weapon = value => typeof value === 'string' ? WEAPONS[value] : value;
 export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, onSelectDeploy }) {
   const hp = Math.max(0, hud.hp || 0);
   const max = hud.maxHp || 1;
-  return <div className="pointer-events-none absolute inset-x-0 top-0 z-20 p-3 text-white sm:p-5">
+  // Flow header ABOVE the canvas (a flex sibling, never an overlay): all
+  // gameplay text lives here in its own DOM region, so nothing can cover the
+  // player or impairments. The engine sizes its camera viewport from the
+  // canvas element's own rect, which excludes this header entirely.
+  return <header className="pointer-events-none w-full shrink-0 border-b-2 border-slate-800 bg-slate-950 p-2 text-white sm:p-3">
     <div className="mx-auto flex max-w-6xl items-start justify-between gap-2">
       <div className="w-36 sm:w-60">
         <div className="mb-1 flex justify-between text-xs font-black uppercase"><span>Jacket Integrity</span><span>{Math.ceil(hp)}/{max}</span></div>
@@ -47,7 +50,6 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, on
     <BossBar boss={hud.boss}/>
     <div className="mt-3 flex justify-center gap-1">{Array.from({length:Math.max(slots,weapons.length)},(_,i)=>{const w=weapon(weapons[i]);return <div key={i} className="flex size-10 items-center justify-center rounded-lg border-2 border-white/20 bg-slate-950/75 text-xl" title={w?`${w.name}${hud.weaponRanges?.[i]!=null?` — ${hud.weaponRanges[i].toFixed(1)} world units`:''}`:'Empty tool slot'}>{w?.icon||'·'}</div>})}</div>
     <RangeReadout hud={hud}/>
-    <ProgressMeters hud={hud}/>
     {/* Deployable bar: structure counter (deployed/permit cap) + one slot per
         owned deployable with its cooldown + stack level. Clicking a slot
         selects it (the HUD wrapper is pointer-events-none, so slots need
@@ -74,5 +76,5 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, on
         <span className="ml-1 hidden text-xs font-black uppercase text-cyan-100/70 sm:block">Q</span>
       </div>
     )}
-  </div>;
+  </header>;
 }

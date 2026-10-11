@@ -37,7 +37,9 @@ test('engine wiring: the truck is exclusive to the Keys turretMount; the Boss si
   assert.match(engine,/drawTruckTurret\(ctx,truckArt,st\.born,x,y,grow\)/);assert.match(engine,/st\.type===truckDef\.structureType/);
   // turrets pool (signature/weapon turrets): NO truck reference at all
   assert.doesNotMatch(engine,/signatureWid/);assert.doesNotMatch(engine,/signature-bucket/);
-  assert.match(engine,/if\(t\.mode==='helper'\)drawHelper\(ctx,Math\.round\(t\.x\),Math\.round\(t\.y\),t\.color\);else drawTurretBody/);
+  // helper branch with placeholder fallback, and the pedestal/placeholder bodies for all other turrets
+  assert.match(engine,/else drawHelper\(ctx,Math\.round\(t\.x\),Math\.round\(t\.y\),t\.color\)\}/);
+  assert.match(engine,/drawTurretBody\(Math\.round\(t\.x\),Math\.round\(t\.y\),t\.color,t\.lookA,t\.r\*grow\+3\)/);
   assert.equal(def.structureType,'turretMount');assert.equal(def.signatureWid,undefined);
   assert.equal(def.atlas,'/assets/buckettruck/turret.png');assert.equal(def.portrait,'/assets/buckettruck/icon.png');
   // the only scoped user of the truck art; other turrets/structures keep drawTurretBody

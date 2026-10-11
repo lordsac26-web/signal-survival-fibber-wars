@@ -82,8 +82,9 @@ test('techSpriteAnimation: idle, walk, walk-left, attack, and special frame sele
     s.moving=false;s.attack=.4;s.special=0;
     const attackFrame=techFrame(art,s);
     assert.equal(attackFrame.image,'attack');
-    // Special: plays special frames
-    s.attack=0;s.special=1;s.vfxClock=0;
+    // Special: plays special frames (Don's timer counts DOWN from 8: a fresh
+    // activation is 8; 1 would mean the activation already finished)
+    s.attack=0;s.special=charId==='don'?8:1;s.vfxClock=0;
     const specialFrame=techFrame(art,s);
     assert.equal(specialFrame.image,'special');
     assert.equal(specialFrame.sx,0);

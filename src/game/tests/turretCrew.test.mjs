@@ -102,7 +102,7 @@ test('engine wiring: weapon turrets route to the pedestal renderer with a tray m
   assert.match(engineSource,/if\(t\.mode==='helper'\)\{ \/\/ Don's crew/,'crew branch precedes the fallback');
   // signature turrets keep their placeholders
   assert.match(engineSource,/drawTurretBody\(Math\.round\(t\.x\)/,'signature sentries keep the placeholder body');
-  assert.match(engineSource,/drawHelper\(ctx,Math\.round\(t\.x\),Math\.round\(t\.y\),t\.color\)\}else drawTurretBody/,'placeholder helper fallback preserved');
+  assert.match(engineSource,/else drawHelper\(ctx,Math\.round\(t\.x\),Math\.round\(t\.y\),t\.color\)\}/,'placeholder helper fallback preserved');
 });
 test('pedestal renderer states, foot anchoring and mirrored left targeting',()=>{
   const art={definition:structureSpriteDef('pedestal_turret'),atlas:{},rotate:{},fire:{},retract:{}};
@@ -122,7 +122,7 @@ test('pedestal renderer states, foot anchoring and mirrored left targeting',()=>
   drawPedestalTurret(ctx,art,{born:3,life:8,fireCd:.1,fire:.45,lookA:Math.PI},100,60,1); // aim LEFT
   assert.deepEqual(ctx.calls.find(c=>c.name==='scale').args,[-1,1],'left aim mirrors');
   const d=art.definition,delta=ctx.calls.find(c=>c.name==='drawImage').args,s=d.worldSize/d.strips.deploy.cellW;
-  assert.equal(delta[5],Math.round(60-d.strips.fire.baselineY*s),'feet anchored at the turret point');
+  assert.equal(delta[6],Math.round(60-d.strips.fire.baselineY*s),'feet anchored at the turret point');
   assert.equal(ctx.imageSmoothingEnabled,false,'pixel smoothing stays off');
 });
 function mockCtx(){const calls=[];const rec=name=>(...args)=>{calls.push({name,args})};
@@ -137,7 +137,8 @@ test('don special plays the solo activation strip once, never the embedded group
   const state={...createTechAnimation(),special:8};
   const frames=[];
   for(let t=8;t>6.1;t-=.125){state.special=t;const f=techFrame(art,state);if(f.image===art.special)frames.push(f.sx/d.specialCellW)}
-  assert.deepEqual(frames,[0,0,1,2,3,4,5,5,6,6,6,6,6,6,6].slice(0,frames.length),'activation plays solo frames 0-6 in order');
+  // .125s sampling at 4fps → two samples per activation frame
+  assert.deepEqual(frames,[0,0,1,1,2,2,3,3,4,4,5,5,6,6,6].slice(0,frames.length),'activation plays solo frames 0-6 in order');
   assert.ok(frames.every(f=>f<7),'the embedded group frame (7) is never drawn');
   // after activation, Don is back to normal behavior (idle/walk/attack)
   state.special=6.1;state.moving=true;state.frame=2;
@@ -164,7 +165,7 @@ test('crew helpers use the four extracted individual figures at E,S,W,N',()=>{
     drawCrewHelper(ctx,art,{helperIndex:idx,lookA:0,x:100,y:60,fire:.65,fireCd:0});
     const call=ctx.calls.find(c=>c.name==='drawImage');
     index.push(call.args.slice(1,3).join(','));
-    assert.equal(call.args[5],Math.round(60-Math.round(ci.worldHeight*ci.frames[idx].h/109)),'foot-anchored at the helper point');
+    assert.equal(call.args[6],Math.round(60-Math.round(ci.worldHeight*ci.frames[idx].h/109)),'foot-anchored at the helper point');
     assert.equal(ctx.imageSmoothingEnabled,false);
   }
   assert.deepEqual(index,ci.frames.map(f=>`${f.x},${f.y}`),'each compass helper draws its own extracted figure');
@@ -183,7 +184,7 @@ test('crew-individual atlas decodes at declared size; frames are clean and foot-
   const bytes=await readFile(new URL('../../../public/assets/don/crew-individual.png',import.meta.url));
   const img=decodePng(bytes);
   assert.equal(img.width,def.atlasW);assert.equal(img.height,def.atlasH);
-  const alpha=(x,y)=>img.data[((y*img.width)+x)*4+3];
+  const alpha=(x,y)=>img.rgba[((y*img.width)+x)*4+3];
   for(let i=0;i<def.frames.length;i++){
     const f=def.frames[i];let opaque=0,feet=0;
     for(let y=f.y;y<f.y+f.h;y++)for(let x=f.x;x<f.x+f.w;x++)if(alpha(x,y)>40)opaque++;

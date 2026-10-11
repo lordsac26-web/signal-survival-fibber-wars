@@ -3,8 +3,7 @@ import { createSignalEngine } from '@/game/signalEngine';
 import { preloadCharacterSprite, preloadEnemySprite, preloadStructureSprite } from '@/game/art/spriteLoader';
 import GameHUD from '@/components/game/GameHUD';
 import TouchControls from '@/components/game/TouchControls';
-import SpecialButton from '@/components/game/SpecialButton';
-import DeployButton from '@/components/game/DeployButton';
+import MatchFooter from '@/components/game/MatchFooter';
 import StatsScreen from '@/components/game/StatsScreen'; // NEW: the Brotato-style stat sheet overlay
 
 export default function GameArena({ run, onFinish }) {
@@ -79,30 +78,34 @@ export default function GameArena({ run, onFinish }) {
     };
   }, [artAttempt]);
 
+  // STRUCTURAL HUD/CANVAS SEPARATION: three stacked DOM regions in normal
+  // flow — header (ALL gameplay text: HP/wave/timer/signal/kills/boss bar/
+  // tools/range), canvas region (the only element the engine measures), and
+  // footer (XP, flash messages, Special/Deploy buttons). No absolute HUD
+  // overlays, no safe-rect insets, no negative margins — the canvas element
+  // IS the remaining visible area, and the engine derives its camera
+  // viewport, DPR backing buffer and touch-sized projection from that same
+  // rect (see signalEngine resize()). TouchControls stays inside the canvas
+  // region because it is transparent and text-free. StatsScreen stays a
+  // fullscreen overlay (gameplay is paused under it).
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-slate-950">
-      <canvas ref={canvas} className="h-full w-full" />
-      {artStatus && <div className="absolute inset-0 z-30 flex items-center justify-center bg-game-bg/95 p-6 text-game-ink"><div role={artStatus==='loading'?'status':'alert'} className="max-w-lg text-center"><p>{artStatus==='loading'?'Loading character and enemy sprite assets…':`Sprite assets could not start: ${artStatus}`}</p>{artStatus!=='loading' && <button className="mt-4 min-h-11 rounded-lg bg-game-signal px-4 font-bold text-game-bg" onClick={()=>setArtAttempt(n=>n+1)}>Retry sprite assets</button>}</div></div>}
+    <main className="relative flex h-screen w-screen flex-col overflow-hidden bg-slate-950">
       <GameHUD
         hud={hud}
         wave={run.wave}
         weapons={run.weapons}
         slots={run.character.slots || 6}
-        onOpenStats={toggleStats} // NEW: renders a small clipboard icon button in the HUD
+        onOpenStats={toggleStats} // renders a small clipboard icon button in the HUD
         onSelectDeploy={i => { input.current.deploySel = i; }} // click a deployable slot to select it
       />
-      <TouchControls input={input} />
-      <SpecialButton hud={hud} input={input} />
-      <DeployButton hud={hud} input={input} />
-      {flash && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-5 text-center">
-          <span className="-rotate-2 rounded-lg bg-amber-300 px-5 py-2 text-xl font-black text-slate-950 shadow-[5px_5px_0_#ea580c] sm:text-2xl">{flash}</span>
-        </div>
-      )}
-      {/* NEW: only mounted while showStats is true. Passing `run` directly is
-          enough — every stat it needs to display (damage, armor, crit, the
-          current weapon loadout, etc.) already lives as plain fields on the
-          run object itself; see StatsScreen.jsx for the full breakdown. */}
+      <div className="relative min-h-0 flex-1">
+        <canvas ref={canvas} className="block h-full w-full" />
+        <TouchControls input={input} />
+        {artStatus && <div className="absolute inset-0 z-30 flex items-center justify-center bg-game-bg/95 p-6 text-game-ink"><div role={artStatus==='loading'?'status':'alert'} className="max-w-lg text-center"><p>{artStatus==='loading'?'Loading character and enemy sprite assets…':`Sprite assets could not start: ${artStatus}`}</p>{artStatus!=='loading' && <button className="mt-4 min-h-11 rounded-lg bg-game-signal px-4 font-bold text-game-bg" onClick={()=>setArtAttempt(n=>n+1)}>Retry sprite assets</button>}</div></div>}
+      </div>
+      <MatchFooter hud={hud} input={input} flash={flash} />
+      {/* Only mounted while showStats is true; every stat it needs already
+          lives as plain fields on the run object (see StatsScreen.jsx). */}
       {showStats && <StatsScreen run={{...run,...hud}} onClose={toggleStats} />}
     </main>
   );
