@@ -17,3 +17,11 @@ export function activateSignature(run,p,api){
     default:return null;
   }
 }
+// Crew survivability (playtest B): a pool turret takes e.damage*0.5 per
+// contact hit (0.5s invulnerability between hits) and enemy damage grows
+// ~5%/wave, so the old flat 35 HP bought only ~2-3 contact hits by the mid
+// teens. 45 base with +9%/wave keeps later-wave contact survival roughly
+// flat-to-better without approaching immortality. A pure function of
+// (wave, engineering), evaluated ONCE at spawn in signalEngine.signatureTurret
+// — it cannot compound across frames.
+export function crewHelperHp(wave,engineering){return Math.round(45*(1+.09*((wave||1)-1)))+(engineering||0)*2}

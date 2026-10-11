@@ -36,5 +36,9 @@
     "frameWidth": 239,
     "frameHeight": 117
   },
-  "fps": 8
+  "fps": 8,
+  "muzzle": {
+    "x": 104,
+    "y": 35
+  }
 }

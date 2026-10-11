@@ -2,7 +2,10 @@
 // the Dirty-Connector Blob enemy. Handles idle (with gesture frames), walk
 // (right/left true art), attack, and special activation. Pure frame selection
 // for testability; VFX (glow, aura, jitter) drawn by the engine on top.
-export const createTechAnimation=()=>({side:'right',vert:'down',frame:0,clock:0,moving:false,hurt:0,special:0,attack:0,vfxClock:0});
+// attackFace: which side the ATTACK pose faces (left/right-only firing
+// sheets); set by the engine toward the current target with a dead-zone.
+// Movement facing (side) stays independent and unchanged during attacks.
+export const createTechAnimation=()=>({side:'right',vert:'down',frame:0,clock:0,moving:false,hurt:0,special:0,attack:0,vfxClock:0,attackFace:'right'});
 export function updateTechAnimation(state,dx,dy,dt,definition){
   state.hurt=Math.max(0,state.hurt-dt);
   state.attack=Math.max(0,state.attack-dt);
@@ -57,7 +60,9 @@ export function techFrame(art,state){
     const cols=d.attackColumns||1;
     const elapsed=(d.attackDuration||.4)-state.attack;
     const frame=Math.min(cols-1,Math.floor(elapsed*(d.attackFps||12)));
-    return {image:art.attack,sx:frame*d.attackCellW,sy:0,frameW:d.attackCellW,frameH:d.attackCellH,mirror:false};
+    // No genuine left-facing attack rows exist in any sheet, so the
+    // right-facing strip is mirrored when the target is to the left.
+    return {image:art.attack,sx:frame*d.attackCellW,sy:0,frameW:d.attackCellW,frameH:d.attackCellH,mirror:(state.attackFace||'right')==='left'};
   }
   if(state.moving){
     if(state.side==='left')return {image:art.walkLeft,sx:state.frame*d.walkLeftCellW,sy:0,frameW:d.walkLeftCellW,frameH:d.walkLeftCellH,mirror:false};
@@ -76,7 +81,11 @@ export function drawTechSprite(ctx,art,state,x,y){
   const fw=f.frameW||d.cellW,fh=f.frameH||d.cellH,w=h*fw/fh;
   const img=state.hurt>0&&art.hurt&&f.image===art.atlas?art.hurt:f.image;
   const prev=ctx.imageSmoothingEnabled;ctx.imageSmoothingEnabled=false;
-  ctx.drawImage(img,f.sx,f.sy,fw,fh,Math.round(x-w*d.anchorX),Math.round(y-h*d.anchorY),Math.round(w),h);
+  if(f.mirror){ // horizontal mirror of the right-facing strip, upright (no rotation)
+    ctx.save();ctx.translate(Math.round(x),0);ctx.scale(-1,1);ctx.translate(-Math.round(x),0);
+    ctx.drawImage(img,f.sx,f.sy,fw,fh,Math.round(x-w*d.anchorX),Math.round(y-h*d.anchorY),Math.round(w),h);
+    ctx.restore();
+  }else ctx.drawImage(img,f.sx,f.sy,fw,fh,Math.round(x-w*d.anchorX),Math.round(y-h*d.anchorY),Math.round(w),h);
   ctx.imageSmoothingEnabled=prev;
 }
 // Enemies are drawn CENTERED on their collision point (feet-anchor math stays

@@ -21,3 +21,14 @@ export function drawCrewHelper(ctx,art,t){
   }else ctx.drawImage(art.crewInd,f.x,f.y,f.w,f.h,Math.round(t.x-w/2),Math.round(t.y-h),w,h);
   ctx.imageSmoothingEnabled=prev;
 }
+// Measured hand/muzzle point per extracted crew figure (box-local, from the
+// box's TOP-LEFT, right-facing art): the weapon tip inside the chest band,
+// from the same pixel pass that produced the figures (muzzleAudit.test.mjs).
+// Mirrors horizontally exactly like drawCrewHelper does, so the shot always
+// leaves the drawn hand.
+const CREW_MUZZLE=[[42,34],[32,32],[46,30],[35,40]];
+export function crewMuzzle(ci,t){
+  const i=((t.helperIndex%4)+4)%4,f=ci.frames[i],hW=ci.worldHeight*f.h/MAX_H,s=hW/f.h,w=hW*f.w/f.h;
+  const [lx,ly]=CREW_MUZZLE[i];
+  return[Math.cos(t.lookA||0)<0?t.x+w/2-lx*s:t.x-w/2+lx*s,t.y-hW+ly*s];
+}

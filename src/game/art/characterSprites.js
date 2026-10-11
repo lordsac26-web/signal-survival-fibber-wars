@@ -43,20 +43,21 @@ oracle:Object.freeze({
   sources:{atlas:source+'6000b350b_oracle-movement.png',portrait:source+'ddab5b16f_oracle-portrait.png',manifest:source+'e3ac4cbf8_oracle-animation.json'},
   width:448,height:320,cell:64,columns:7,rows:5,fps:8,worldSize:48,
   anchorX:.5,anchorY:.90625,
-  directions:{down:0,left:64,right:128,up:192},idleRow:256
+  directions:{down:0,left:64,right:128,up:192},idleRow:256,
+  muzzle:{x:43,y:35,cellW:64,cellH:64}
 }),
 veteran:Object.freeze(tech('veteran',78,132,
   {atlasW:675,atlasH:120,cellW:75,cellH:120,frames:9},
   {atlasW:544,atlasH:113,cellW:68,cellH:113,frames:8},
   {atlasW:544,atlasH:113,cellW:68,cellH:113,frames:8},
-  {atlasW:792,atlasH:124,cellW:132,cellH:124,frames:6},
+  {atlasW:792,atlasH:124,cellW:132,cellH:124,frames:6,muzzle:{x:131,y:36}},
   {atlasW:1939,atlasH:119,cellW:277,cellH:119,frames:7}
 )),
 clone:Object.freeze(tech('clone',74,124,
   {atlasW:648,atlasH:112,cellW:72,cellH:112,frames:9},
   {atlasW:504,atlasH:114,cellW:63,cellH:114,frames:8},
   {atlasW:520,atlasH:115,cellW:65,cellH:115,frames:8},
-  {atlasW:720,atlasH:112,cellW:120,cellH:112,frames:6},
+  {atlasW:720,atlasH:112,cellW:120,cellH:112,frames:6,muzzle:{x:119,y:41}},
   {atlasW:1448,atlasH:114,cellW:181,cellH:114,frames:8}
 )),
 don:Object.freeze((()=>{
@@ -69,7 +70,7 @@ don:Object.freeze((()=>{
     {atlasW:792,atlasH:124,cellW:88,cellH:124,frames:9},
     {atlasW:608,atlasH:122,cellW:76,cellH:122,frames:8},
     {atlasW:616,atlasH:120,cellW:77,cellH:120,frames:8},
-    {atlasW:888,atlasH:114,cellW:111,cellH:114,frames:8},
+    {atlasW:888,atlasH:114,cellW:111,cellH:114,frames:8,muzzle:{x:104,y:35}},
     {atlasW:1912,atlasH:117,cellW:239,cellH:117,frames:8});
   const crewInd=Object.freeze({atlas:'/assets/don/crew-individual.png',atlasW:171,atlasH:109,worldHeight:46,
     // Per-figure boxes in the atlas, helper index order E,S,W,N (bottom-aligned).
@@ -81,7 +82,7 @@ nomad:Object.freeze(tech('nomad',76,140,
   {atlasW:684,atlasH:138,cellW:76,cellH:138,frames:9},
   {atlasW:648,atlasH:138,cellW:72,cellH:138,frames:9},
   {atlasW:648,atlasH:138,cellW:72,cellH:138,frames:9},
-  {atlasW:984,atlasH:138,cellW:164,cellH:138,frames:6,muzzle:{x:1,y:96,cellW:164,cellH:138}},
+  {atlasW:984,atlasH:138,cellW:164,cellH:138,frames:6,muzzle:{x:163,y:66,cellW:164,cellH:138}},
   {atlasW:1584,atlasH:138,cellW:198,cellH:138,frames:8}
 ))
 });
@@ -155,7 +156,7 @@ pedestal_turret:Object.freeze({
     fire:{cellW:79,cellH:101,columns:7,baselineY:99,anchorX:37},
     retract:{cellW:71,cellH:106,columns:9,baselineY:104,anchorX:28}
   },
-  muzzle:{x:35,y:49},worldSize:56,portraitW:73,portraitH:106,structureType:'turretMount',
+  muzzle:{x:74,y:49},worldSize:56,portraitW:73,portraitH:106,structureType:'turretMount',
   manifestSpec:{structureId:'pedestal_turret','strips.deploy.cellW':81,'strips.deploy.cellH':111,'strips.deploy.columns':9,'strips.rotate.cellW':77,'strips.rotate.cellH':98,'strips.rotate.columns':8,'strips.fire.cellW':79,'strips.fire.cellH':101,'strips.fire.columns':7,'strips.retract.cellW':71,'strips.retract.cellH':106,'strips.retract.columns':9}
 })
 });
