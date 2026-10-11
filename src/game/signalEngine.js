@@ -22,6 +22,8 @@ import { structureSpriteDef } from '@/game/art/characterSprites';
 import { SQUIRREL, bossWave } from '@/game/data/bosses';
 import { createSquirrelAnimation, updateSquirrelAnimation, squirrelRelease, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation';
 import { createTechAnimation, updateTechAnimation, drawTechSprite, drawTechEnemy } from '@/game/art/techSpriteAnimation';
+import { JITTER, createJitterState, stepJitter, jitterVelocity, jitterPulseHits, pickEnemyKind } from '@/game/combat/jitter';
+import { drawJitterSprite } from '@/game/art/jitterSpriteAnimation';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
 const clamp=(n,a,b)=>n<a?a:n>b?b:n;
@@ -42,7 +44,7 @@ const weaponOf=w=>typeof w==='string'?WEAPONS[w]:w;
 // structures (Q key) live in the `structures` pool. Both integrate with the
 // enemy spatial hash for targeting, and structure-vs-enemy steering is a small
 // per-enemy loop over the (tiny) active-structure list — no repathing, no O(n²).
-export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null,puddingArt=null){
+export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null,puddingArt=null,jitterArt=null){
  const ctx=canvas.getContext('2d',{alpha:false}),grid=new SpatialHash(96),charId=run.character.id;
  let dpr=Math.min(devicePixelRatio||1,2);
  if(run.character.id==='oracle'&&!characterArt)throw new Error('Oracle art must be preloaded before combat');
@@ -108,10 +110,12 @@ function kill(e){kills++;killsByType[e.kind]=(killsByType[e.kind]||0)+1;const ca
  function nearest(range){queryX=p.x;queryY=p.y;nearestBest=null;nearestDist=range;grid.visit(p.x,p.y,range,nearestVisitor);return nearestBest}
  function nearestAt(x,y,range){queryX=x;queryY=y;nearestBest=null;nearestDist=range;grid.visit(x,y,range,nearestVisitor);return nearestBest}
  function activeFoeCount(){let n=0;for(let i=0;i<enemies.items.length;i++)if(enemies.items[i].active)n++;return n}
- function spawnEnemy(kind,force){if(!force&&activeFoeCount()>=maxActiveEnemies(run.wave))return;const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||TYPES[(Math.random()*Math.min(TYPES.length,2+(run.wave/2|0)))|0]],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;// DENSITY REBALANCE: fewer simultaneous bodies (see maxActiveEnemies) are
+ function spawnEnemy(kind,force){if(!force&&activeFoeCount()>=maxActiveEnemies(run.wave))return;const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||pickEnemyKind(TYPES,run.wave)],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;// DENSITY REBALANCE: fewer simultaneous bodies (see maxActiveEnemies) are
 // compensated with steeper per-wave HP scaling (.19 → .28) plus a new
 // contact-damage scale. The boss keeps its own literal .19 scaling untouched.
 e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage*(1+(run.wave-1)*.05);e.r=base.r;e.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
+ e.art=null;e.anim=null;e.pud=null;e.sq=null;e.jit=null;e.boss=false;
+ if(e.kind==='jitter'&&jitterArt){e.art=jitterArt;e.jit=createJitterState()}
  if(e.kind==='lag'&&lagArt){e.art=lagArt;e.anim=createLagAnimation()}if(e.kind==='dirty'&&blobArtDef){e.art=blobArtDef;e.anim=createTechAnimation();e.anim.special=.5}
  if(e.kind==='packet'&&puddingArt){e.art=puddingArt;e.anim=createPuddingAnimation();e.pud=initPuddingState()}}
  // SQUIRREL BOSS: spawns at the wave-20 gate (then every 10 waves). Phase 1
@@ -121,7 +125,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
  function spawnBoss(){if(!sqArt||!SQUIRREL)return;const e=enemies.acquire();if(!e)return;
   const edge=(Math.random()*4)|0,pad=60;e.kind=SQUIRREL.id;
   e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;
-  e.hp=SQUIRREL.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=SQUIRREL.speed*(1+(run.wave-1)*.025);e.damage=SQUIRREL.damage;e.r=SQUIRREL.r;e.value=Math.round(SQUIRREL.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=SQUIRREL.color;e.elite=true;e.boss=true;e.dirty=false;e.sound='boss';e.lastShot=-1;e.sprite=null;e.art=null;e.anim=null;
+  e.hp=SQUIRREL.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=SQUIRREL.speed*(1+(run.wave-1)*.025);e.damage=SQUIRREL.damage;e.r=SQUIRREL.r;e.value=Math.round(SQUIRREL.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=SQUIRREL.color;e.elite=true;e.boss=true;e.dirty=false;e.sound='boss';e.lastShot=-1;e.sprite=null;e.art=null;e.anim=null;e.pud=null;e.jit=null;
   e.sq={...createSquirrelAnimation(),art:sqArt,phase:1,castCd:2,wind:0,cast:0,aim:0};
   cb.flash(SQUIRREL.intro);addShake(6)}
  function fireCone(e){const c=SQUIRREL.cone,step=c.pellets>1?c.half*2/(c.pellets-1):0;
@@ -266,6 +270,10 @@ spawn-=dt;if(spawn<=0){const outage=specialTimer>0&&run.character.special.id==='
   // chomp + shove, snares slow — none of it touches the player.
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(!e.active)continue;let a=Math.atan2(p.y-e.y,p.x-e.x),spd=e.speed;
    let slowMul=1;
+   if(e.jit){const action=stepJitter(e.jit,dt,{alive:e.active&&e.hp>0,playerAlive:p.hp>0,dist:distance(p,e),targetDx:p.x-e.x,visible:e.x-JITTER.radius>=camX&&e.x+JITTER.radius<=camX+viewW&&e.y-JITTER.radius>=camY&&e.y+JITTER.radius<=camY+viewH});
+    if(action==='charge'){e.jit.rootX=e.x;e.jit.rootY=e.y}
+    if(action==='fire'){if(jitterPulseHits(e.jit,distance(p,e),p.inv)){damagePlayer(JITTER.damage*(1+(run.wave-1)*.05));p.inv=.55}particle(e.x,e.y,'#67e8f9',lowFx?3:8);sfx('spark')}
+   }
    // PACKET-LOSS PUDDING cast: within range + on screen + cooldown ready →
    // root in place for the 1s telegraph (drop spot saved at cast start), then
    // collapse into a puddle at that exact spot and instantly resume chasing.
@@ -277,13 +285,15 @@ spawn-=dt;if(spawn<=0){const outage=specialTimer>0&&run.character.special.id==='
     if(def.kind==='block'){const dx=e.x-st.x,dy=e.y-st.y,sd=Math.hypot(dx,dy),min=st.r+e.r;if(sd<min){const push=(min-sd)*.55;e.x+=dx/(sd||1)*push;e.y+=dy/(sd||1)*push}}
     else if(def.kind==='trap'&&st.rearm<=0&&st.uses>0){const sd=Math.hypot(e.x-st.x,e.y-st.y);if(sd<st.r+e.r){st.rearm=.7;st.uses--;hit(e,def.chomp*(1+.2*(st.power-1)),'#f87171',false);const ba=Math.atan2(e.y-st.y,e.x-st.x);e.x+=Math.cos(ba)*22;e.y+=Math.sin(ba)*22;sfx('snip');if(st.uses<=0){particle(st.x,st.y,'#f87171',lowFx?2:6);structures.release(st);structCount--}}}
     else if(def.kind==='slow'){if(Math.hypot(e.x-st.x,e.y-st.y)<st.r)slowMul=Math.min(slowMul,1-(def.slow+.05*(st.power-1)))}}
+   if(e.jit&&e.jit.phase!=='chase'){e.x=e.jit.rootX;e.y=e.jit.rootY}
    if(e.sq)({a,spd}=squirrelUpdate(e,dt));
-   const mvx=Math.cos(a)*spd*slowMul,mvy=Math.sin(a)*spd*slowMul;
+   const velocity=e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
+   const mvx=velocity.x,mvy=velocity.y;
    e.x+=mvx*dt;e.y+=mvy*dt;
    if(e.anim){if(e.art===puddingArt)updatePuddingAnimation(e.anim,mvx,mvy,dt,pudArtDef.definition);else if(e.art===blobArtDef){e.anim.special=Math.max(0,e.anim.special-dt);updateTechAnimation(e.anim,mvx*dt,mvy*dt,dt,blobArtDef.definition)}else updateLagAnimation(e.anim,mvx*dt,mvy*dt,dt,lagArt.definition)}
    else if(e.sq)updateSquirrelAnimation(e.sq,mvx,mvy,dt,sqArt.definition)
-   if(separate){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
-   if(distance(p,e)<p.r+e.r&&p.inv<=0){if(e.anim){if(e.kind==='packet'){e.anim.melee=.34;e.anim.facing=p.x<e.x?'left':'right'}else e.anim.attack=.35}if(run.firstHitBlocked&&!firstBlockUsed){firstBlockUsed=true;cb.flash('FIRST HIT POLITELY DECLINED')}else damagePlayer(e.damage);p.inv=.55}}
+   if(separate&&(!e.jit||e.jit.phase==='chase')){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
+   if(distance(p,e)<p.r+e.r&&p.inv<=0&&(!e.jit||e.jit.phase==='chase')){if(e.jit&&e.jit.phase==='chase'){e.jit.melee=1/3;e.jit.facing=p.x<e.x?'left':'right'}if(e.anim){if(e.kind==='packet'){e.anim.melee=.34;e.anim.facing=p.x<e.x?'left':'right'}else e.anim.attack=.35}if(run.firstHitBlocked&&!firstBlockUsed){firstBlockUsed=true;cb.flash('FIRST HIT POLITELY DECLINED')}else damagePlayer(e.damage);p.inv=.55}}
   for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(!d.active)continue;const dd=distance(p,d);if(dd<120*(run.character.pickupScale||1)){d.x+=(p.x-d.x)*dt*7;d.y+=(p.y-d.y)*dt*7}if(dd<p.r+10){signal+=d.value;earnedSignal+=d.value;xp+=d.value*TUNING.xpPickupFactor;xpEarnedWave+=d.value*TUNING.xpPickupFactor;sfx('pickup');pickups.release(d);while(xp>=signalForLevel(run.level+levels)){xp-=signalForLevel(run.level+levels);levels++;sfx('level');cb.flash('SIGNAL LEVEL UP!')}}}
   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(!q.active)continue;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=.94;q.vy*=.94;q.life-=dt;if(q.life<=0)particles.release(q)}for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;n.y-=25*dt;n.life-=dt;if(n.life<=0)numbers.release(n)}if(soundClock<=0){for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active){sfx(e.sound);break}}soundClock=.35+Math.random()*.35}
   if((p.hp<=0||time<=0)&&!over){over=true;const harvest=p.hp>0?Math.round(run.harvesting||0):0;signal+=harvest;earnedSignal+=harvest;sfx(p.hp<=0?'death':'clear');cancelAnimationFrame(raf);cb.finish({...run,hp:Math.max(0,p.hp),signal,earnedSignal,kills,xp,pendingLevels:levels,specialProgress:0,specialUnlocked:true,specialCooldown,deployCds:{...deployCds},won:p.hp>0,damageDealt:Math.round(damageDealt),healed:Math.round(healed),damageTaken:Math.round(damageTaken),killsByType,lastWaveMetrics:{duration:duration-Math.max(0,time),kills:kills-startKills,earnedSignal:earnedSignal-startEarned,xpEarned:+xpEarnedWave.toFixed(2),levelsGained:levels}})}
@@ -323,7 +333,7 @@ spawn-=dt;if(spawn<=0){const outage=specialTimer>0&&run.character.special.id==='
     if(run.character.id==='don'&&specialTimer>0&&characterArt&&characterArt.crewInd)drawCrewHelper(ctx,characterArt,t);else drawHelper(ctx,Math.round(t.x),Math.round(t.y),t.color)}
    else if(t.weaponTurret&&pedArt)drawPedestalTurret(ctx,pedArt,t,Math.round(t.x),Math.round(t.y),grow); // weapon-deployed turrets share the splice-pedestal pack
    else drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
-  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.art&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40){if(e.art===puddingArt)drawPuddingSprite(ctx,puddingArt,e.anim,e.x,e.y);else if(e.art===blobArtDef)drawTechEnemy(ctx,e.art,e.anim,e.x,e.y);else drawLagSprite(ctx,e.art,e.anim,e.x,e.y)}}
+  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.art&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40){if(e.jit)drawJitterSprite(ctx,jitterArt,e.jit,e.x,e.y,e.jit.phase==='chase');else if(e.art===puddingArt)drawPuddingSprite(ctx,puddingArt,e.anim,e.x,e.y);else if(e.art===blobArtDef)drawTechEnemy(ctx,e.art,e.anim,e.x,e.y);else drawLagSprite(ctx,e.art,e.anim,e.x,e.y)}}
   for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&!e.art&&e.kind===kind&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40)ctx.drawImage(e.sprite,Math.round(e.x-e.sprite.width/2),Math.round(e.y-e.sprite.height/2))}}
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.sq&&e.x>camX-90&&e.x<camX+viewW+90&&e.y>camY-90&&e.y<camY+viewH+90)drawSquirrelSprite(ctx,e.sq.art,e.sq,e.x,e.y)}
   for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>camX-28&&s.x<camX+viewW+28&&s.y>camY-28&&s.y<camY+viewH+28)drawProjectile(ctx,s)}

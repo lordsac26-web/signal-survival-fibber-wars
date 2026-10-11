@@ -139,10 +139,11 @@ const baseRun = () => {
 const { preloadCharacterSprite, preloadEnemySprite, preloadStructureSprite } = await import('@/game/art/spriteLoader.js');
 const { createSignalEngine } = await import('@/game/signalEngine.js');
 
-async function session({ width, height, seconds }) {
+async function session({ width, height, seconds, jitterOnly=false }) {
   const rec = makeRecordingCtx();
   const canvas = makeCanvas(width, height, rec);
   const run = baseRun();
+  if(jitterOnly)run.weapons=[]; // survive long enough to exercise repeated novas, no baseline changes
   const input = { current: { x: 0, y: 0, special: false, deploy: false, cycle: false, deploySel: 0 } };
   const paused = { current: false };
   const huds = []; let finished = null; const flashes = [];
@@ -157,16 +158,17 @@ async function session({ width, height, seconds }) {
   const arts = await Promise.all([
     preloadCharacterSprite(run.character.id), preloadEnemySprite('lag'), preloadStructureSprite('bucket'),
     preloadStructureSprite('pedestal_turret'), preloadEnemySprite('squirrel'), preloadEnemySprite('dirty'),
-    preloadEnemySprite('packet'),
+    preloadEnemySprite('packet'), preloadEnemySprite('jitter'),
   ]);
   assert.ok(arts[0], 'character art resolved');
 
   const dispose = createSignalEngine(canvas, run, input, cb, paused,
-    arts[0], arts[1], arts[2], arts[3], arts[4], arts[5], arts[6]);
+    arts[0], arts[1], arts[2], arts[4], arts[5], arts[3], arts[6], arts[7]);
 
   // Script: hold right for the first 4s (movement/camera), then wiggle
   // diagonally, and fire the special once mid-session.
   const stoppedAt = pump(seconds, f => {
+    if(jitterOnly)return;
     if (f < 240) { input.current.x = 1; input.current.y = 0; }
     else { input.current.x = (f % 120 < 60) ? .7 : -.7; input.current.y = (f % 90 < 45) ? .7 : -.7; }
     if (f === 1200) input.current.special = true;
@@ -181,7 +183,8 @@ async function session({ width, height, seconds }) {
   const fpsMin = Math.min(...huds.map(h => h.fps));
   dispose();
 
-  return { stoppedAt, camXs, setTs, huds, timerFirst, timerLast, killsMax, xpLast, hpMin, fpsMin, finished, flashes };
+  const jitterDraws=rec.record.filter(r=>r[0]==='drawImage'&&r[1]?.naturalWidth===1200&&r[1]?.naturalHeight===800);
+  return { stoppedAt, camXs, setTs, huds, timerFirst, timerLast, killsMax, xpLast, hpMin, fpsMin, finished, flashes, jitterDraws };
 }
 
 test('runtime startup sim (mobile 375×667): 40s of play — engine loop never stops, timer decreases, input moves player, enemies die', async () => {
@@ -222,10 +225,10 @@ test('runtime pause/reset contract: paused loop holds the timer (and sim time), 
   const arts = await Promise.all([
     preloadCharacterSprite(run.character.id), preloadEnemySprite('lag'), preloadStructureSprite('bucket'),
     preloadStructureSprite('pedestal_turret'), preloadEnemySprite('squirrel'), preloadEnemySprite('dirty'),
-    preloadEnemySprite('packet'),
+    preloadEnemySprite('packet'), preloadEnemySprite('jitter'),
   ]);
   const dispose = createSignalEngine(canvas, run, input, cb, paused,
-    arts[0], arts[1], arts[2], arts[3], arts[4], arts[5], arts[6]);
+    arts[0], arts[1], arts[2], arts[4], arts[5], arts[3], arts[6], arts[7]);
   pump(3);
   const before = huds[huds.length - 1]?.time;
   paused.current = true;
@@ -238,4 +241,15 @@ test('runtime pause/reset contract: paused loop holds the timer (and sim time), 
   assert.equal(rafMap.size, 0, 'cleanup cancelled the loop');
   assert.equal(held, before, `timer frozen while paused (${before} → ${held})`);
   assert.ok(after < before, `timer resumed after unpausing (${before} → ${after})`);
+});
+
+for(const [width,height] of [[375,667],[1280,800]])test(`Jitter-specific real engine simulation ${width}×${height}: chase / melee / charge / nova / recovery`,async()=>{
+ const random=Math.random;Math.random=()=>.49; // existing ordinary slot picks jitter, no extra spawn entry
+ let r;try{r=await session({width,height,seconds:40,jitterOnly:true})}finally{Math.random=random}
+ assert.equal(r.stoppedAt,-1);assert(!r.finished);assert(r.jitterDraws.length>0);
+ for(const draw of r.jitterDraws){assert(draw.slice(2).every(Number.isFinite));assert(draw[2]>=0&&draw[2]+draw[4]<=1200);assert(draw[3]>=0&&draw[3]+draw[5]<=800)}
+ assert(r.jitterDraws.some(d=>d[3]===200),'move row rendered');
+ assert(r.jitterDraws.some(d=>d[3]===400),'contact melee row rendered');
+ for(const x of [0,240,480,720,960])assert(r.jitterDraws.some(d=>d[3]===600&&d[2]===x),`special frame ${x/240} rendered`);
+ assert(r.hpMin<2000,'actual enemy threat reached player');
 });
