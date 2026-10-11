@@ -100,6 +100,28 @@ export const ENEMY_SPRITES=Object.freeze({lag:Object.freeze({
   frontRow:0,sideRow:64,sideFaces:'right',attackFront:0,attackSide:64,
   manifestSpec:{frameWidth:64,frameHeight:64,'anchor.x':.5,'anchor.y':.90625,'movementAtlas.columns':6,'movementAtlas.rows':2,'attackAtlas.columns':2,'attackAtlas.rows':1,fps:8}
 }),
+// Packet-Loss Pudding — processed from the 1168×784 magenta-checkerboard JPEG
+// (border-connected checker removal + JPEG fringe unmixing; true RGBA out).
+// Strips: movement 10f (rows 4+6, foot-baseline aligned), melee 4f, charge 4f,
+// drop 4f (enemy plays the first 2 transformation poses; frames 2-3 are the
+// flattened residual puddle, packed separately as ground-anchored goo).
+// Anchors = measured body-foot centroid/baseline per frame; drop frame 0 keeps
+// its falling packet particles below the baseline. Base facing: right.
+pudding:Object.freeze({
+  atlas:'/assets/pudding/movement.png',portrait:'/assets/pudding/portrait.png',manifest:'/assets/pudding/animation.json',
+  sources:{sheet:'https://media.base44.com/images/public/6aab67049cd04a621f2adf4f/de7a595cf_6764.jpg'},
+  extras:[['charge','/assets/pudding/charge.png',688,118],['drop','/assets/pudding/drop.png',880,124],['puddle','/assets/pudding/puddle.png',432,76]],
+  atlasW:1020,atlasH:212,cellW:170,cellH:106,columns:10,moveAColumns:4,moveBColumns:6,fps:9,worldSize:54,
+  moveAnchors:[[85,104],[85,104],[85,104],[85,104],[93,104],[89,104],[92,104],[85,104],[85,104],[85,104]],
+  moveBodyTops:[11,11,10,11,6,5,3,5,15,13],
+  attack:'/assets/pudding/attack.png',attackW:912,attackH:100,attackCellW:228,attackCellH:100,attackColumns:4,attackFps:12,
+  attackAnchors:[[114,98],[136,98],[149,98],[114,98]],attackBodyTops:[6,6,8,7],
+  chargeCellW:172,chargeCellH:118,chargeColumns:4,chargeFps:8,chargeAnchors:[[86,116],[86,116],[82,116],[78,116]],chargeBodyTops:[11,11,11,5],
+  dropCellW:220,dropCellH:124,dropColumns:4,dropEnemyFrames:2,dropFps:8,dropAnchors:[[110,96],[110,122],[110,122],[110,122]],dropBodyTops:[6,33,51,51],
+  puddleCellW:216,puddleCellH:76,puddleColumns:2,puddleScale:.38,puddleAnchors:[[108,74],[107,74]],
+  portraitW:175,portraitH:120,baseFacing:'right',
+  manifestSpec:{frameWidth:170,frameHeight:106,'movement.columns':10,'movement.rowAColumns':4,'movement.rowBColumns':6,'attack.columns':4,'charge.columns':4,'drop.columns':4,'puddle.columns':2,'baseFacing':'right'}
+}),
 // Dirty-Connector Blob — processed from a 1024×683 magenta-bg sheet.
 // 5 rows: idle(10), walk-right(9), walk-left(9), attack(9, frames 3-4 emit
 // brown spit), special(7, golden enrage ring). Row-5 merged ring box split

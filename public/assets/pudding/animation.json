@@ -1,0 +1,25 @@
+{
+  "frameWidth": 170,
+  "frameHeight": 106,
+  "movement": { "columns": 10, "rowAColumns": 4, "rowBColumns": 6, "fps": 9 },
+  "attack": { "columns": 4, "fps": 12 },
+  "charge": { "columns": 4, "fps": 8 },
+  "drop": { "columns": 4, "enemyFrames": 2, "fps": 8 },
+  "puddle": { "columns": 2 },
+  "baseFacing": "right",
+  "anchorNote": "ax/ay = measured body-foot anchor (foot centroid x, foot baseline y) in cell-local pixels; drop frame 0 keeps 26px of falling packet particles below its baseline; drop frames 2-3 are the flattened residual puddle and are ground-anchored",
+  "anchors": {
+    "movement": [[85,104],[85,104],[85,104],[85,104],[93,104],[89,104],[92,104],[85,104],[85,104],[85,104]],
+    "attack": [[114,98],[136,98],[149,98],[114,98]],
+    "charge": [[86,116],[86,116],[82,116],[78,116]],
+    "drop": [[110,96],[110,122],[110,122],[110,122]],
+    "puddle": [[108,74],[107,74]]
+  },
+  "bodyTops": {
+    "movement": [11,11,10,11,6,5,3,5,15,13],
+    "attack": [6,6,8,7],
+    "charge": [11,11,11,5],
+    "drop": [6,33,51,51]
+  },
+  "source": "https://media.base44.com/images/public/6aab67049cd04a621f2adf4f/de7a595cf_6764.jpg"
+}

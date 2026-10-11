@@ -16,6 +16,8 @@ import { createSpriteAnimation, updateSpriteAnimation, drawCharacterSprite } fro
 import { createLagAnimation, updateLagAnimation, drawLagSprite } from '@/game/art/enemySpriteAnimation';
 import { drawTruckTurret, drawPedestalTurret } from '@/game/art/structureSprite';
 import { drawCrewHelper, crewMuzzle } from '@/game/art/crewHelper';
+import { PUDDING, initPuddingState, stepPuddingState, puddleMitigation } from '@/game/combat/puddles';
+import { createPuddingAnimation, updatePuddingAnimation, drawPuddingSprite } from '@/game/art/puddingSpriteAnimation';
 import { structureSpriteDef } from '@/game/art/characterSprites';
 import { SQUIRREL, bossWave } from '@/game/data/bosses';
 import { createSquirrelAnimation, updateSquirrelAnimation, squirrelRelease, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation';
@@ -40,7 +42,7 @@ const weaponOf=w=>typeof w==='string'?WEAPONS[w]:w;
 // structures (Q key) live in the `structures` pool. Both integrate with the
 // enemy spatial hash for targeting, and structure-vs-enemy steering is a small
 // per-enemy loop over the (tiny) active-structure list — no repathing, no O(n²).
-export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null){
+export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null,puddingArt=null){
  const ctx=canvas.getContext('2d',{alpha:false}),grid=new SpatialHash(96),charId=run.character.id;
  let dpr=Math.min(devicePixelRatio||1,2);
  if(run.character.id==='oracle'&&!characterArt)throw new Error('Oracle art must be preloaded before combat');
@@ -50,6 +52,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  const blobArtDef=blobArt&&blobArt.definition?blobArt:null;
  const truckArt=structureArt&&structureArt.definition?structureArt:null,truckDef=truckArt?structureSpriteDef('bucket'):null;
  const pedArt=pedestalArt&&pedestalArt.definition?pedestalArt:null;
+ const pudArtDef=puddingArt&&puddingArt.definition?puddingArt:null;
  const viewport={width:1100,height:800},signatureWeapon=SIGNATURE_RANGE_WEAPONS[run.character.special.id];
  const areaFx={life:0,x:0,y:0,reach:0,angle:0,half:Math.PI,color:'#fff',limit:Infinity,originX:0,originY:0};
  const enemies=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,r:10,lastShot:-1}));
@@ -60,6 +63,10 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  const foeShots=new ObjectPool(64,i=>({poolIndex:i,active:false,x:0,y:0,prevX:0,prevY:0,vx:0,vy:0,r:6,remaining:0,traveled:0,life:0,damage:0,color:'#a16207',pattern:'foe'}));
  const turrets=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,inv:0,r:13,wid:null,mode:'pellet',color:'#f59e0b',life:0,maxLife:1,fireCd:0,fire:.5,damage:10,range:300,born:0,lookA:0,weapon:null}));
  const structures=new ObjectPool(24,i=>({poolIndex:i,active:false,type:null,x:0,y:0,life:0,maxLife:1,r:20,born:0,uses:0,rearm:0,power:1,fireCd:0,lookA:0}));
+ // Puddle hazards are their own bounded pool — never counted against the
+ // enemy cap, cleaned up with the engine instance on reset/wave end.
+ const puddles=new ObjectPool(16,i=>({poolIndex:i,active:false,x:0,y:0,born:0,life:PUDDING.puddleLife,maxLife:PUDDING.puddleLife,mirror:false}));
+ let puddleTickClock=0,puddleSlowMul=1;
  const W=1100,H=800,CLAUSE_RADIUS=260;
  let viewW=W,viewH=H,scale=1,camX=0,camY=0,last=performance.now(),acc=0,raf,spawn=0,hudClock=0,soundClock=0,shotId=0,over=false,stress=false,lowFx=false,separate=true,fps=60,fpsClock=0,frames=0,lastNumber=0;
  let slow=0,timeScale=1,shakeMag=0,powerMult=1,clauseFired=false,burstCount=0;
@@ -105,7 +112,8 @@ function kill(e){kills++;killsByType[e.kind]=(killsByType[e.kind]||0)+1;const ca
 // compensated with steeper per-wave HP scaling (.19 → .28) plus a new
 // contact-damage scale. The boss keeps its own literal .19 scaling untouched.
 e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage*(1+(run.wave-1)*.05);e.r=base.r;e.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
- if(e.kind==='lag'&&lagArt){e.art=lagArt;e.anim=createLagAnimation()}if(e.kind==='dirty'&&blobArtDef){e.art=blobArtDef;e.anim=createTechAnimation();e.anim.special=.5}}
+ if(e.kind==='lag'&&lagArt){e.art=lagArt;e.anim=createLagAnimation()}if(e.kind==='dirty'&&blobArtDef){e.art=blobArtDef;e.anim=createTechAnimation();e.anim.special=.5}
+ if(e.kind==='packet'&&puddingArt){e.art=puddingArt;e.anim=createPuddingAnimation();e.pud=initPuddingState()}}
  // SQUIRREL BOSS: spawns at the wave-20 gate (then every 10 waves). Phase 1
  // chases the player; at <=50% HP it flees, keeps other impairments between
  // itself and the player, and casts the telegraphed FEC cone between retreats.
@@ -214,6 +222,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
   s.power=Math.min(item.stacks||1,TUNING.deployRankCap);s.rearm=0;s.fireCd=.3;s.lookA=Math.random()*6.28;s.uses=def.uses||0;
   deployCds[item.structure]=deployCdMax(item,def);
   sfx('deploy');particle(p.x,p.y,'#d6d3d1',lowFx?3:8);cb.flash(`${def.name.toUpperCase()} DEPLOYED`)}
+ function spawnPuddle(x,y){const d=puddles.acquire();if(!d)return;d.x=x;d.y=y;d.born=0;d.life=d.maxLife=PUDDING.puddleLife;d.mirror=((Math.round(x*.13)+Math.round(y*.07))&1)===1;sfx('packet')}
  function signatureTurret(cfg){const t=turrets.acquire();if(!t)return false;const a=cfg.index*Math.PI/2,helper=cfg.mode==='helper';
   Object.assign(t,{x:p.x+(helper?Math.cos(a)*22:0),y:p.y+(helper?Math.sin(a)*22:0),wid:`signature-${run.character.id}`,mode:cfg.mode,helperIndex:cfg.index,color:cfg.color,born:0,inv:0,r:13,life:cfg.life,maxLife:cfg.life,fire:cfg.fire,fireCd:.15,damage:cfg.damage*(1+(run.engineering||0)*.01)*(1+(run.turretQuality||0)*.004),range:cfg.range,weapon:{range:cfg.range,pattern:'turret'},hp:cfg.mode==='helper'?crewHelperHp(run.wave,run.engineering):35+(run.engineering||0),lookA:0});return true}
  function signatureBarrier(){let count=0;for(const s of structures.items)if(s.active)count++;if(count>=structCap())return false;const st=structures.acquire();if(!st)return false;const d=STRUCTURES.barricade;Object.assign(st,{type:'barricade',x:p.x,y:p.y,born:0,life:d.life,maxLife:d.life,r:d.r,power:1,rearm:0,uses:0,fireCd:0,lookA:0});return true}
