@@ -59,13 +59,24 @@ clone:Object.freeze(tech('clone',74,124,
   {atlasW:720,atlasH:112,cellW:120,cellH:112,frames:6},
   {atlasW:1448,atlasH:114,cellW:181,cellH:114,frames:8}
 )),
-don:Object.freeze(tech('don',94,136,
-  {atlasW:792,atlasH:124,cellW:88,cellH:124,frames:9},
-  {atlasW:608,atlasH:122,cellW:76,cellH:122,frames:8},
-  {atlasW:616,atlasH:120,cellW:77,cellH:120,frames:8},
-  {atlasW:888,atlasH:114,cellW:111,cellH:114,frames:8},
-  {atlasW:1912,atlasH:117,cellW:239,cellH:117,frames:8}
-)),
+don:Object.freeze((()=>{
+  // Dispatch Don v2: the 'Escalate to Field Crew' special plays the solo
+  // radio-up/directing poses (special strip frames 0-6) ONCE as its
+  // activation, then four INDIVIDUAL field-crew helpers — extracted from the
+  // sheet's group frame (frame 7) — carry the sustained phase. The embedded
+  // multi-crew group frame itself is never drawn.
+  const d=tech('don',94,136,
+    {atlasW:792,atlasH:124,cellW:88,cellH:124,frames:9},
+    {atlasW:608,atlasH:122,cellW:76,cellH:122,frames:8},
+    {atlasW:616,atlasH:120,cellW:77,cellH:120,frames:8},
+    {atlasW:888,atlasH:114,cellW:111,cellH:114,frames:8},
+    {atlasW:1912,atlasH:117,cellW:239,cellH:117,frames:8});
+  const crewInd=Object.freeze({atlas:'/assets/don/crew-individual.png',atlasW:171,atlasH:109,worldHeight:46,
+    // Per-figure boxes in the atlas, helper index order E,S,W,N (bottom-aligned).
+    frames:[{x:0,y:0,w:43,h:109},{x:47,y:15,w:33,h:94},{x:84,y:8,w:47,h:101},{x:135,y:18,w:36,h:91}]});
+  d.extras.push(['crewInd',crewInd.atlas,crewInd.atlasW,crewInd.atlasH]);
+  return {...d,specialActivationFrames:7,specialFps:4,specialDuration:8,crewInd};
+})()),
 nomad:Object.freeze(tech('nomad',76,140,
   {atlasW:684,atlasH:138,cellW:76,cellH:138,frames:9},
   {atlasW:648,atlasH:138,cellW:72,cellH:138,frames:9},

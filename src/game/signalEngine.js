@@ -14,6 +14,7 @@ import { advanceProjectile, projectileCanHit } from '@/game/combat/projectileTra
 import { createSpriteAnimation, updateSpriteAnimation, drawCharacterSprite } from '@/game/art/spriteAnimation';
 import { createLagAnimation, updateLagAnimation, drawLagSprite } from '@/game/art/enemySpriteAnimation';
 import { drawTruckTurret, drawPedestalTurret } from '@/game/art/structureSprite';
+import { drawCrewHelper } from '@/game/art/crewHelper';
 import { structureSpriteDef } from '@/game/art/characterSprites';
 import { SQUIRREL, bossWave } from '@/game/data/bosses';
 import { createSquirrelAnimation, updateSquirrelAnimation, squirrelRelease, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation';
@@ -154,19 +155,23 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
   t.fire=cfg.fire;t.fireCd=cfg.fire*.4;
   t.damage=w.damage*(1+(run.engineering||0)*.01)*(1+(run.turretQuality||0)*.004);
   t.weapon=w;t.range=w.range;t.hp=20+(run.engineering||0)*2;t.lookA=a+Math.PI;
+  t.weaponTurret=true; // drawn with the splice-pedestal pack (see draw loop)
   sfx('deploy');particle(t.x,t.y,'#d6d3d1',lowFx?2:8)}
  function turretContact(e){const t=queryStruct;if(!e.active||t.inv>0)return;if(Math.hypot(e.x-t.x,e.y-t.y)<t.r+e.r+4){t.hp-=e.damage*.5;t.inv=.5}}
+ // Tray muzzle origin for weapon-turrets drawn with the pedestal pack: the
+ // projectile spawns at the fire strip's tray muzzle, mirrored with the aim.
+ function turretMuzzle(t){if(!(pedArt&&t.weaponTurret))return [t.x,t.y];const d=pedArt.definition,f=d.strips.fire,s=d.worldSize/d.strips.deploy.cellW;return [t.x+(Math.cos(t.lookA||0)<0?-1:1)*(d.muzzle.x-f.anchorX)*s,t.y+(d.muzzle.y-f.baselineY)*s]}
  function turretsUpdate(dt){for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;
   t.born+=dt;t.inv=Math.max(0,t.inv-dt);t.fireCd-=dt;t.life-=dt;
   if(t.mode==='helper'){const a=t.helperIndex*Math.PI/2;t.x+=(p.x+Math.cos(a)*38-t.x)*Math.min(1,dt*4);t.y+=(p.y+Math.sin(a)*38-t.y)*Math.min(1,dt*4)}
   if(t.life<=0||t.hp<=0){particle(t.x,t.y,'#94a3b8',lowFx?2:5);turrets.release(t);continue} // quiet despawn — no shake spam
   if(t.inv<=0){queryStruct=t;grid.visit(t.x,t.y,t.r+40,turretContact)} // impairments dent the sentry on contact
   if(t.fireCd<=0){const reach=effectiveRange(t.weapon,run,viewport,'turret'),target=nearestAt(t.x,t.y,reach);
-   if(target){const ang=Math.atan2(target.y-t.y,target.x-t.x);t.lookA=ang;t.fireCd=t.fire;
-    if(t.mode==='pellet'||t.mode==='helper'){launch({damage:t.damage,range:t.range,pattern:'projectile',color:t.color},ang,t.x,t.y,reach);sfx('snip')}
-    else if(t.mode==='mortar'){launch({damage:t.damage,range:t.range,pattern:'mortar',color:t.color,mortar:true,speed:260},ang,t.x,t.y,reach);sfx('packet')}
-    else if(t.mode==='pulse'){launch({damage:t.damage,range:t.range,pattern:'pierce',color:t.color,speed:620},ang,t.x,t.y,reach);sfx('laser')}
-    else{for(let k=-2;k<=2;k++)launch({damage:t.damage,range:t.range,pattern:'projectile',color:t.color},ang+k*.22,t.x,t.y,reach);sfx('spark')}
+   if(target){const ang=Math.atan2(target.y-t.y,target.x-t.x);t.lookA=ang;t.fireCd=t.fire;const [mx,my]=turretMuzzle(t);
+    if(t.mode==='pellet'||t.mode==='helper'){launch({damage:t.damage,range:t.range,pattern:'projectile',color:t.color},ang,mx,my,reach);sfx('snip')}
+    else if(t.mode==='mortar'){launch({damage:t.damage,range:t.range,pattern:'mortar',color:t.color,mortar:true,speed:260},ang,mx,my,reach);sfx('packet')}
+    else if(t.mode==='pulse'){launch({damage:t.damage,range:t.range,pattern:'pierce',color:t.color,speed:620},ang,mx,my,reach);sfx('laser')}
+    else{for(let k=-2;k<=2;k++)launch({damage:t.damage,range:t.range,pattern:'projectile',color:t.color},ang+k*.22,mx,my,reach);sfx('spark')}
    }else t.fireCd=.12}}}
  // Player-placed structures: expire quietly (fade is handled in draw), mounts
  // fire through the same projectile pool, pedestals set the attack-speed buff.
@@ -270,7 +275,13 @@ spawn-=dt;if(spawn<=0){const outage=specialTimer>0&&run.character.special.id==='
    else if(def.kind==='slow'){ctx.fillStyle='rgba(34,211,238,.12)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.strokeStyle='rgba(103,232,249,.55)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,st.r*.66*grow,0,4.6);ctx.stroke();drawEyes(x,y,st.lookA)}
    else if(def.kind==='buff'){ctx.fillStyle='rgba(250,204,21,.10)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.fillStyle='#a8a29e';ctx.fillRect(x-12,y,24,10);ctx.fillRect(x-8,y-8,16,8);drawHardHat(x,y-12);drawEyes(x,y-2,st.lookA)}
    ctx.globalAlpha=1}
-  for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;const grow=Math.min(1,t.born*4);ctx.globalAlpha=t.life<1?Math.max(.2,t.life):1;if(t.mode==='helper')drawHelper(ctx,Math.round(t.x),Math.round(t.y),t.color);else drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
+  for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;const grow=Math.min(1,t.born*4);ctx.globalAlpha=t.life<1?Math.max(.2,t.life):1;
+   if(t.mode==='helper'){ // Don's crew: the four extracted individual crew
+    // sprites while his special runs; the placeholder helper is the mutually
+    // exclusive fallback (asset failure), never drawn alongside.
+    if(run.character.id==='don'&&specialTimer>0&&characterArt&&characterArt.crewInd)drawCrewHelper(ctx,characterArt,t);else drawHelper(ctx,Math.round(t.x),Math.round(t.y),t.color)}
+   else if(t.weaponTurret&&pedArt)drawPedestalTurret(ctx,pedArt,t,Math.round(t.x),Math.round(t.y),grow); // weapon-deployed turrets share the splice-pedestal pack
+   else drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.art&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40){if(e.art===blobArtDef)drawTechEnemy(ctx,e.art,e.anim,e.x,e.y);else drawLagSprite(ctx,e.art,e.anim,e.x,e.y)}}
   for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&!e.art&&e.kind===kind&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40)ctx.drawImage(e.sprite,Math.round(e.x-e.sprite.width/2),Math.round(e.y-e.sprite.height/2))}}
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.sq&&e.x>camX-90&&e.x<camX+viewW+90&&e.y>camY-90&&e.y<camY+viewH+90)drawSquirrelSprite(ctx,e.sq.art,e.sq,e.x,e.y)}

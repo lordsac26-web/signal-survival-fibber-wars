@@ -8,12 +8,18 @@ export const cloneOverclockCap=run=>run.character.id==='clone'?TUNING.cloneOverc
 export const premiumTargets=run=>run.character.id==='clone'
   ?run.weapons.filter(w=>w.rarity==='Rare' && (w.overclockRank || 0)<TUNING.cloneOverclockCap)
   :run.weapons.filter(w=>w.rarity==='Epic' || (w.rarity==='Legendary' && (w.overclockRank || 0)<TUNING.overclockRankCap));
+// ONE deployable turret WEAPON per character — an inventory cap, not an
+// active-unit cap. A second turret tool is blocked across ALL variants;
+// upgrades to the owned turret (premium overclock / rank caps) stay
+// available. Legacy saves that already hold several turret tools load
+// untouched (non-destructive); only new acquisitions are gated.
+export const ownedTurretCount=run=>run.weapons.filter(w=>w.pattern==='turret').length;
 function freshOffer(run,sequence){
   const seed=(run.seed+run.wave*7919+sequence*104729)>>>0,r=seeded(seed),gen=createGenerator(seed+31,run.wave,run.character.id==='clone'?'Rare':null),chance=r();
   let item;
   if(chance<TUNING.deployOfferChance){
     const candidates=DEPLOYABLES.filter(d=>['turretMount','barricade'].includes(d.structure) && d.structure!==run.character.signatureStructure && ((run.deployables || []).find(o=>o.structure===d.structure)?.stacks || 0)<TUNING.deployRankCap);
-    const turrets=WEAPON_ARCHETYPES.filter(a=>a[2]==='turret' && allowedWeapon(run.character,{pattern:a[2]}) && run.character.signatureStructure!=='turretMount');
+    const turrets=ownedTurretCount(run)?[]:WEAPON_ARCHETYPES.filter(a=>a[2]==='turret' && allowedWeapon(run.character,{pattern:a[2]}) && run.character.signatureStructure!=='turretMount'); // no turret offers once one tool is owned
     if(candidates.length && (r()<.6 || !turrets.length)){
       const d=candidates[Math.floor(r()*candidates.length)],rar=run.character.id==='clone'?'Rare':(r()<.8?'Rare':'Epic');
       item={...d,id:`deploy-${sequence}`,deploy:true,rarity:rar,mods:[],cost:Math.round(TUNING.deployBasePrice*RARITY[rar].power*(1+((run.deployables || []).find(o=>o.structure===d.structure)?.stacks || 0)*.5))};
@@ -39,13 +45,14 @@ function freshOffer(run,sequence){
 export function enterShop(run){
   if(run.shop?.wave===run.wave)return run;
   const old=run.shop?.offers || [],locked=run.lockedIds || [];let sequence=run.shop?.sequence || 0;
-  const offers=Array.from({length:TUNING.shopSlots},(_,index)=>{const item=old[index];return item && locked.includes(item.id)?item:freshOffer(run,++sequence)});
+  const offers=Array.from({length:TUNING.shopSlots},(_,index)=>{const item=old[index];return item && locked.includes(item.id) && !(item.pattern==='turret'&&ownedTurretCount(run))?item:freshOffer(run,++sequence)});
   return {...run,shop:{wave:run.wave,offers,sequence,rerolls:0},lockedIds:locked.filter(id=>offers.some(o=>o?.id===id))};
 }
 export function swapTargets(run,item){return run.weapons.filter(old=>legalLoadout(run.character,run.weapons.map(w=>w.id===old.id?item:w)))}
 export function offerReason(run,item){
   if(!item)return 'Offer already purchased.';
   if(item.baseId && !allowedWeapon(run.character,item))return `${run.character.restriction}-only technician.`;
+  if(item.baseId && item.pattern==='turret' && ownedTurretCount(run))return 'Only one deployable turret tool per technician — upgrade the one you own.';
   if(item.deploy && (item.structure===run.character.signatureStructure || ((run.deployables || []).find(d=>d.structure===item.structure)?.stacks || 0)>=TUNING.deployRankCap))return 'Signature duplicate or loot rank cap reached.';
   if(item.premium && !premiumTargets(run).length)return run.character.id==='clone'?'Requires an owned Rare tool below its overclock cap.':'Requires an eligible Epic or Legendary tool.';
   if(run.signal<item.cost)return `Need ${item.cost-run.signal} more spendable Signal.`;
@@ -80,6 +87,7 @@ export function shopTransaction(run,event){
     const tool=normalizeWeapon(item,0,cloneOverclockCap(run));
     next.weapons=event.replaceId?run.weapons.map(w=>w.id===event.replaceId?tool:w):[...run.weapons,tool];
     if(event.replaceId && !run.weapons.some(w=>w.id===event.replaceId))throw new Error('Replacement tool missing');
+    if(next.weapons.filter(w=>w.pattern==='turret').length>1)throw new Error('Only one deployable turret tool per technician — upgrade the one you own.'); // guards stale/locked offers and any UI bypass
     if(!legalLoadout(run.character,next.weapons))throw new Error('Choose a compatible tool to replace; slot or family cap reached');
   }else if(item.deploy){
     const owned=(run.deployables || []).find(d=>d.structure===item.structure);

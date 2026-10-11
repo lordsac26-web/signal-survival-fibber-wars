@@ -6,6 +6,11 @@ export const createTechAnimation=()=>({side:'right',vert:'down',frame:0,clock:0,
 export function updateTechAnimation(state,dx,dy,dt,definition){
   state.hurt=Math.max(0,state.hurt-dt);
   state.attack=Math.max(0,state.attack-dt);
+  // One authoritative special timeline: vfxClock restarts at activation
+  // (special 0 → positive), so a special always starts at its first frame
+  // instead of resuming mid-strip from a stale clock.
+  if(state.special>0&&!state.specialActive){state.specialActive=true;state.vfxClock=0}
+  else if(!state.special&&state.specialActive)state.specialActive=false;
   state.vfxClock+=dt;
   const moving=Math.abs(dx)+Math.abs(dy)>.001;
   if(moving){
@@ -28,10 +33,25 @@ export function updateTechAnimation(state,dx,dy,dt,definition){
 export function techFrame(art,state){
   const d=art.definition;
   if(state.special>0){
-    const cols=d.specialColumns||1;
-    const fps=d.specialFps||3;
-    const frame=Math.min(cols-1,Math.floor(state.vfxClock*fps));
-    return {image:art.special,sx:frame*d.specialCellW,sy:0,frameW:d.specialCellW,frameH:d.specialCellH,mirror:false};
+    // Definition-driven: characters with specialActivationFrames play their
+    // solo activation strip ONCE from the moment of activation, then return
+    // to normal idle/walk/attack for the rest of the timer (sustained visuals
+    // come from the ability itself — e.g. Don's crew helpers). Everyone else
+    // keeps the existing special-strip behavior.
+    const actFrames=d.specialActivationFrames||0;
+    if(actFrames){
+      const elapsed=(d.specialDuration||8)-state.special,fps=d.specialFps||3;
+      if(elapsed<actFrames/fps){
+        const frame=Math.min(actFrames-1,Math.floor(elapsed*fps));
+        return {image:art.special,sx:frame*d.specialCellW,sy:0,frameW:d.specialCellW,frameH:d.specialCellH,mirror:false};
+      }
+      // activation finished: fall through to normal behavior
+    }else{
+      const cols=d.specialColumns||1;
+      const fps=d.specialFps||3;
+      const frame=Math.min(cols-1,Math.floor(state.vfxClock*fps));
+      return {image:art.special,sx:frame*d.specialCellW,sy:0,frameW:d.specialCellW,frameH:d.specialCellH,mirror:false};
+    }
   }
   if(state.attack>0){
     const cols=d.attackColumns||1;
