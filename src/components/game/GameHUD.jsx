@@ -14,7 +14,7 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, on
   // gameplay text lives here in its own DOM region, so nothing can cover the
   // player or impairments. The engine sizes its camera viewport from the
   // canvas element's own rect, which excludes this header entirely.
-  return <header className="pointer-events-none w-full shrink-0 border-b-2 border-slate-800 bg-slate-950 p-2 text-white sm:p-3">
+  return <header className="pointer-events-none w-full shrink-0 border-b-2 border-slate-800 bg-slate-950 p-2 text-white sm:p-3" data-hud-region>
     <div className="mx-auto flex max-w-6xl items-start justify-between gap-2">
       <div className="w-36 sm:w-60">
         <div className="mb-1 flex justify-between text-xs font-black uppercase"><span>Jacket Integrity</span><span>{Math.ceil(hp)}/{max}</span></div>

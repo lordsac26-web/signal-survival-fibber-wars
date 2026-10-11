@@ -78,6 +78,24 @@ export default function GameArena({ run, onFinish }) {
     };
   }, [artAttempt]);
 
+  // DEV-ONLY RUNTIME ASSERTION: measures the real DOM — header/footer text
+  // regions must never intersect the canvas rect, and the page must not
+  // scroll. Re-measured every second so the boss bar's dynamic height is
+  // covered too. Production builds skip this entirely.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const id = setInterval(() => {
+      const canvasRect = canvas.current?.getBoundingClientRect();
+      if (!canvasRect) return;
+      for (const el of document.querySelectorAll('[data-hud-region]')) {
+        const r = el.getBoundingClientRect();
+        if (!(r.bottom <= canvasRect.top || r.top >= canvasRect.bottom)) console.warn('HUD region overlaps the canvas:', el.tagName, r.top, r.bottom, 'canvas', canvasRect.top, canvasRect.bottom);
+      }
+      if (document.documentElement.scrollHeight > window.innerHeight + 1) console.warn('Match page scrolls vertically:', document.documentElement.scrollHeight);
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   // STRUCTURAL HUD/CANVAS SEPARATION: three stacked DOM regions in normal
   // flow — header (ALL gameplay text: HP/wave/timer/signal/kills/boss bar/
   // tools/range), canvas region (the only element the engine measures), and
@@ -89,7 +107,7 @@ export default function GameArena({ run, onFinish }) {
   // region because it is transparent and text-free. StatsScreen stays a
   // fullscreen overlay (gameplay is paused under it).
   return (
-    <main className="relative flex h-screen w-screen flex-col overflow-hidden bg-slate-950">
+    <main className="relative flex h-[100dvh] w-screen flex-col overflow-hidden bg-slate-950">
       <GameHUD
         hud={hud}
         wave={run.wave}

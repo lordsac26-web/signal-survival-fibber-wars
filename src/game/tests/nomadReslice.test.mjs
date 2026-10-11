@@ -56,8 +56,8 @@ test('Nomad sprite definition matches the re-sliced manifest', () => {
   assert.equal(def.specialCellW, 198, 'special cell width');
   assert.equal(def.specialCellH, 138, 'special cell height');
   assert.ok(def.muzzle, 'Nomad must have a muzzle offset');
-  assert.equal(def.muzzle.x, 1, 'muzzle x (pixels right of body center)');
-  assert.equal(def.muzzle.y, 96, 'muzzle y (pixels above baseline)');
+  assert.equal(def.muzzle.x, 163, 'muzzle x (cell-local from the frame LEFT edge, right-facing fire frame)');
+  assert.equal(def.muzzle.y, 66, 'muzzle y (cell-local from the frame TOP edge)');
   assert.equal(def.muzzle.cellW, 164, 'muzzle cellW');
   assert.equal(def.muzzle.cellH, 138, 'muzzle cellH');
 });
@@ -126,8 +126,8 @@ test('Nomad muzzle offset is within the torso height band', () => {
   assert.ok(muzzleYFrac > 0.4 && muzzleYFrac < 0.8, `Muzzle y fraction should be 0.4-0.8, got ${muzzleYFrac.toFixed(3)}`);
 });
 
-test('Nomad muzzle x offset is small (hand near body center)', () => {
+test('Nomad muzzle x sits at the leading edge of the right-facing fire frame', () => {
   const def = characterSprite('nomad');
   const muzzleXFrac = def.muzzle.x / def.muzzle.cellW;
-  assert.ok(Math.abs(muzzleXFrac) < 0.05, `Muzzle x fraction should be < 0.05, got ${muzzleXFrac.toFixed(4)}`);
+  assert.ok(muzzleXFrac > 0.9, `Muzzle x fraction should be > 0.9, got ${muzzleXFrac.toFixed(3)}`);
 });

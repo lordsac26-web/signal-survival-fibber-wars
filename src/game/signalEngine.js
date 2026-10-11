@@ -6,15 +6,16 @@ import { enemySprite } from '@/game/performance/spriteAtlas';
 import { drawProjectile } from '@/game/performance/drawProjectile';
 import { sfx } from '@/game/audio';
 import { TUNING, signalForLevel, waveDuration, spawnInterval, spawnDoubleChance, maxActiveEnemies } from '@/game/data/tuning';
-import { activateSignature } from '@/game/combat/signatures';
+import { activateSignature, crewHelperHp } from '@/game/combat/signatures';
 import { drawHelper } from '@/game/performance/drawHelper';
+import { techMuzzlePoint } from '@/game/combat/muzzle';
 import { effectiveRange, updateVisibleViewport, withinReach, areaCanHit } from '@/game/combat/effectiveRange';
 import { SIGNATURE_RANGE_WEAPONS } from '@/game/combat/rangeConfig';
 import { advanceProjectile, projectileCanHit } from '@/game/combat/projectileTravel';
 import { createSpriteAnimation, updateSpriteAnimation, drawCharacterSprite } from '@/game/art/spriteAnimation';
 import { createLagAnimation, updateLagAnimation, drawLagSprite } from '@/game/art/enemySpriteAnimation';
 import { drawTruckTurret, drawPedestalTurret } from '@/game/art/structureSprite';
-import { drawCrewHelper } from '@/game/art/crewHelper';
+import { drawCrewHelper, crewMuzzle } from '@/game/art/crewHelper';
 import { structureSpriteDef } from '@/game/art/characterSprites';
 import { SQUIRREL, bossWave } from '@/game/data/bosses';
 import { createSquirrelAnimation, updateSquirrelAnimation, squirrelRelease, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation';
@@ -140,7 +141,16 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
  // Targeting and travel use one CSS-viewport-derived reach, with no DPR multiplier.
  // Range is frozen for each launch; lifetime is only a failsafe, never the distance budget.
  function launch(w,angle,ox=p.x,oy=p.y,reach=effectiveRange(w,run,viewport)){const s=shots.acquire();if(!s)return;const v=w.speed||540;s.id=++shotId;s.x=s.prevX=s.originX=ox;s.y=s.prevY=s.originY=oy;s.maxReach=s.remaining=reach;s.traveled=0;s.vx=Math.cos(angle)*v;s.vy=Math.sin(angle)*v;s.r=w.helper?9:w.pattern==='beam'?7:5;s.life=reach/v+.5;s.damage=w.damage;s.color=w.color;s.helper=!!w.helper;s.pen=Math.round(run.pierce||0);s.pierce=['pierce','beam','beamSweep'].includes(w.pattern);s.mortar=!!w.mortar;s.pattern=w.pattern;s.boom=false}
- function attack(w){if(w.turret){deployTurret(w);return}const reach=effectiveRange(w,run,viewport),t=nearest(reach);if(!t)return;const a=Math.atan2(t.y-p.y,t.x-p.x),pattern=w.pattern||'projectile';sfx(w.family||'laser');if(spriteState)spriteState.attack=Math.max(spriteState.attack,.4);queryHits=0;if(['melee','nova','cone','orbiting'].includes(pattern)){queryX=p.x;queryY=p.y;queryR=reach;queryDamage=w.damage;queryColor=w.color;queryLimit=Infinity;queryArcAngle=a;queryArcHalf=['melee','cone'].includes(pattern)?Math.PI/3:Math.PI;grid.visit(p.x,p.y,reach,areaVisitor);showArea();if(w.heal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+w.heal);healed+=p.hp-before}particle(p.x,p.y,w.color,7)}else{const def=characterArt?.definition,ws=def?.worldSize||0;let mx=p.x,my=p.y;if(ws){const mu=def.muzzle,scale=ws/((mu?.cellH)||def.attackCellH||def.cellH||def.cell||ws),dir=Math.cos(a)>=0?1:-1;if(mu){mx=p.x+mu.x*scale*dir;my=p.y+ws*(1-def.anchorY)-mu.y*scale}else{my=p.y+ws*(1-def.anchorY)-ws*.57}}launch(w,a,mx,my,reach);if(pattern==='chain'){launch(w,a-.16,mx,my,reach);launch(w,a+.16,mx,my,reach)}}}
+ function attack(w){if(w.turret){deployTurret(w);return}const reach=effectiveRange(w,run,viewport),t=nearest(reach);if(!t)return;const a=Math.atan2(t.y-p.y,t.x-p.x),pattern=w.pattern||'projectile';sfx(w.family||'laser');if(spriteState){spriteState.attack=Math.max(spriteState.attack,.4);
+  // ATTACK FACING: the attack sheets are left/right-only, so the pose faces
+  // the TARGET (not the movement direction). A ±10-unit dead-zone keeps
+  // near-vertical targets from flickering the mirror frame to frame.
+  if(Math.abs(t.x-p.x)>10)spriteState.attackFace=t.x<p.x?'left':'right'}
+ const faceDir=spriteState?((spriteState.attackFace||'right')==='left'?-1:1):(Math.cos(a)<0?-1:1);queryHits=0;if(['melee','nova','cone','orbiting'].includes(pattern)){queryX=p.x;queryY=p.y;queryR=reach;queryDamage=w.damage;queryColor=w.color;queryLimit=Infinity;queryArcAngle=a;queryArcHalf=['melee','cone'].includes(pattern)?Math.PI/3:Math.PI;grid.visit(p.x,p.y,reach,areaVisitor);showArea();if(w.heal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+w.heal);healed+=p.hp-before}particle(p.x,p.y,w.color,7)}else{const def=characterArt?.definition;let mx=p.x,my=p.y-def.worldSize*.45;
+   if(def){if(def.muzzle){const mp=techMuzzlePoint(def,faceDir,p.x,p.y);mx=mp.x;my=mp.y}else my=p.y+def.worldSize*(1-def.anchorY)-def.worldSize*.57}
+   // Aim the projectile exactly from the transformed muzzle toward the actual
+   // target (vertical/diagonal included); the upright sprite is never rotated.
+   const aim=def&&def.muzzle?Math.atan2(t.y-my,t.x-mx):a;launch(w,aim,mx,my,reach);if(pattern==='chain'){launch(w,aim-.16,mx,my,reach);launch(w,aim+.16,mx,my,reach)}}}
  // AUTO-DEPLOY TURRET WEAPONS: every rate/attackSpeed seconds, drop a sentry
  // near the player instead of firing directly. Turret damage/HP/lifetime/cap
  // all scale with the weapon's rolls + Engineering (see structures.js for
@@ -160,14 +170,20 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
  function turretContact(e){const t=queryStruct;if(!e.active||t.inv>0)return;if(Math.hypot(e.x-t.x,e.y-t.y)<t.r+e.r+4){t.hp-=e.damage*.5;t.inv=.5}}
  // Tray muzzle origin for weapon-turrets drawn with the pedestal pack: the
  // projectile spawns at the fire strip's tray muzzle, mirrored with the aim.
- function turretMuzzle(t){if(!(pedArt&&t.weaponTurret))return [t.x,t.y];const d=pedArt.definition,f=d.strips.fire,s=d.worldSize/d.strips.deploy.cellW;return [t.x+(Math.cos(t.lookA||0)<0?-1:1)*(d.muzzle.x-f.anchorX)*s,t.y+(d.muzzle.y-f.baselineY)*s]}
+ function pedestalMuzzlePoint(d,x,y,lookA){const f=d.strips.fire,s=d.worldSize/d.strips.deploy.cellW;return [x+(Math.cos(lookA||0)<0?-1:1)*(d.muzzle.x-f.anchorX)*s,y+(d.muzzle.y-f.baselineY)*s]}
+ // Muzzle origins for pool turrets: Don's crew helpers fire from the measured
+ // hand point of their extracted figure (crewMuzzle — a feet origin was the
+ // playtest bug); weapon-deployed pedestal turrets from the fire strip's
+ // barrel tip; signature sentries and the placeholder helper from a sensible
+ // body-forward point instead of the feet.
+ function turretMuzzle(t){if(t.mode==='helper')return characterArt&&characterArt.definition&&characterArt.definition.crewInd?crewMuzzle(characterArt.definition.crewInd,t):[t.x+Math.cos(t.lookA||0)*8,t.y-12];if(!(pedArt&&t.weaponTurret))return [t.x+Math.cos(t.lookA||0)*10,t.y-12];return pedestalMuzzlePoint(pedArt.definition,t.x,t.y,t.lookA)}
  function turretsUpdate(dt){for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;
   t.born+=dt;t.inv=Math.max(0,t.inv-dt);t.fireCd-=dt;t.life-=dt;
   if(t.mode==='helper'){const a=t.helperIndex*Math.PI/2;t.x+=(p.x+Math.cos(a)*38-t.x)*Math.min(1,dt*4);t.y+=(p.y+Math.sin(a)*38-t.y)*Math.min(1,dt*4)}
   if(t.life<=0||t.hp<=0){particle(t.x,t.y,'#94a3b8',lowFx?2:5);turrets.release(t);continue} // quiet despawn — no shake spam
   if(t.inv<=0){queryStruct=t;grid.visit(t.x,t.y,t.r+40,turretContact)} // impairments dent the sentry on contact
   if(t.fireCd<=0){const reach=effectiveRange(t.weapon,run,viewport,'turret'),target=nearestAt(t.x,t.y,reach);
-   if(target){const ang=Math.atan2(target.y-t.y,target.x-t.x);t.lookA=ang;t.fireCd=t.fire;const [mx,my]=turretMuzzle(t);
+   if(target){let ang=Math.atan2(target.y-t.y,target.x-t.x);t.lookA=ang;t.fireCd=t.fire;const [mx,my]=turretMuzzle(t);ang=Math.atan2(target.y-my,target.x-mx); // re-aim from the muzzle each shot
     if(t.mode==='pellet'||t.mode==='helper'){launch({damage:t.damage,range:t.range,pattern:'projectile',color:t.color},ang,mx,my,reach);sfx('snip')}
     else if(t.mode==='mortar'){launch({damage:t.damage,range:t.range,pattern:'mortar',color:t.color,mortar:true,speed:260},ang,mx,my,reach);sfx('packet')}
     else if(t.mode==='pulse'){launch({damage:t.damage,range:t.range,pattern:'pierce',color:t.color,speed:620},ang,mx,my,reach);sfx('laser')}
@@ -182,7 +198,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
    activeStructs.push(s)}
   structCount=activeStructs.length;pedestalBuff=0;
   for(let i=0;i<activeStructs.length;i++){const s=activeStructs[i],def=STRUCTURES[s.type];if(!def)continue;
-   if(def.kind==='turret'){s.fireCd-=dt;if(s.fireCd<=0){const reach=effectiveRange(def,run,viewport,'turret'),target=nearestAt(s.x,s.y,reach);if(target){const ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;launch({damage:def.damage*(1+.2*(s.power-1))*(1+(run.engineering||0)*.01),range:def.range,pattern:'projectile',color:def.color},ang,s.x,s.y,reach);sfx('snip');s.fireCd=def.fire}else s.fireCd=.15}}
+   if(def.kind==='turret'){s.fireCd-=dt;if(s.fireCd<=0){const reach=effectiveRange(def,run,viewport,'turret'),target=nearestAt(s.x,s.y,reach);if(target){let ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;const [mx,my]=pedArt?pedestalMuzzlePoint(pedArt.definition,s.x,s.y,ang):[s.x,s.y-14];ang=Math.atan2(target.y-my,target.x-mx);launch({damage:def.damage*(1+.2*(s.power-1))*(1+(run.engineering||0)*.01),range:def.range,pattern:'projectile',color:def.color},ang,mx,my,reach);sfx('snip');s.fireCd=def.fire}else s.fireCd=.15}}
    else if(def.kind==='buff'&&Math.hypot(p.x-s.x,p.y-s.y)<s.r)pedestalBuff=Math.max(pedestalBuff,def.buff+.05*(s.power-1))}}
  // Q-key placement: structure appears AT the player, respecting per-type
  // cooldown and the total permit cap (6 + Engineering/10).
@@ -199,7 +215,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
   deployCds[item.structure]=deployCdMax(item,def);
   sfx('deploy');particle(p.x,p.y,'#d6d3d1',lowFx?3:8);cb.flash(`${def.name.toUpperCase()} DEPLOYED`)}
  function signatureTurret(cfg){const t=turrets.acquire();if(!t)return false;const a=cfg.index*Math.PI/2,helper=cfg.mode==='helper';
-  Object.assign(t,{x:p.x+(helper?Math.cos(a)*22:0),y:p.y+(helper?Math.sin(a)*22:0),wid:`signature-${run.character.id}`,mode:cfg.mode,helperIndex:cfg.index,color:cfg.color,born:0,inv:0,r:13,life:cfg.life,maxLife:cfg.life,fire:cfg.fire,fireCd:.15,damage:cfg.damage*(1+(run.engineering||0)*.01)*(1+(run.turretQuality||0)*.004),range:cfg.range,weapon:{range:cfg.range,pattern:'turret'},hp:35+(run.engineering||0),lookA:0});return true}
+  Object.assign(t,{x:p.x+(helper?Math.cos(a)*22:0),y:p.y+(helper?Math.sin(a)*22:0),wid:`signature-${run.character.id}`,mode:cfg.mode,helperIndex:cfg.index,color:cfg.color,born:0,inv:0,r:13,life:cfg.life,maxLife:cfg.life,fire:cfg.fire,fireCd:.15,damage:cfg.damage*(1+(run.engineering||0)*.01)*(1+(run.turretQuality||0)*.004),range:cfg.range,weapon:{range:cfg.range,pattern:'turret'},hp:cfg.mode==='helper'?crewHelperHp(run.wave,run.engineering):35+(run.engineering||0),lookA:0});return true}
  function signatureBarrier(){let count=0;for(const s of structures.items)if(s.active)count++;if(count>=structCap())return false;const st=structures.acquire();if(!st)return false;const d=STRUCTURES.barricade;Object.assign(st,{type:'barricade',x:p.x,y:p.y,born:0,life:d.life,maxLife:d.life,r:d.r,power:1,rearm:0,uses:0,fireCd:0,lookA:0});return true}
  function activateSpecial(){if(specialCooldown>0)return;const timer=activateSignature(run,p,{launch,area:(r,d,color)=>explode(p.x,p.y,d,color,effectiveRange(signatureWeapon,run,viewport)),heal:amount=>{const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+amount);healed+=p.hp-before},turret:signatureTurret,barrier:signatureBarrier});if(timer===null){cb.flash('NO PERMIT SPACE — TRY AGAIN');return}specialTimer=timer;specialCooldown=run.character.special.cooldown;sfx(run.character.special.id==='cash'?'cash':run.character.special.id==='outage'?'whistle':run.character.special.id==='clause'?'charge':run.character.special.id==='sprint'?'chug':'special');cb.flash(run.character.special.name.toUpperCase());addShake(5);particle(p.x,p.y,'#ffffff',lowFx?6:16);if(run.character.special.id==='cash'){for(let i=0;i<8;i++){let q=particles.acquire();if(q){q.x=p.x+(Math.random()-.5)*20;q.y=p.y+(Math.random()-.5)*20;q.vx=(Math.random()-.5)*200;q.vy=-100-Math.random()*100;q.life=.5;q.color='#22c55e'}}}}
  function separateVisitor(other){const e=queryShot;if(!other.active||other===e)return;let dx=e.x-other.x,dy=e.y-other.y,d2=dx*dx+dy*dy,min=e.r+other.r;if(d2>0&&d2<min*min){const push=(min-Math.sqrt(d2))*.025;e.x+=dx*push;e.y+=dy*push}}

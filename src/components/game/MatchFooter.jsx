@@ -7,7 +7,7 @@ import ProgressMeters from '@/components/game/ProgressMeters';
 // never overlaid on the play area. The flash row keeps a fixed height so its
 // appearance doesn't shift the layout mid-wave.
 export default function MatchFooter({ hud, input, flash }) {
-  return <footer className="w-full shrink-0 border-t-2 border-slate-800 bg-slate-950 px-3 py-2 text-white">
+  return <footer className="w-full shrink-0 border-t-2 border-slate-800 bg-slate-950 px-3 py-2 text-white" data-hud-region>
     <div className="mx-auto flex max-w-6xl flex-col items-center gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <div className="w-full sm:w-64 sm:shrink-0"><ProgressMeters hud={hud}/></div>
       <div className="flex h-10 items-center justify-center" aria-live="polite">

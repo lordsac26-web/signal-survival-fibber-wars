@@ -21,7 +21,7 @@ const read = async p => await readFile(new URL('../../' + p, import.meta.url), '
 test('arena: header → canvas region → footer are flow siblings in a fixed column; no gameplay text overlays the canvas', async () => {
   const s = await read('components/game/GameArena.jsx');
   // The match screen is a fixed-height flex COLUMN (no overlays in flow).
-  assert.match(s, /className="relative flex h-screen w-screen flex-col overflow-hidden bg-slate-950"/);
+  assert.match(s, /className="relative flex h-\[100dvh\] w-screen flex-col overflow-hidden bg-slate-950"/);
   // The old centered flash overlay over the canvas is gone (flash lives in the footer).
   assert.doesNotMatch(s, /pointer-events-none absolute inset-0 z-20/);
   // DOM ORDER: header first, then the canvas region, then the footer, then the
@@ -70,7 +70,8 @@ test('touch controls remain inside the canvas region, text-free and transparent 
   assert.ok(region.includes('<TouchControls input={input} />'), 'TouchControls lives in the canvas region');
   const tc = await read('components/game/TouchControls.jsx');
   assert.doesNotMatch(tc, /[>"][A-Za-z]{3,}[<"]/); // no text labels on the pad
-  assert.match(tc, /bg-slate-950\/35/); // translucent, not opaque
+  assert.match(tc, /bg-white\/5/); // near-transparent input zone, never a concealing panel
+  assert.doesNotMatch(tc, /bg-slate-950\/35/);
 });
 
 test('engine contract: camera viewport, DPR buffer and ranges derive from the canvas element rect only — no safe-rect insets (no double reservation)', async () => {
