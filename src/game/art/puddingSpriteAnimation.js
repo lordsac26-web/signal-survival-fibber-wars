@@ -10,7 +10,7 @@ import { PUDDING } from '@/game/combat/puddles';
 // the enemy; poses 3-4 (flattened goo) belong to the ground puddle instead.
 export const MELEE_LEN=1/3;
 
-export const createPuddingAnimation=()=>({frame:0,clock:0,facing:'right',telegraph:false,teleClock:0,melee:0,dropT:0});
+export const createPuddingAnimation=()=>({frame:0,clock:0,facing:'right',motionAxis:null,telegraph:false,teleClock:0,melee:0,dropT:0});
 
 export function updatePuddingAnimation(state,dx,dy,dt,def){
  state.melee=Math.max(0,state.melee-dt);
@@ -21,9 +21,11 @@ export function updatePuddingAnimation(state,dx,dy,dt,def){
  if(state.melee>0){state.frame=Math.min(def.attackColumns-1,Math.floor((MELEE_LEN-state.melee)*def.attackFps));return}
  const moving=Math.abs(dx)+Math.abs(dy)>.001;
  if(!moving){state.clock=0;state.frame=0;return}
- if(Math.abs(dx)>.01)state.facing=dx<0?'left':'right';
+ const motionAxis=Math.abs(dx)>.01?'horizontal':'vertical';
+ if(state.motionAxis!==motionAxis){state.motionAxis=motionAxis;state.clock=0}
+ if(motionAxis==='horizontal')state.facing=dx<0?'left':'right';
  state.clock+=dt;
- state.frame=Math.floor(state.clock*def.fps)%def.columns;
+ state.frame=Math.floor(state.clock*(motionAxis==='vertical'?def.fps/2:def.fps)+1e-8)%def.columns;
 }
 
 // Pure frame selection so wiring is testable without a canvas.

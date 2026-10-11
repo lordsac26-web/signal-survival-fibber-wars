@@ -93,7 +93,7 @@ test('loader resolves lag art once and rejects unknown kinds; real engine spawns
   try{
     const a=preloadEnemySprite('lag'),b=preloadEnemySprite('lag');assert.equal(a,b);
     const art=await a;assert.equal(art.definition,lag);assert(art.attack);
-    assert.equal(await preloadEnemySprite('packet'),null);
+    assert.equal(await preloadEnemySprite('unknown-kind'),null);
     // real engine boot with deterministic spawns: first impairment is a Lag Sprite
     delete globalThis.Image;delete globalThis.fetch;delete globalThis.document;
     const listeners=new Map();let nextFrame;

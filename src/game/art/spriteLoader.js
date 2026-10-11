@@ -5,7 +5,7 @@ function image(url,width,height){return new Promise((resolve,reject)=>{
   img.onload=async()=>{try{await img.decode();if(img.naturalWidth!==width || img.naturalHeight!==height)throw new Error(`Unexpected image size: ${img.naturalWidth}×${img.naturalHeight}`);resolve(img)}catch(error){reject(error)}};
   img.onerror=()=>reject(new Error(`Sprite image failed to load: ${url}`));img.src=url;
 })}
-function matches(manifest,spec){for(const [key,expected] of Object.entries(spec)){const actual=key.split('.').reduce((o,p)=>o?.[p],manifest);if(actual!==expected)return false}return true}
+function matches(manifest,spec){for(const [key,expected] of Object.entries(spec)){const actual=key.split('.').reduce((o,p)=>o?.[p],manifest);if(actual!==expected)return key}return null}
 function hurtAtlas(atlas,width,height,tint){const hurt=document.createElement('canvas');hurt.width=width;hurt.height=height;const ctx=hurt.getContext('2d');ctx.drawImage(atlas,0,0);ctx.globalCompositeOperation='source-atop';ctx.fillStyle=tint;ctx.fillRect(0,0,width,height);return hurt}
 // One shared preload path for every sprite definition (characters and enemies).
 // Atlas/portrait/manifest start in parallel; per-definition extras (attack
@@ -20,7 +20,8 @@ function preloadSprite(definition){
     image(definition.portrait,portraitW,portraitH),
     fetch(definition.manifest).then(r=>{if(!r.ok)throw new Error(`Sprite manifest HTTP ${r.status}`);return r.json()})
   ]).then(async([atlas,portrait,manifest])=>{
-    if(!matches(manifest,spec))throw new Error('Sprite manifest does not match atlas');
+    const mismatch=matches(manifest,spec);
+    if(mismatch){const actual=mismatch.split('.').reduce((o,p)=>o?.[p],manifest);throw new Error(`Sprite manifest mismatch: ${mismatch}, expected ${spec[mismatch]}, received ${actual}`);}
     const art={definition,atlas,portrait};
     for(const [key,url,width,height] of definition.extras || [])art[key]=await image(url,width,height);
     if(definition.attackW)art.attack=await image(definition.attack,definition.attackW,definition.attackH);
