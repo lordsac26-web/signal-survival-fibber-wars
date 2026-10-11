@@ -39,7 +39,7 @@ test('Lag Sprite is melee-only, keeps its stats, and the wiring references real 
   assert(!('pattern' in ENEMIES.lag));assert(!('projectile' in ENEMIES.lag));
   const read=p=>readFileSync(new URL('../../'+p,import.meta.url),'utf8');
   const engine=read('game/signalEngine.js');
-  assert.match(engine,/drawLagSprite\(ctx,e\.art,e\.anim/);assert.match(engine,/if\(e\.anim\)e\.anim\.attack=\.35/);assert.match(engine,/if\(e\.kind==='lag'&&lagArt\)/);
+  assert.match(engine,/drawLagSprite\(ctx,e\.art,e\.anim/);assert.match(engine,/else e\.anim\.attack=\.35\}/);assert.match(engine,/if\(e\.kind==='lag'&&lagArt\)/);
   assert.equal(lag.atlas,'/assets/lagsprite/movement.png');assert.equal(lag.attack,'/assets/lagsprite/attack.png');assert.equal(lag.portrait,'/assets/lagsprite/portrait.png');
   assert.match(read('pages/FieldGuide.jsx'),/tab==='Enemies' && enemySpriteDef\(e\.id\) && <EnemyPortrait/);
   assert.match(read('components/game/EnemyPortrait.jsx'),/\/assets\/lagsprite\/portrait\.png|def\.portrait/);
