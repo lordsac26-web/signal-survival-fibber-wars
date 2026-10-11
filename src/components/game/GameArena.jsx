@@ -62,7 +62,7 @@ export default function GameArena({ run, onFinish }) {
     // Character art (Oracle or Dispatch Don), the Lag Sprite enemy art, the
     // Bucket-Truck turret art, and the Squirrel boss art load in parallel;
     // a failure blocks start with a retry.
-    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadEnemySprite('pudding')]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt])=>{
+    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadEnemySprite('packet')]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt])=>{
       if(disposed)return;
       clean=createSignalEngine(canvas.current,run,input,{
         hud:setHud,reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,

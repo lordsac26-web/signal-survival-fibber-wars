@@ -107,7 +107,7 @@ export const ENEMY_SPRITES=Object.freeze({lag:Object.freeze({
 // flattened residual puddle, packed separately as ground-anchored goo).
 // Anchors = measured body-foot centroid/baseline per frame; drop frame 0 keeps
 // its falling packet particles below the baseline. Base facing: right.
-pudding:Object.freeze({
+packet:Object.freeze({
   atlas:'/assets/pudding/movement.png',portrait:'/assets/pudding/portrait.png',manifest:'/assets/pudding/animation.json',
   sources:{sheet:'https://media.base44.com/images/public/6aab67049cd04a621f2adf4f/de7a595cf_6764.jpg'},
   extras:[['charge','/assets/pudding/charge.png',688,118],['drop','/assets/pudding/drop.png',880,124],['puddle','/assets/pudding/puddle.png',432,76]],

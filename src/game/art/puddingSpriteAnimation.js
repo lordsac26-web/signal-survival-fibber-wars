@@ -21,7 +21,7 @@ export function updatePuddingAnimation(state,dx,dy,dt,def){
  if(state.melee>0){state.frame=Math.min(def.attackColumns-1,Math.floor((MELEE_LEN-state.melee)*def.attackFps));return}
  const moving=Math.abs(dx)+Math.abs(dy)>.001;
  if(!moving){state.clock=0;state.frame=0;return}
- if(Math.abs(dx)>1)state.facing=dx<0?'left':'right';
+ if(Math.abs(dx)>.01)state.facing=dx<0?'left':'right';
  state.clock+=dt;
  state.frame=Math.floor(state.clock*def.fps)%def.columns;
 }
