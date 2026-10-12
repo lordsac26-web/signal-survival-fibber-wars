@@ -1,0 +1,29 @@
+{
+ "frameWidth": 130,
+ "frameHeight": 15,
+ "idleFront": {
+  "columns": 1
+ },
+ "walkSide": {
+  "columns": 6,
+  "facing": "right"
+ },
+ "walkLeft": {
+  "columns": 6,
+  "facing": "left"
+ },
+ "attack": {
+  "columns": 4
+ },
+ "special": {
+  "columns": 4
+ },
+ "fps": 8,
+ "source": "repeat-pete-source.png",
+ "excludedBakedMiniCompositeFrames": [
+  4,
+  5,
+  6,
+  7
+ ]
+}
