@@ -19,7 +19,7 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, on
       <div className="w-36 sm:w-60">
         <div className="mb-1 flex justify-between text-xs font-black uppercase"><span>Jacket Integrity</span><span>{Math.ceil(hp)}/{max}</span></div>
         <div className="h-5 overflow-hidden rounded-md border-2 border-slate-950 bg-slate-900"><div className="h-full bg-gradient-to-r from-rose-500 to-orange-400 transition-[width] duration-200" style={{width:`${hp/max*100}%`}}/></div>
-        <div className="mt-1 hidden text-xs font-bold text-slate-300 sm:block">{hud.specialUnlocked ? `${hud.specialName} ready on E` : 'Special locked'}</div>
+        <div className="mt-1 hidden text-xs font-bold text-slate-300 sm:block">{hud.characterId==='isr' ? `${hud.specialName} · ${hud.specialRemaining>0?`${Math.ceil(hud.specialRemaining)}s active · `:''}${hud.specialCooldown>0?`${Math.ceil(hud.specialCooldown)}s cooldown`:'E / touch ready'}` : hud.specialUnlocked ? `${hud.specialName} ready on E` : 'Special locked'}</div>
       </div>
       <div className="rounded-xl border-2 border-cyan-200 bg-slate-950/85 px-2.5 py-1.5 text-center sm:px-4 sm:py-2">
         <div className="text-xs font-black uppercase tracking-widest text-cyan-200">Wave {wave}</div>

@@ -22,7 +22,7 @@ function preloadSprite(definition){
   ]).then(async([atlas,portrait,manifest])=>{
     const mismatch=matches(manifest,spec);
     if(mismatch){const actual=mismatch.split('.').reduce((o,p)=>o?.[p],manifest);throw new Error(`Sprite manifest mismatch: ${mismatch}, expected ${spec[mismatch]}, received ${actual}`);}
-    const art={definition,atlas,portrait};
+    const art={definition,atlas,portrait,...(definition.seated?{manifest}:{})};
     for(const [key,url,width,height] of definition.extras || [])art[key]=await image(url,width,height);
     if(definition.attackW)art.attack=await image(definition.attack,definition.attackW,definition.attackH);
     if(definition.hurtTint)art.hurt=hurtAtlas(atlas,atlasW,atlasH,definition.hurtTint);

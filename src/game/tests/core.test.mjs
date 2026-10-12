@@ -41,7 +41,7 @@ test('new technicians: kits, unlock gates, signature timers and engine wiring',(
   assert.equal(activateSignature({...run('clone'),character:clone},{},{}),8);
   assert.equal(activateSignature({...run('isr'),character:isr},{},{}),8);
   const engine=readFileSync(new URL('../signalEngine.js',import.meta.url),'utf8');
-  assert(engine.includes("'outage'?.5:1"));assert(engine.includes("cash'?2:1"));assert(engine.includes('outage?2.2:1'));
+  assert(!engine.includes("'outage'?.5:1"));assert(engine.includes("cash'?2:1"));assert(!engine.includes('outage?2.2:1'));assert(engine.includes('outageMovement(specialTimer,p.hp,slowMul)'));assert(engine.includes('outageKillHeal(p,specialTimer,true)'));
   const audio=readFileSync(new URL('../audio.js',import.meta.url),'utf8');
   assert(audio.includes('cash:()=>'));assert(audio.includes('whistle:()=>'));
 });

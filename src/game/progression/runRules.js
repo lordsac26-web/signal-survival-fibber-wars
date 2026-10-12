@@ -31,6 +31,7 @@ export function normalizeRun(raw) {
   if (!weapons.length) weapons.push(...c.start.map((id,i)=>normalizeWeapon({...WEAPONS[id],baseId:id,id:`${raw.runId}-starter-${i}`},i,rankCap)));
   const items = (raw.items || []).filter(i=>!i.baseId && !i.deploy && !i.premium);
   const next = {...raw,signal:raw.signal || 0,xp:raw.xp || 0,level:raw.level || 0,kills:raw.kills || 0,earnedSignal:raw.earnedSignal ?? raw.signal ?? 0,character:c,weapons,items,specialUnlocked:true,deployables:(raw.deployables || []).filter(d=>d.structure!==c.signatureStructure).map(d=>({...d,stacks:Math.min(TUNING.deployRankCap,d.stacks || 1)})),lockedIds:(raw.lockedIds || []).slice(0,TUNING.maxLocks)};
+  if(c.id==='isr')next.specialCooldown=Math.min(c.special.cooldown,Math.max(0,raw.specialCooldown||0));
   if(next.shop) next.shop={...next.shop,offers:(next.shop.offers || []).map(i=>!i || !i.baseId || allowedWeapon(c,i) ? i : null)};
   next.lockedIds=next.lockedIds.filter(id=>next.shop?.offers?.some(i=>i?.id===id));
   return rebuildStats(next);

@@ -291,7 +291,9 @@
         585
       ]
     ],
-    "notes": "Palette-aware border flood plus high-confidence enclosed background seeds. No blanket purple chroma key. Nearest-neighbor repack, fixed scale per source row, independently measured chair wheel anchors."
+    "notes": "Palette-aware border flood plus high-confidence enclosed background seeds. No blanket purple chroma key. Nearest-neighbor repack, fixed scale per source row, independently measured chair wheel anchors.",
+    "additionalEdgeUnmix": 17682,
+    "fxBodyMask": "Dilated alpha silhouette of row5 quiet chair pose, not a rectangular hole."
   },
   "rows": [
     {

@@ -1,5 +1,6 @@
 // Granted abilities operate only on engine-owned pools; no React frame updates.
 import { KNOWLEDGE_DUMP } from '@/game/combat/knowledgeDump';
+import { OUTAGE } from '@/game/combat/outage';
 export function activateSignature(run,p,api){
   switch(run.character.special.id){
     case 'callback':api.area(300,80,'#67e8f9');return 0;
@@ -14,7 +15,7 @@ export function activateSignature(run,p,api){
     case 'sprint':api.heal(40);return 5; // chug + heal + 1.8× speed for 5s
     case 'deadline':return 4;
     case 'cash':return 8;   // double Signal on every drop while the timer runs
-    case 'outage':return 8; // −50% player damage + slowed spawns while it runs
+    case 'outage':return OUTAGE.duration; // immediate global movement impairment + guarded owned-kill healing
     default:return null;
   }
 }

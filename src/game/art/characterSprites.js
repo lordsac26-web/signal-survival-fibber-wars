@@ -1,6 +1,7 @@
 // Stable ids verified against characters.js and combat.js ENEMIES. Local files
 // are processed transparent atlases (background keyed, frames repacked).
 import jitterSpriteDefinition from '@/game/art/jitterSpriteDefinition';
+import isrSpriteDefinition from '@/game/art/isrSpriteDefinition';
 const source='https://base44.app/api/apps/6aab67049cd04a621f2adf4f/files/mp/public/6aab67049cd04a621f2adf4f/';
 
 // ── Shared helper: builds a technician sprite definition from measured atlas data.
@@ -39,6 +40,7 @@ function tech(id,portraitW,portraitH,idle,walk,walkLeft,attack,special){
 }
 
 export const CHARACTER_SPRITES=Object.freeze({
+isr:isrSpriteDefinition,
 oracle:Object.freeze({
   atlas:'/assets/oracle/movement.png',portrait:'/assets/oracle/portrait.png',hurtTint:'rgba(251,113,133,.6)',
   manifest:'/assets/oracle/animation.json',
