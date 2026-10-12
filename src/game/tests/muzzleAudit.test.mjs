@@ -71,7 +71,7 @@ test('attack frames mirror toward the target side; walk facing is untouched', ()
 
 test('engine wiring: target-facing with dead-zone, muzzle-aimed vectors, helpers re-aim each shot', () => {
   assert.match(engineSource, /if\(Math\.abs\(t\.x-p\.x\)>10\)spriteState\.attackFace=t\.x<p\.x\?'left':'right'/, 'dead-zone prevents flicker on near-vertical targets');
-  assert.match(engineSource, /const aim=def&&def\.muzzle\?Math\.atan2\(t\.y-my,t\.x-mx\):a/, 'projectile vector starts at the transformed muzzle');
+  assert.match(engineSource, /const aim=\(def\?\.muzzle\|\|charId==='isr'\)\?Math\.atan2\(t\.y-my,t\.x-mx\):a/, 'projectile vector starts at the transformed muzzle, including ISR current-frame laptop');
   assert.match(engineSource, /ang=Math\.atan2\(target\.y-my,target\.x-mx\)/, 'turret/helper volleys re-aim from the muzzle');
   assert.match(engineSource, /if\(!t\)return/, 'no-target fallback: no shot and no attack anim');
   assert.doesNotMatch(engineSource, /if\!\(pedArt&&t\.weaponTurret\)\)return \[t\.x,t\.y\]/, 'feet-only turret muzzle origin removed');
