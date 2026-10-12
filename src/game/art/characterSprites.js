@@ -143,13 +143,13 @@ dirty:Object.freeze(tech('blob',90,98,
 // baked mini-composite poses (burst+mini etc.) were excluded — minis are
 // simulated as independent entities at runtime instead.
 pete:Object.freeze((()=>{
-  const d=tech('pete',96,120,
-    {atlasW:96,atlasH:120,cellW:96,cellH:120,frames:1},
-    {atlasW:462,atlasH:118,cellW:77,cellH:118,frames:6},
-    {atlasW:455,atlasH:117,cellW:65,cellH:117,frames:7},
-    {atlasW:376,atlasH:104,cellW:94,cellH:104,frames:4},
-    {atlasW:500,atlasH:139,cellW:125,cellH:139,frames:4});
-  return {...d,worldSize:58,idleBreathFrames:1,specialActivationFrames:4,specialFps:4,specialDuration:1.2};
+  const d=tech('pete',124,124,
+    {atlasW:124,atlasH:124,cellW:124,cellH:124,frames:1},
+    {atlasW:744,atlasH:124,cellW:124,cellH:124,frames:6},
+    {atlasW:744,atlasH:124,cellW:124,cellH:124,frames:6},
+    {atlasW:496,atlasH:124,cellW:124,cellH:124,frames:4},
+    {atlasW:1120,atlasH:140,cellW:140,cellH:140,frames:8});
+  return {...d,worldSize:58,idleBreathFrames:1,specialActivationFrames:8,specialFps:8,specialDuration:1.2};
 })()),
 squirrel:Object.freeze({
   atlas:'/assets/squirrel/idle-front.png',attack:'/assets/squirrel/fec-attack.png',portrait:'/assets/squirrel/portrait.png',manifest:'/assets/squirrel/animation.json',
