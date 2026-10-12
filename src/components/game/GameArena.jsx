@@ -24,7 +24,7 @@ export default function GameArena({ run, onFinish }) {
   const paused = useRef(false);
   const [showStats, setShowStats] = useState(false);
 
-  const [hud, setHud] = useState(run);
+  const [hud, setHud] = useState({...run,characterId:run.character.id,specialName:run.character.special.name,specialRemaining:0});
   const [flash, setFlash] = useState('');
   const [artStatus,setArtStatus]=useState('loading');
   const [artAttempt,setArtAttempt]=useState(0);
