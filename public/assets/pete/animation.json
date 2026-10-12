@@ -1,26 +1,13 @@
 {
- "idleFront": {
-  "file": "idle-front.png",
-  "columns": 1
- },
- "walkSide": {
-  "file": "walk-side.png",
-  "columns": 6
- },
- "walkLeft": {
-  "file": "walk-left.png",
-  "columns": 7
- },
- "attack": {
-  "file": "attack.png",
-  "columns": 4
- },
- "special": {
-  "file": "special.png",
-  "columns": 4
- },
- "portrait": "portrait.png",
- "fps": 8,
- "source": "repeat-pete-source.png",
- "notes": "Baked mini-composite poses (burst+mini, pete+mini, pete+2 minis) excluded; minis are simulated as independent entities at runtime."
+  "frameWidth": 96,
+  "frameHeight": 120,
+  "idleFront": { "file": "idle-front.png", "columns": 1 },
+  "walkSide": { "file": "walk-side.png", "columns": 6, "facing": "right" },
+  "walkLeft": { "file": "walk-left.png", "columns": 7, "facing": "left" },
+  "attack": { "file": "attack.png", "columns": 4 },
+  "special": { "file": "special.png", "columns": 4 },
+  "portrait": "portrait.png",
+  "fps": 8,
+  "source": "repeat-pete-source.png",
+  "notes": "Baked mini-composite poses (burst+mini, pete+mini, pete+2 minis) excluded; minis are simulated as independent entities at runtime."
 }

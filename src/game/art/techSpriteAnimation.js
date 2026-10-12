@@ -92,8 +92,8 @@ export function drawTechSprite(ctx,art,state,x,y){
 }
 // Enemies are drawn CENTERED on their collision point (feet-anchor math stays
 // in the manifest for provenance), matching the Lag and Squirrel convention.
-export function drawTechEnemy(ctx,art,state,x,y){
-  const d=art.definition,f=techFrame(art,state),size=d.worldSize;
+export function drawTechEnemy(ctx,art,state,x,y,scale=1){
+  const d=art.definition,f=techFrame(art,state),size=d.worldSize*scale;
   const fw=f.frameW||d.cellW,fh=f.frameH||d.cellH,w=size*fw/fh,h=size;
   const prev=ctx.imageSmoothingEnabled;ctx.imageSmoothingEnabled=false;
   ctx.save();ctx.translate(Math.round(x),Math.round(y));

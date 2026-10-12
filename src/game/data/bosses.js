@@ -20,4 +20,16 @@ export const SQUIRREL=Object.freeze({
   flavor:"Officially, aerial fiber fails from weather. Unofficially, it is one squirrel with strong opinions about cable texture. It chews the drop for the crunch, causes the outage, and files no incident report. At half health it stops being brave and starts being a logistics problem: it flees, hides behind other impairments, and lobs FEC (Fiber-Encrusted Crap) from cover.",
   counter:'Strafe during the tail-fluffing windup; the cone aim is locked the moment it starts. Chase it between casts — it cannot cast while running.'
 });
+// Repeat Pete — the wave-11+ rare elite (NOT a boss-wave spawn; the ordinary
+// pool picks him through pickEnemyKind's weight gate). Every 30 seconds he
+// "files the same outage again": one smaller independent clone peels off with
+// half his baseline HP/damage, cap 5 live minis, minis never reproduce.
+export const PETE=Object.freeze({
+  id:'pete',name:'Repeat Pete',color:'#f472b6',
+  minWave:11,spawnWeight:.25,
+  cloneInterval:30,miniCap:5,miniScale:.55,
+  intro:'REPEAT PETE HAS FILED THE SAME OUTAGE TWICE',
+  flavor:"Pete is the ticket that keeps reopening. He reports the same outage every thirty seconds, and every report peels off the clipboard as its own smaller, independent Pete. The minis chase and hit on their own, never duplicate further, and the paperwork caps at five of them at once.",
+  counter:"Focus the original: its 30-second pulse telegraphs with the ring pose. Minis cap at five, so the paperwork is finite — but the original never stops filing."
+});
 export const bossWave=wave=>wave>=20&&wave%10===0;

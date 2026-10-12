@@ -137,6 +137,20 @@ dirty:Object.freeze(tech('blob',90,98,
   {atlasW:1251,atlasH:86,cellW:139,cellH:86,frames:9},
   {atlasW:1932,atlasH:115,cellW:276,cellH:115,frames:7}
 )),
+// Repeat Pete — processed from a 1024×683 magenta-bg sheet into five strips:
+// idle-front (1f), walk-right (6f), walk-left (7f — the sheet carries one more
+// left pose than labeled), attack (4f), special (4f). The special strip's
+// baked mini-composite poses (burst+mini etc.) were excluded — minis are
+// simulated as independent entities at runtime instead.
+pete:Object.freeze((()=>{
+  const d=tech('pete',96,120,
+    {atlasW:96,atlasH:120,cellW:96,cellH:120,frames:1},
+    {atlasW:462,atlasH:118,cellW:77,cellH:118,frames:6},
+    {atlasW:455,atlasH:117,cellW:65,cellH:117,frames:7},
+    {atlasW:376,atlasH:104,cellW:94,cellH:104,frames:4},
+    {atlasW:500,atlasH:139,cellW:125,cellH:139,frames:4});
+  return {...d,worldSize:58,idleBreathFrames:1,specialActivationFrames:4,specialFps:4,specialDuration:1.2};
+})()),
 squirrel:Object.freeze({
   atlas:'/assets/squirrel/idle-front.png',attack:'/assets/squirrel/fec-attack.png',portrait:'/assets/squirrel/portrait.png',manifest:'/assets/squirrel/animation.json',
   extras:[['back','/assets/squirrel/idle-back.png',1020,170],['walk','/assets/squirrel/walk-side.png',1020,170]],

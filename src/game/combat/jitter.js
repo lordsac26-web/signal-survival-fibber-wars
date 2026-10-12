@@ -1,3 +1,4 @@
+import { PETE } from '@/game/data/bosses';
 export const JITTER=Object.freeze({telegraph:1,recovery:.45,cooldown:12,initialMin:10,initialMax:15,radius:76*1.20,damage:12,activationRange:130,spawnWeight:.5});
 export const createJitterState=(random=Math.random)=>({phase:'chase',remaining:0,cooldown:JITTER.initialMin+random()*(JITTER.initialMax-JITTER.initialMin),clock:0,melee:0,facing:'right'});
 export function stepJitter(s,dt,{alive=true,playerAlive=true,dist=Infinity,visible=false,targetDx=0}={}){
@@ -21,8 +22,11 @@ export function jitterVelocity(s,angle,speed){
 }
 export const jitterPulseHits=(s,dist,inv)=>s.phase==='recover'&&inv<=0&&dist<=JITTER.radius;
 export function pickEnemyKind(types,wave,random=Math.random){
- const eligible=types.slice(0,Math.min(types.length,2+(wave/2|0)));
- const kind=eligible[Math.floor(random()*eligible.length)];
- if(kind!=='jitter'||random()<JITTER.spawnWeight)return kind;
- const ordinary=eligible.filter(id=>id!=='jitter');return ordinary[Math.floor(random()*ordinary.length)];
+  const eligible=types.slice(0,Math.min(types.length,2+(wave/2|0))).filter(id=>id!=='peteMini');
+  if(wave>=PETE.minWave&&!eligible.includes('pete'))eligible.push('pete');
+  const kind=eligible[Math.floor(random()*eligible.length)];
+  if(kind!=='jitter'&&kind!=='pete')return kind;
+  if(kind==='jitter'&&random()<JITTER.spawnWeight)return kind;
+  if(kind==='pete'&&random()<PETE.spawnWeight)return kind;
+  const ordinary=eligible.filter(id=>id!==kind);return ordinary[Math.floor(random()*ordinary.length)];
 }
