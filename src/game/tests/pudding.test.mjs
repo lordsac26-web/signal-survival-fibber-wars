@@ -119,8 +119,8 @@ test('engine wiring: shared tick clock, single slow multiplier, ticks respect in
   assert.match(engine,/if\(e\.pud&&e\.pud\.phase!=='chase'\)spd=0/); // rooted during telegraph
   assert.match(engine,/d\.life<=1e-8\)\{puddles\.release\(d\);continue\}/); // exact-lifetime expiry
   assert.match(read('components/game/GameArena.jsx'),/preloadEnemySprite\('packet'\)/);
-  assert.match(read('components/game/GameArena.jsx'),/pedestalArt,puddingArt,jitterArt\)/);
-  assert.match(engine,/puddingArt=null,jitterArt=null\)\{/); // engine signature takes the pudding art in slot order
+  assert.match(read('components/game/GameArena.jsx'),/pedestalArt,puddingArt,jitterArt,peteArt\)/);
+  assert.match(engine,/puddingArt=null,jitterArt=null,peteArt=null\)\{/); // engine signature takes the pudding art in slot order
 });
 
 test('contact melee strip plays on the ordinary contact tick without extra damage',()=>{
