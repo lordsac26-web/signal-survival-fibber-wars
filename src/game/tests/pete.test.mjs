@@ -17,23 +17,25 @@ const file=p=>readFileSync(new URL('../../../public'+p,import.meta.url));
 const def2=enemySpriteDef('pete');
 
 test('processed strips match the definition, clean cells, manifest counts',()=>{
-  assert.equal(def2.portraitW,96);assert.equal(def2.portraitH,120);assert.equal(def2.worldSize,58);
-  assert.equal(def2.walkColumns,6);assert.equal(def2.walkLeftColumns,7);
-  assert.equal(def2.attackColumns,4);assert.equal(def2.specialColumns,4);
-  const strips=[['idle-front.png',96,120,1],['walk-side.png',462,118,6],['walk-left.png',455,117,7],['attack.png',376,104,4],['special.png',500,139,4]];
+  assert.equal(def2.portraitW,124);assert.equal(def2.portraitH,124);assert.equal(def2.worldSize,58);
+  assert.equal(def2.walkColumns,6);assert.equal(def2.walkLeftColumns,6);
+  assert.equal(def2.attackColumns,4);assert.equal(def2.specialColumns,8);
+  const strips=[['idle-front.png',124,124,1],['walk-side.png',744,124,6],['walk-left.png',744,124,6],['attack.png',496,124,4],['special.png',1120,140,8]];
   for(const [name,w,h,cols] of strips){
     const img=decodePng(file('/assets/pete/'+name));
     assert.equal(img.width,w);assert.equal(img.height,h,name);
-    // per-cell: outermost 2 columns transparent, feet on the bottom row, head near the top
-    const cellW=w/cols;
+    // per-cell: outermost 2 columns transparent, full body present, feet
+    // anchored to the bottom row (final walk poses may lift the trailing foot)
+    const cellW=w/cols,cellH=h;
     for(let c=0;c<cols;c++){
-      let edgeOp=0,bottomOp=0;
-      for(let y=0;y<h;y++){
-        for(const x of [c*cellW,c*cellW+1,(c+1)*cellW-2,(c+1)*cellW-1])if(img.rgba[(y*w+x)*4+3]>=200)edgeOp++;
-        if(img.rgba[((h-1)*w+Math.round(c*cellW+cellW/2))*4+3]>=200)bottomOp++;
+      let edgeOp=0,body=0,lowest=-1;
+      for(let y=0;y<h;y++)for(let x=c*cellW;x<(c+1)*cellW;x++){
+        const a=img.rgba[(y*w+x)*4+3];
+        if(a>=200){body++;if(x<c*cellW+2||x>=(c+1)*cellW-2)edgeOp++;if(y>lowest)lowest=y}
       }
       assert.equal(edgeOp,0,name+' cell '+c+' edge bleed');
-      assert(bottomOp>0,name+' cell '+c+' feet baseline');
+      assert(body>1500,name+' cell '+c+' full body present, saw '+body);
+      assert(h-1-lowest<=2,name+' cell '+c+' feet anchored, lowest row '+lowest);
     }
     // no stray near-opaque pixels; (Pete's own glow is magenta-family by
     // design, so chromatic background checks would false-positive here —
@@ -44,9 +46,10 @@ test('processed strips match the definition, clean cells, manifest counts',()=>{
     }
   }
   const manifest=JSON.parse(file('/assets/pete/animation.json'));
-  assert.equal(manifest.walkSide.columns,6);assert.equal(manifest.walkLeft.columns,7);
-  assert.equal(manifest.attack.columns,4);assert.equal(manifest.special.columns,4);
-  assert(manifest.notes.includes('excluded'));
+  assert.equal(manifest.frameWidth,124);assert.equal(manifest.frameHeight,124);
+  assert.equal(manifest.walkSide.columns,6);assert.equal(manifest.walkLeft.columns,6);
+  assert.equal(manifest.attack.columns,4);assert.equal(manifest.special.columns,8);
+  assert(manifest.notes.includes('component pass'));
 });
 
 test('pete combat data and 50%-baseline mini',()=>{

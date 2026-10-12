@@ -137,11 +137,13 @@ dirty:Object.freeze(tech('blob',90,98,
   {atlasW:1251,atlasH:86,cellW:139,cellH:86,frames:9},
   {atlasW:1932,atlasH:115,cellW:276,cellH:115,frames:7}
 )),
-// Repeat Pete — processed from a 1024×683 magenta-bg sheet into five strips:
-// idle-front (1f), walk-right (6f), walk-left (7f — the sheet carries one more
-// left pose than labeled), attack (4f), special (4f). The special strip's
-// baked mini-composite poses (burst+mini etc.) were excluded — minis are
-// simulated as independent entities at runtime instead.
+// Repeat Pete — re-cut from the 1024×683 magenta-bg source into five uniform
+// foot-anchored strips: idle-front (1f), walk-right (6f), walk-left (6f),
+// attack (4f), special (8f, wider 140px cells for the outstretched-boom poses).
+// Keying uses the exact bg palette (border flood + enclosed pockets) with
+// distance-scaled fringe unmixing; the special strip's baked mini-composite
+// poses and neighbor-figure fragments were dropped by component pixels —
+// minis are simulated as independent entities at runtime instead.
 pete:Object.freeze((()=>{
   const d=tech('pete',124,124,
     {atlasW:124,atlasH:124,cellW:124,cellH:124,frames:1},
