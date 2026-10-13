@@ -58,12 +58,13 @@ test('slow idle cycle is a 3-pose wobble at 1.5fps; draw is centered, ground-anc
   assert.deepEqual(truckFrame(def,-1),{sx:0,sy:0});
   const draws=[],ctx={imageSmoothingEnabled:true,drawImage(...a){assert.equal(this.imageSmoothingEnabled,false);draws.push(a)}};
   drawTruckTurret(ctx,{definition:def,atlas:{id:'truck'}},0,100,100,1);
+  assert.equal(def.worldSize,86.4,'1.35× playtest scale');
   let a=draws.at(-1);assert.equal(a[0].id,'truck');assert.equal(a[1],0);assert.equal(a[2],0);assert.equal(a[3],230);assert.equal(a[4],190);
-  assert.equal(a[5],100-32);assert(Number.isInteger(a[5])&&Number.isInteger(a[6]));assert.equal(a[7],64);assert.equal(a[8],53);
+  assert.equal(a[5],100-43);assert(Number.isInteger(a[5])&&Number.isInteger(a[6]));assert.equal(a[7],86);assert.equal(a[8],71);
   // ground baseline: tile-local y=174 scaled to displayed width sits on the structure point
   drawTruckTurret(ctx,{definition:def,atlas:{}},.7,0,0,.5);
-  a=draws.at(-1);assert.equal(a[1],230);assert.equal(a[6],-Math.round(174*(32/230)));assert.equal(a[7],32);
-  drawTruckTurret(ctx,{definition:def,atlas:{}},0,10,10,.05);assert.equal(draws.at(-1)[7],Math.round(64*.2));
+  a=draws.at(-1);assert.equal(a[1],230);assert.equal(a[6],-Math.round(174*(43.2/230)));assert.equal(a[7],43);
+  drawTruckTurret(ctx,{definition:def,atlas:{}},0,10,10,.05);assert.equal(draws.at(-1)[7],Math.round(86.4*.2));
   assert.equal(ctx.imageSmoothingEnabled,true);
 });
 

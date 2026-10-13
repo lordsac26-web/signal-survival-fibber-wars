@@ -37,6 +37,6 @@ export function drawBendRing(ctx,art,s){
  const img=art.ring,d=art.definition,size=28;
  const previousSmoothing=ctx.imageSmoothingEnabled;ctx.imageSmoothingEnabled=false;
  ctx.save();ctx.translate(Math.round(s.x),Math.round(s.y));ctx.rotate((s.traveled||0)*.04);
- ctx.drawImage(img,-size*d.extras[3][2]/d.extras[3][3]/2,-size/2,size*116/92,size);
+ ctx.drawImage(img,-size*116/184,-size/2,size*116/92,size);
  ctx.restore();ctx.imageSmoothingEnabled=previousSmoothing;
 }

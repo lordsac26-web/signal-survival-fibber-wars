@@ -1,4 +1,5 @@
 import { PETE } from '@/game/data/bosses';
+import { MACRO } from '@/game/combat/macrobend';
 export const JITTER=Object.freeze({telegraph:1,recovery:.45,cooldown:12,initialMin:10,initialMax:15,radius:76*1.20,damage:12,activationRange:130,spawnWeight:.5});
 export const createJitterState=(random=Math.random)=>({phase:'chase',remaining:0,cooldown:JITTER.initialMin+random()*(JITTER.initialMax-JITTER.initialMin),clock:0,melee:0,facing:'right'});
 export function stepJitter(s,dt,{alive=true,playerAlive=true,dist=Infinity,visible=false,targetDx=0}={}){
@@ -24,9 +25,13 @@ export const jitterPulseHits=(s,dist,inv)=>s.phase==='recover'&&inv<=0&&dist<=JI
 export function pickEnemyKind(types,wave,random=Math.random){
   const eligible=types.slice(0,Math.min(types.length,2+(wave/2|0))).filter(id=>id!=='peteMini');
   if(wave>=PETE.minWave&&!eligible.includes('pete'))eligible.push('pete');
+  // MACROBEND BEAST: explicit wave-4 gate (the slice alone would surface it at
+  // wave 6) and the same half-weight gate the Jitter Bug uses.
+  if(wave>=MACRO.wave&&!eligible.includes('bend'))eligible.push('bend');
   const kind=eligible[Math.floor(random()*eligible.length)];
-  if(kind!=='jitter'&&kind!=='pete')return kind;
+  if(kind!=='jitter'&&kind!=='bend'&&kind!=='pete')return kind;
   if(kind==='jitter'&&random()<JITTER.spawnWeight)return kind;
+  if(kind==='bend'&&random()<MACRO.spawnWeight)return kind;
   if(kind==='pete'&&random()<PETE.spawnWeight)return kind;
   const ordinary=eligible.filter(id=>id!==kind);return ordinary[Math.floor(random()*ordinary.length)];
 }

@@ -153,6 +153,20 @@ pete:Object.freeze((()=>{
     {atlasW:980,atlasH:140,cellW:140,cellH:140,frames:7});
   return {...d,worldSize:58,idleBreathFrames:1,specialActivationFrames:7,specialFps:8,specialDuration:1.2};
 })()),
+// Macrobend Beast — cut from the provided JPEG (magenta-checker/flat pink bg,
+// exact-palette keying + distance-scaled fringe unmixing). Strips: idle (4f),
+// walk-right (5f, mirrored for left), melee (4f), special (5f: 0-2 coil,
+// 3 twist-release, 4 snap-back) plus the cropped cast ring. Body height
+// ≈ 0.93 × worldSize — ~86 units against the r=25 collider, same
+// sprite-to-collider ratio as the Lag Sprite.
+bend:Object.freeze({
+ atlas:'/assets/bend/idle.png',portrait:'/assets/bend/portrait.png',manifest:'/assets/bend/animation.json',
+ sources:{sheet:'https://signalsurvival.base44.app/assets/bend/source.jpg'},
+ extras:[['walk','/assets/bend/walk-side.png',895,134],['attack','/assets/bend/attack.png',868,138],['special','/assets/bend/special.png',920,128],['ring','/assets/bend/ring.png',116,92]],
+ atlasW:672,atlasH:137,cellW:168,cellH:137,columns:4,idleFps:5,walkFps:9,attackFps:10,specialFps:5,
+ worldSize:93,anchorX:.5,anchorY:.5,portraitW:320,portraitH:252,baseFacing:'right',hurtTint:'rgba(251,113,133,.6)',
+ manifestSpec:{frameWidth:168,frameHeight:137,'idle.columns':4,'walk.columns':5,'walk.facing':'right','attack.columns':4,'special.columns':5,'baseFacing':'right'}
+}),
 squirrel:Object.freeze({
   atlas:'/assets/squirrel/idle-front.png',attack:'/assets/squirrel/fec-attack.png',portrait:'/assets/squirrel/portrait.png',manifest:'/assets/squirrel/animation.json',
   extras:[['back','/assets/squirrel/idle-back.png',1020,170],['walk','/assets/squirrel/walk-side.png',1020,170]],
@@ -174,7 +188,7 @@ bucket:Object.freeze({
   atlas:'/assets/buckettruck/turret.png',portrait:'/assets/buckettruck/icon.png',
   manifest:'/assets/buckettruck/animation.json',
   sources:{atlas:source+'53bcc4815_buckettruck-turret.png',icon:source+'8c553ef43_buckettruck-icon.png',manifest:source+'cb0ba0033_buckettruck-animation.json'},
-  atlasW:690,atlasH:190,tileW:230,tileH:190,columns:3,rows:1,fps:1.5,idleCycle:3,worldSize:64,anchorY:174,portraitW:234,portraitH:204,muzzle:{x:150,y:30},
+  atlasW:690,atlasH:190,tileW:230,tileH:190,columns:3,rows:1,fps:1.5,idleCycle:3,worldSize:86.4,anchorY:174,portraitW:234,portraitH:204,muzzle:{x:150,y:30},
   structureType:'turretMount',
   manifestSpec:{structureId:'bucket_truck_turret',tileWidth:230,tileHeight:190,rightEdgeAnchorX:210,groundBaselineY:174,'animation.type':'idle_cycle','animation.fps':1.5}
 }),

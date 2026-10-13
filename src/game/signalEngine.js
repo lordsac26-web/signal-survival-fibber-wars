@@ -29,6 +29,8 @@ import { KNOWLEDGE_DUMP } from '@/game/combat/knowledgeDump';
 import { outageMovement, outageKillHeal } from '@/game/combat/outage';
 import { createISRAnimation, updateISRAnimation } from '@/game/art/isrSpriteAnimation';
 import { drawISR, isrMuzzlePoint } from '@/game/art/drawISR';
+import { MACRO, createBendState, stepBend, bendVelocity } from '@/game/combat/macrobend';
+import { createBendAnimation, updateBendAnimation, drawBendSprite, drawBendRing } from '@/game/art/bendSpriteAnimation';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
 const clamp=(n,a,b)=>n<a?a:n>b?b:n;
@@ -49,7 +51,7 @@ const weaponOf=w=>typeof w==='string'?WEAPONS[w]:w;
 // structures (Q key) live in the `structures` pool. Both integrate with the
 // enemy spatial hash for targeting, and structure-vs-enemy steering is a small
 // per-enemy loop over the (tiny) active-structure list — no repathing, no O(n²).
-export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null,puddingArt=null,jitterArt=null,peteArt=null){
+export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null,puddingArt=null,jitterArt=null,peteArt=null,bendArt=null){
  const ctx=canvas.getContext('2d',{alpha:false}),grid=new SpatialHash(96),charId=run.character.id;
  let dpr=Math.min(devicePixelRatio||1,2);
  if(run.character.id==='oracle'&&!characterArt)throw new Error('Oracle art must be preloaded before combat');
@@ -61,6 +63,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  const truckArt=structureArt&&structureArt.definition?structureArt:null,truckDef=truckArt?structureSpriteDef('bucket'):null;
  const pedArt=pedestalArt&&pedestalArt.definition?pedestalArt:null;
  const pudArtDef=puddingArt&&puddingArt.definition?puddingArt:null;
+ const bendArtDef=bendArt&&bendArt.definition?bendArt:null;
  const viewport={width:1100,height:800},signatureWeapon=SIGNATURE_RANGE_WEAPONS[run.character.special.id];
  const areaFx={life:0,x:0,y:0,reach:0,angle:0,half:Math.PI,color:'#fff',limit:Infinity,originX:0,originY:0};
  const enemies=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,r:10,lastShot:-1}));
@@ -68,7 +71,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  const particles=new ObjectPool(300,i=>({poolIndex:i,active:false,x:0,y:0,vx:0,vy:0,life:0,color:'#fff'}));
  const pickups=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,value:1}));
  const numbers=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,life:0,value:0,crit:false}));
- const foeShots=new ObjectPool(64,i=>({poolIndex:i,active:false,x:0,y:0,prevX:0,prevY:0,vx:0,vy:0,r:6,remaining:0,traveled:0,life:0,damage:0,color:'#a16207',pattern:'foe'}));
+ const foeShots=new ObjectPool(64,i=>({poolIndex:i,active:false,x:0,y:0,prevX:0,prevY:0,vx:0,vy:0,r:6,remaining:0,traveled:0,life:0,damage:0,color:'#a16207',pattern:'foe',ring:false}));
  const turrets=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,inv:0,r:13,wid:null,mode:'pellet',color:'#f59e0b',life:0,maxLife:1,fireCd:0,fire:.5,damage:10,range:300,born:0,lookA:0,weapon:null}));
  const structures=new ObjectPool(24,i=>({poolIndex:i,active:false,type:null,x:0,y:0,life:0,maxLife:1,r:20,born:0,uses:0,rearm:0,power:1,fireCd:0,lookA:0}));
  // Puddle hazards are their own bounded pool — never counted against the
@@ -121,14 +124,17 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
 // compensated with steeper per-wave HP scaling (.19 → .28) plus a new
 // contact-damage scale. The boss keeps its own literal .19 scaling untouched.
 e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage*(1+(run.wave-1)*.05);e.r=base.r;e.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
- e.art=null;e.anim=null;e.pud=null;e.sq=null;e.jit=null;e.boss=false;
+ e.art=null;e.anim=null;e.pud=null;e.sq=null;e.jit=null;e.mac=null;e.boss=false;
  if(e.kind==='jitter'&&jitterArt){e.art=jitterArt;e.jit=createJitterState()}
  if(e.kind==='lag'&&lagArt){e.art=lagArt;e.anim=createLagAnimation()}if(e.kind==='dirty'&&blobArtDef){e.art=blobArtDef;e.anim=createTechAnimation();e.anim.special=.5}
  if(e.kind==='packet'&&puddingArt){e.art=puddingArt;e.anim=createPuddingAnimation();e.pud=initPuddingState()}
  // REPEAT PETE: the original carries a 30s clone-pulse clock; the mini is a
  // fully independent entity (no clock, never reproduces). Drawn from the same
  // processed strip set, minis scaled down at draw time.
- if((e.kind==='pete'||e.kind==='peteMini')&&petArt){e.art=petArt;e.anim=createTechAnimation();if(e.kind==='pete')e.cloneT=PETE.cloneInterval}}
+ if((e.kind==='pete'||e.kind==='peteMini')&&petArt){e.art=petArt;e.anim=createTechAnimation();if(e.kind==='pete')e.cloneT=PETE.cloneInterval}
+  // MACROBEND BEAST: chase state machine + animation; the cast ring spawns
+  // from the stepBend 'fire' action inside the enemy loop.
+  if(e.kind==='bend'&&bendArt){e.art=bendArt;e.anim=createBendAnimation();e.mac=createBendState()}}
  function spawnPeteMini(src){const m=enemies.acquire();if(!m)return;const base=ENEMIES.peteMini;
   m.kind='peteMini';m.x=clamp(src.x+(Math.random()<.5?-1:1)*26,20,W-20);m.y=clamp(src.y+(Math.random()<.5?-1:1)*26,20,H-20);
   m.hp=base.hp*(1+(run.wave-1)*.28);m.max=m.hp;m.speed=base.speed*(1+(run.wave-1)*.025);m.damage=base.damage*(1+(run.wave-1)*.05);m.r=base.r;
@@ -147,9 +153,16 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
   cb.flash(SQUIRREL.intro);addShake(6)}
  function fireCone(e){const c=SQUIRREL.cone,step=c.pellets>1?c.half*2/(c.pellets-1):0;
   for(let k=0;k<c.pellets;k++){const a=e.sq.aim+(k-(c.pellets-1)/2)*step,f=foeShots.acquire();if(!f)break;
-   f.x=f.prevX=e.x;f.y=f.prevY=e.y;f.vx=Math.cos(a)*c.speed;f.vy=Math.sin(a)*c.speed;f.remaining=c.range;f.traveled=0;f.life=c.range/c.speed+.5;f.damage=c.damage;f.r=6;sfx('packet')}
+   f.x=f.prevX=e.x;f.y=f.prevY=e.y;f.vx=Math.cos(a)*c.speed;f.vy=Math.sin(a)*c.speed;f.remaining=c.range;f.traveled=0;f.life=c.range/c.speed+.5;f.damage=c.damage;f.r=6;f.ring=false;sfx('packet')}
   addShake(3)}
- // Returns this frame's steering angle and speed for the squirrel only.
+  // MACROBEND BEAST cast: ONE ring released instantly at the end of the 1s
+  // coil — direction locks to the beast's pose at release and never tracks.
+  // Sized to 35% of the shorter visible side, 210 units/s, pops on player hit.
+  function bendRing(e){const c=MACRO,angle=Math.atan2(p.y-e.y,p.x-e.x),f=foeShots.acquire();if(!f)return;
+  f.ring=true;f.x=f.prevX=e.x;f.y=f.prevY=e.y;f.vx=Math.cos(angle)*c.ringSpeed;f.vy=Math.sin(angle)*c.ringSpeed;
+  f.remaining=Math.min(viewport.width,viewport.height)*c.rangeFactor;f.traveled=0;f.life=f.remaining/c.ringSpeed+.5;f.damage=e.damage;f.r=c.ringRadius;sfx('packet');addShake(2);
+  cb.event?.({type:'macrobendRing',time:duration-time,index:e.poolIndex,x:e.x,y:e.y,damage:f.damage})}
+  // Returns this frame's steering angle and speed for the squirrel only.
  function squirrelUpdate(e,dt){const s=e.sq,d=SQUIRREL,wasWind=s.wind>0;
   if(s.phase===1&&e.hp<=e.max*.5){s.phase=2;s.castCd=1.2;cb.flash(SQUIRREL.phaseFlash);addShake(6)}
   s.cast=Math.max(0,s.cast-dt);s.wind=Math.max(0,s.wind-dt);s.castCd-=dt;
@@ -175,7 +188,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
   // the TARGET (not the movement direction). A ±10-unit dead-zone keeps
   // near-vertical targets from flickering the mirror frame to frame.
   if(Math.abs(t.x-p.x)>10)spriteState.attackFace=t.x<p.x?'left':'right'}
- const faceDir=spriteState?((spriteState.attackFace||'right')==='left'?-1:1):(Math.cos(a)<0?-1:1);queryHits=0;if(['melee','nova','cone','orbiting'].includes(pattern)){queryX=p.x;queryY=p.y;queryR=reach;queryDamage=w.damage;queryColor=w.color;queryLimit=Infinity;queryArcAngle=a;queryArcHalf=['melee','cone'].includes(pattern)?Math.PI/3:Math.PI;grid.visit(p.x,p.y,reach,areaVisitor);showArea();if(w.heal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+w.heal);healed+=p.hp-before}particle(p.x,p.y,w.color,7)}else{const def=characterArt?.definition;let mx=p.x,my=p.y-(def?.worldSize||48)*.45;
+ const faceDir=spriteState?((spriteState.attackFace||'right')==='left'?-1:1):(Math.cos(a)<0?-1:1);queryHits=0;if(['melee','nova','cone','orbiting'].includes(pattern)){queryX=p.x;queryY=p.y;queryR=reach;queryDamage=w.damage;queryColor=w.color;queryLimit=Infinity;queryArcAngle=a;queryArcHalf=['melee','cone'].includes(pattern)?Math.PI/3:Math.PI;grid.visit(p.x,p.y,reach,areaVisitor);showArea();cb.event?.({type:'attackHits',weapon:w.name,pattern,hits:queryHits});if(w.heal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+w.heal);healed+=p.hp-before}particle(p.x,p.y,w.color,7)}else{const def=characterArt?.definition;let mx=p.x,my=p.y-(def?.worldSize||48)*.45;
    if(charId==='isr'&&characterArt){const mp=isrMuzzlePoint(characterArt,spriteState,p.x,p.y);mx=mp.x;my=mp.y}
    else if(def){if(def.muzzle){const mp=techMuzzlePoint(def,faceDir,p.x,p.y);mx=mp.x;my=mp.y}else my=p.y+def.worldSize*(1-def.anchorY)-def.worldSize*.57}
    // Aim the projectile exactly from the transformed muzzle toward the actual
@@ -275,7 +288,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
 spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave))spawnEnemy();spawn=spawnInterval(run.wave)}grid.clear();
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active)grid.insert(e)}
   structuresUpdate(dt); // mounts fire + pedestal buff, uses the freshly built enemy grid
-  for(let i=0;i<run.weapons.length;i++){cooldowns[i]-=dt;const w=weaponOf(run.weapons[i]);if(w&&cooldowns[i]<=0){attack(w);cooldowns[i]=w.rate/(run.attackSpeed*(1+pedestalBuff)*(specialTimer>0?(run.character.special.id==='frenzy'?2.5:run.character.special.id==='deadline'?1.35:1):1))}}
+  for(let i=0;i<run.weapons.length;i++){cooldowns[i]-=dt;const w=weaponOf(run.weapons[i]);if(w&&cooldowns[i]<=0){const scheduled=w.rate/(run.attackSpeed*(1+pedestalBuff)*(specialTimer>0?(run.character.special.id==='frenzy'?2.5:run.character.special.id==='deadline'?1.35:1):1));attack(w);cb.event?.({type:'weaponTrigger',weapon:w.name,index:i,scheduled});cooldowns[i]=scheduled}}
   turretsUpdate(dt);
   for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(!s.active)continue;const ended=advanceProjectile(s,dt);queryShot=s;grid.visit((s.prevX+s.x)/2,(s.prevY+s.y)/2,Math.hypot(s.x-s.prevX,s.y-s.prevY)/2+s.r+34,shotVisitor);if(!s.active)continue;if(s.boom || ended){if(s.mortar)explode(s.x,s.y,s.damage,s.color,Math.min(55,s.maxReach*.25),s);shots.release(s)}}
   // Enemy projectiles (FEC pellets): travel, then one hit on the player each;
@@ -292,6 +305,11 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
     if(action==='charge'){e.jit.rootX=e.x;e.jit.rootY=e.y}
     if(action==='fire'){if(jitterPulseHits(e.jit,distance(p,e),p.inv)){damagePlayer(JITTER.damage*(1+(run.wave-1)*.05));p.inv=.55}novaSparks(e.x,e.y);sfx('spark')}
    }
+   // MACROBEND BEAST: state-machine step; 'coil' saves the root pose, 'fire'
+   // releases the ring from the same spot. Rooted through coil AND recovery.
+   if(e.mac){const act=stepBend(e.mac,dt,{alive:e.active&&e.hp>0,playerAlive:p.hp>0,dist:distance(p,e),visible:e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40,targetDx:p.x-e.x});
+    if(act==='coil'){e.mac.rootX=e.x;e.mac.rootY=e.y;cb.event?.({type:'macrobendCoil',time:duration-time,index:e.poolIndex,x:e.x,y:e.y})}
+    if(act==='fire')bendRing(e)}
    // PACKET-LOSS PUDDING cast: within range + on screen + cooldown ready →
    // root in place for the 1s telegraph (drop spot saved at cast start), then
    // collapse into a puddle at that exact spot and instantly resume chasing.
@@ -310,9 +328,10 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
     else if(def.kind==='slow'){if(Math.hypot(e.x-st.x,e.y-st.y)<st.r)slowMul=Math.min(slowMul,1-(def.slow+.05*(st.power-1)))}}
    if(e.pud&&e.pud.phase==='telegraph'){e.x=e.pud.rootX;e.y=e.pud.rootY}
    if(e.jit&&e.jit.phase!=='chase'){e.x=e.jit.rootX;e.y=e.jit.rootY}
+   if(e.mac&&e.mac.phase!=='chase'){e.x=e.mac.rootX;e.y=e.mac.rootY}
    if(e.sq)({a,spd}=squirrelUpdate(e,dt));
    if(charId==='isr')slowMul=outageMovement(specialTimer,p.hp,slowMul);
-   const velocity=e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
+   const velocity=e.mac?bendVelocity(e.mac,a,spd*slowMul):e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
    const mvx=velocity.x,mvy=velocity.y;
    if(cb.inspect&&charId==='isr')e.outageMotion={x:mvx,y:mvy,slow:slowMul};
    e.x+=mvx*dt;e.y+=mvy*dt;
@@ -321,9 +340,10 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
    if(e.sq&&e.sq.phase===2){e.x=clamp(e.x,camX+e.r+6,camX+viewW-e.r-6);e.y=clamp(e.y,camY+e.r+6,camY+viewH-e.r-6)}
    if(e.anim){if(e.art===puddingArt)updatePuddingAnimation(e.anim,mvx,mvy,dt,pudArtDef.definition);else if(e.art===blobArtDef){e.anim.special=Math.max(0,e.anim.special-dt);updateTechAnimation(e.anim,mvx*dt,mvy*dt,dt,blobArtDef.definition)}
     else if(petArt&&(e.kind==='pete'||e.kind==='peteMini')){e.anim.special=Math.max(0,e.anim.special-dt);updateTechAnimation(e.anim,mvx*dt,mvy*dt,dt,petArt.definition)}
+    else if(e.mac&&bendArtDef)updateBendAnimation(e.anim,mvx,mvy,dt,e.mac)
     else updateLagAnimation(e.anim,mvx*dt,mvy*dt,dt,lagArt.definition)}
    else if(e.sq)updateSquirrelAnimation(e.sq,mvx,mvy,dt,sqArt.definition)
-   if(separate&&(!e.jit||e.jit.phase==='chase')&&(!e.pud||e.pud.phase==='chase')){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
+   if(separate&&(!e.jit||e.jit.phase==='chase')&&(!e.pud||e.pud.phase==='chase')&&(!e.mac||e.mac.phase==='chase')){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
    if(distance(p,e)<p.r+e.r&&p.inv<=0&&(!e.jit||e.jit.phase==='chase')){if(e.jit&&e.jit.phase==='chase'){e.jit.melee=1/3;e.jit.facing=p.x<e.x?'left':'right'}if(e.anim){if(e.kind==='packet'){e.anim.melee=.34;e.anim.facing=p.x<e.x?'left':'right'}else e.anim.attack=.35}if(run.firstHitBlocked&&!firstBlockUsed){firstBlockUsed=true;cb.flash('FIRST HIT POLITELY DECLINED')}else damagePlayer(e.damage);p.inv=.55}}
   for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(!d.active)continue;const dd=distance(p,d);if(dd<120*(run.character.pickupScale||1)){d.x+=(p.x-d.x)*dt*7;d.y+=(p.y-d.y)*dt*7}if(dd<p.r+10){signal+=d.value;earnedSignal+=d.value;xp+=d.value*TUNING.xpPickupFactor;xpEarnedWave+=d.value*TUNING.xpPickupFactor;sfx('pickup');pickups.release(d);while(xp>=signalForLevel(run.level+levels)){xp-=signalForLevel(run.level+levels);levels++;sfx('level');cb.flash('SIGNAL LEVEL UP!')}}}
   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(!q.active)continue;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=.94;q.vy*=.94;q.life-=dt;if(q.life<=0)particles.release(q)}for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;n.y-=25*dt;n.life-=dt;if(n.life<=0)numbers.release(n)}if(soundClock<=0){for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active){sfx(e.sound);break}}soundClock=.35+Math.random()*.35}
@@ -332,7 +352,10 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
    deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,STRUCTURES[d.structure]),selected:i===depIdx})),structures:structCount,cap:structCap()}:null});hudClock=.1}
   // Opt-in automated-test observation only; GameArena supplies neither callback.
   if(cb.inspect)cb.inspect({time:duration-time,player:{...p},slow:puddleSlowMul,specialTimer,specialCooldown,healed,kills,clauseFired,damageDealt,camX,camY,...(charId==='isr'?{enemies:enemies.items.filter(e=>e.active).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,speed:e.speed,boss:e.boss,hp:e.hp,motion:e.outageMotion})),shots:shots.items.filter(s=>s.active).map(s=>({id:s.id,originX:s.originX,originY:s.originY,vx:s.vx,vy:s.vy})),sprite:{...spriteState}}:{}),puddles:puddles.items.filter(d=>d.active).map(d=>({...d})),puddings:enemies.items.filter(e=>e.active&&e.pud).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,cast:{...e.pud}})),
-  petes:enemies.items.filter(e=>e.active&&(e.kind==='pete'||e.kind==='peteMini')).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cloneT:e.cloneT}))});
+  petes:enemies.items.filter(e=>e.active&&(e.kind==='pete'||e.kind==='peteMini')).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cloneT:e.cloneT})),
+  bends:enemies.items.filter(e=>e.active&&e.mac).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cast:{...e.mac}})),
+  rings:foeShots.items.filter(s=>s.active&&s.ring).map(s=>({x:s.x,y:s.y,remaining:s.remaining,damage:s.damage})),
+  foes:enemies.items.filter(e=>e.active).slice(0,40).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,hp:e.hp,radius:e.r}))});
  }
  // Silly-but-mandated accessories: every turret and structure gets a hard hat
  // and googly eyes (pupils track whatever it's currently aiming at).
@@ -371,11 +394,11 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
     if(run.character.id==='don'&&specialTimer>0&&characterArt&&characterArt.crewInd)drawCrewHelper(ctx,characterArt,t);else drawHelper(ctx,Math.round(t.x),Math.round(t.y),t.color)}
    else if(t.weaponTurret&&pedArt)drawPedestalTurret(ctx,pedArt,t,Math.round(t.x),Math.round(t.y),grow); // weapon-deployed turrets share the splice-pedestal pack
    else drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
-  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.art&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40){if(e.jit)drawJitterSprite(ctx,jitterArt,e.jit,e.x,e.y,e.jit.phase==='chase');else if(e.art===puddingArt)drawPuddingSprite(ctx,puddingArt,e.anim,e.x,e.y);else if(e.art===blobArtDef)drawTechEnemy(ctx,e.art,e.anim,e.x,e.y);else if(petArt&&(e.kind==='pete'||e.kind==='peteMini'))drawTechEnemy(ctx,petArt,e.anim,e.x,e.y,e.kind==='peteMini'?PETE.miniScale:1);else drawLagSprite(ctx,e.art,e.anim,e.x,e.y)}}
+  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.art&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40){if(e.jit)drawJitterSprite(ctx,jitterArt,e.jit,e.x,e.y,e.jit.phase==='chase');else if(e.art===puddingArt)drawPuddingSprite(ctx,puddingArt,e.anim,e.x,e.y);else if(e.art===blobArtDef)drawTechEnemy(ctx,e.art,e.anim,e.x,e.y);else if(petArt&&(e.kind==='pete'||e.kind==='peteMini'))drawTechEnemy(ctx,petArt,e.anim,e.x,e.y,e.kind==='peteMini'?PETE.miniScale:1);else if(e.mac&&bendArtDef)drawBendSprite(ctx,bendArtDef,e.anim,e.x,e.y);else drawLagSprite(ctx,e.art,e.anim,e.x,e.y)}}
   for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&!e.art&&e.kind===kind&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40)ctx.drawImage(e.sprite,Math.round(e.x-e.sprite.width/2),Math.round(e.y-e.sprite.height/2))}}
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.sq&&e.x>camX-90&&e.x<camX+viewW+90&&e.y>camY-90&&e.y<camY+viewH+90)drawSquirrelSprite(ctx,e.sq.art,e.sq,e.x,e.y)}
   for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>camX-28&&s.x<camX+viewW+28&&s.y>camY-28&&s.y<camY+viewH+28)drawProjectile(ctx,s)}
-  for(let i=0;i<foeShots.items.length;i++){const s=foeShots.items[i];if(s.active&&s.x>camX-28&&s.x<camX+viewW+28&&s.y>camY-28&&s.y<camY+viewH+28)drawProjectile(ctx,s)}
+  for(let i=0;i<foeShots.items.length;i++){const s=foeShots.items[i];if(s.active&&s.x>camX-28&&s.x<camX+viewW+28&&s.y>camY-28&&s.y<camY+viewH+28){if(s.ring&&bendArtDef)drawBendRing(ctx,bendArtDef,s);else drawProjectile(ctx,s)}}
   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(q.active&&q.x>=camX&&q.x<=camX+viewW&&q.y>=camY&&q.y<=camY+viewH){ctx.globalAlpha=Math.max(0,q.life*2);ctx.fillStyle=q.color;ctx.fillRect(Math.round(q.x),Math.round(q.y),3,3)}}ctx.globalAlpha=1;
   for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;ctx.fillStyle=n.crit?'#fde047':'#fff';ctx.font=n.crit?'bold 18px Chivo':'bold 13px Chivo';ctx.fillText(n.value,Math.round(n.x),Math.round(n.y))}
   const px=Math.round(p.x),py=Math.round(p.y);

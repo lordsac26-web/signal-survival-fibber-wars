@@ -62,12 +62,12 @@ export default function GameArena({ run, onFinish }) {
     // Character art (Oracle or Dispatch Don), the Lag Sprite enemy art, the
     // Bucket-Truck turret art, and the Squirrel boss art load in parallel;
     // a failure blocks start with a retry.
-    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadEnemySprite('packet'),preloadEnemySprite('jitter'),preloadEnemySprite('pete')]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt,jitterArt,peteArt])=>{
+    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadEnemySprite('packet'),preloadEnemySprite('jitter'),preloadEnemySprite('pete'),preloadEnemySprite('bend')]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt,jitterArt,peteArt,bendArt])=>{
       if(disposed)return;
       clean=createSignalEngine(canvas.current,run,input,{
         hud:setHud,reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,
         flash:t=>{setFlash(t);setTimeout(()=>setFlash(''),1400)}
-      },paused,art,lagArt,truckArt,squirrelArt,blobArt,pedestalArt,puddingArt,jitterArt,peteArt);
+      },paused,art,lagArt,truckArt,squirrelArt,blobArt,pedestalArt,puddingArt,jitterArt,peteArt,bendArt);
       setArtStatus('');
     }).catch(error=>{if(!disposed)setArtStatus(error.message)});
 
