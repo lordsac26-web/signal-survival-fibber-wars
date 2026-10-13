@@ -10,7 +10,7 @@
 // between FEC casts, without outrunning any player build.
 export const SQUIRREL=Object.freeze({
   id:'squirrel',name:'Fiber-Nibbling Squirrel',color:'#b4763f',
-  hp:520,speed:95,damage:22,r:26,value:30,
+  hp:780,speed:95,damage:27.5,r:26,value:30,
   // FEC: 55°-total cone locked in aim at windup start; 7 pellets at 290 units/s
   // cross the 340-unit reach in ~1.2s, so strafing sideways during the 0.8s
   // tail-fluffing windup cleanly dodges it. 5s cooldown between casts.

@@ -150,8 +150,8 @@ pete:Object.freeze((()=>{
     {atlasW:744,atlasH:124,cellW:124,cellH:124,frames:6},
     {atlasW:744,atlasH:124,cellW:124,cellH:124,frames:6},
     {atlasW:496,atlasH:124,cellW:124,cellH:124,frames:4},
-    {atlasW:1120,atlasH:140,cellW:140,cellH:140,frames:8});
-  return {...d,worldSize:58,idleBreathFrames:1,specialActivationFrames:8,specialFps:8,specialDuration:1.2};
+    {atlasW:980,atlasH:140,cellW:140,cellH:140,frames:7});
+  return {...d,worldSize:58,idleBreathFrames:1,specialActivationFrames:7,specialFps:8,specialDuration:1.2};
 })()),
 squirrel:Object.freeze({
   atlas:'/assets/squirrel/idle-front.png',attack:'/assets/squirrel/fec-attack.png',portrait:'/assets/squirrel/portrait.png',manifest:'/assets/squirrel/animation.json',
@@ -174,7 +174,7 @@ bucket:Object.freeze({
   atlas:'/assets/buckettruck/turret.png',portrait:'/assets/buckettruck/icon.png',
   manifest:'/assets/buckettruck/animation.json',
   sources:{atlas:source+'53bcc4815_buckettruck-turret.png',icon:source+'8c553ef43_buckettruck-icon.png',manifest:source+'cb0ba0033_buckettruck-animation.json'},
-  atlasW:690,atlasH:190,tileW:230,tileH:190,columns:3,rows:1,fps:1.5,idleCycle:3,worldSize:64,anchorY:174,portraitW:234,portraitH:204,
+  atlasW:690,atlasH:190,tileW:230,tileH:190,columns:3,rows:1,fps:1.5,idleCycle:3,worldSize:64,anchorY:174,portraitW:234,portraitH:204,muzzle:{x:150,y:30},
   structureType:'turretMount',
   manifestSpec:{structureId:'bucket_truck_turret',tileWidth:230,tileHeight:190,rightEdgeAnchorX:210,groundBaselineY:174,'animation.type':'idle_cycle','animation.fps':1.5}
 }),
