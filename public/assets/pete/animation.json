@@ -1,13 +1,32 @@
 {
   "frameWidth": 124,
   "frameHeight": 124,
-  "idleFront": { "file": "idle-front.png", "columns": 1 },
-  "walkSide": { "file": "walk-side.png", "columns": 6, "facing": "right" },
-  "walkLeft": { "file": "walk-left.png", "columns": 6, "facing": "left" },
-  "attack": { "file": "attack.png", "columns": 4 },
-  "special": { "file": "special.png", "frameWidth": 140, "frameHeight": 140, "columns": 8 },
+  "idleFront": {
+    "file": "idle-front.png",
+    "columns": 1
+  },
+  "walkSide": {
+    "file": "walk-side.png",
+    "columns": 6,
+    "facing": "right"
+  },
+  "walkLeft": {
+    "file": "walk-left.png",
+    "columns": 6,
+    "facing": "left"
+  },
+  "attack": {
+    "file": "attack.png",
+    "columns": 4
+  },
+  "special": {
+    "file": "special.png",
+    "frameWidth": 140,
+    "frameHeight": 140,
+    "columns": 7
+  },
   "portrait": "portrait.png",
   "fps": 8,
-  "source": "repeat-pete-source.png",
-  "notes": "Re-cut from the 1024x683 magenta-bg source: border flood key on the exact bg palette (243,3,250 +/-10), enclosed pocket keying, distance-scaled fringe unmixing, per-frame 4-connected component pass (baked mini-composite poses and neighbor-figure fragments dropped by component pixels, never by bounding box), uniform foot-anchored cells (feet on the bottom row, body centered). Minis are simulated as independent entities at runtime."
+  "source": "repeat-pete-source.png (1024x683, magenta bg)",
+  "notes": "v2 component pass re-cut: exact bg-palette key with distance-scaled fringe unmixing, despeckle >=8px, baked mini-composite poses erased by component pixels and f7 by column cut at x873; frame 8 dropped (main clipped by sheet edge, only its baked mini remained); walk-left mirrored from the 6 genuine right-walk poses (source left band is 7 near-identical copies of one pose). Feet anchored 2px above cell bottom, body centered. Minis simulated as independent runtime entities."
 }
