@@ -1,0 +1,24 @@
+{
+ "frameWidth": 168,
+ "frameHeight": 137,
+ "idle": {
+  "columns": 4
+ },
+ "walk": {
+  "columns": 5,
+  "facing": "right"
+ },
+ "attack": {
+  "columns": 4
+ },
+ "special": {
+  "columns": 5
+ },
+ "ring": {
+  "frameWidth": 116,
+  "frameHeight": 92
+ },
+ "baseFacing": "right",
+ "fps": 9,
+ "worldSize": 93
+}
