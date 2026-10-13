@@ -14,7 +14,7 @@ import { SIGNATURE_RANGE_WEAPONS } from '@/game/combat/rangeConfig';
 import { advanceProjectile, projectileCanHit } from '@/game/combat/projectileTravel';
 import { createSpriteAnimation, updateSpriteAnimation, drawCharacterSprite } from '@/game/art/spriteAnimation';
 import { createLagAnimation, updateLagAnimation, drawLagSprite } from '@/game/art/enemySpriteAnimation';
-import { drawTruckTurret, drawPedestalTurret } from '@/game/art/structureSprite';
+import { drawTruckTurret, drawPedestalTurret, truckMuzzlePoint } from '@/game/art/structureSprite';
 import { drawCrewHelper, crewMuzzle } from '@/game/art/crewHelper';
 import { PUDDING, initPuddingState, stepPuddingState, puddleMitigation } from '@/game/combat/puddles';
 import { createPuddingAnimation, updatePuddingAnimation, drawPuddingSprite } from '@/game/art/puddingSpriteAnimation';
@@ -228,7 +228,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
    activeStructs.push(s)}
   structCount=activeStructs.length;pedestalBuff=0;
   for(let i=0;i<activeStructs.length;i++){const s=activeStructs[i],def=STRUCTURES[s.type];if(!def)continue;
-   if(def.kind==='turret'){s.fireCd-=dt;if(s.fireCd<=0){const reach=effectiveRange(def,run,viewport,'turret'),target=nearestAt(s.x,s.y,reach);if(target){let ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;const [mx,my]=pedArt?pedestalMuzzlePoint(pedArt.definition,s.x,s.y,ang):[s.x,s.y-14];ang=Math.atan2(target.y-my,target.x-mx);launch({damage:def.damage*(1+.2*(s.power-1))*(1+(run.engineering||0)*.01),range:def.range,pattern:'projectile',color:def.color},ang,mx,my,reach);sfx('snip');s.fireCd=def.fire}else s.fireCd=.15}}
+   if(def.kind==='turret'){s.fireCd-=dt;if(s.fireCd<=0){const reach=effectiveRange(def,run,viewport,'turret'),target=nearestAt(s.x,s.y,reach);if(target){let ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;const [mx,my]=truckArt&&truckDef&&s.type===truckDef.structureType?truckMuzzlePoint(truckDef,s.x,s.y,ang):pedArt?pedestalMuzzlePoint(pedArt.definition,s.x,s.y,ang):[s.x,s.y-14];ang=Math.atan2(target.y-my,target.x-mx);launch({damage:def.damage*(1+.2*(s.power-1))*(1+(run.engineering||0)*.01),range:def.range,pattern:'projectile',color:def.color},ang,mx,my,reach);sfx('snip');s.fireCd=def.fire}else s.fireCd=.15}}
    else if(def.kind==='buff'&&Math.hypot(p.x-s.x,p.y-s.y)<s.r)pedestalBuff=Math.max(pedestalBuff,def.buff+.05*(s.power-1))}}
  // Q-key placement: structure appears AT the player, respecting per-type
  // cooldown and the total permit cap (6 + Engineering/10).
@@ -238,6 +238,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
   if((deployCds[item.structure]||0)>0){cb.flash(`REBOOTING ${def.name.toUpperCase()} — ${Math.ceil(deployCds[item.structure])}s`);return}
   let count=0;for(let i=0;i<structures.items.length;i++)if(structures.items[i].active)count++;
   if(count>=structCap()){cb.flash('PERMIT LIMIT: TOO MUCH STRUCTURE');return}
+  if(def.kind==='turret'&&!(truckArt&&truckDef&&truckDef.structureType===item.structure))cb.flash('TRUCK ART UNAVAILABLE — PEDESTAL STAND-IN');
   const s=structures.acquire();if(!s){cb.flash('PERMIT LIMIT');return}
   s.active=true;s.type=item.structure;s.x=clamp(p.x,30,W-30);s.y=clamp(p.y,30,H-30);
   s.born=0;s.life=s.maxLife=def.life+(run.engineering||0)*.06;s.r=def.r;
@@ -315,6 +316,9 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
    const mvx=velocity.x,mvy=velocity.y;
    if(cb.inspect&&charId==='isr')e.outageMotion={x:mvx,y:mvy,slow:slowMul};
    e.x+=mvx*dt;e.y+=mvy*dt;
+   // SQUIRREL RETREAT BOUNDS: phase-2 flee must keep the boss's full body and
+   // collider inside the logical viewport — no clipping offscreen to hide.
+   if(e.sq&&e.sq.phase===2){e.x=clamp(e.x,camX+e.r+6,camX+viewW-e.r-6);e.y=clamp(e.y,camY+e.r+6,camY+viewH-e.r-6)}
    if(e.anim){if(e.art===puddingArt)updatePuddingAnimation(e.anim,mvx,mvy,dt,pudArtDef.definition);else if(e.art===blobArtDef){e.anim.special=Math.max(0,e.anim.special-dt);updateTechAnimation(e.anim,mvx*dt,mvy*dt,dt,blobArtDef.definition)}
     else if(petArt&&(e.kind==='pete'||e.kind==='peteMini')){e.anim.special=Math.max(0,e.anim.special-dt);updateTechAnimation(e.anim,mvx*dt,mvy*dt,dt,petArt.definition)}
     else updateLagAnimation(e.anim,mvx*dt,mvy*dt,dt,lagArt.definition)}
@@ -350,7 +354,11 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   // structures (under enemies): pop-in scale, fade out during the last 1.5s of life
   for(let i=0;i<structures.items.length;i++){const st=structures.items[i];if(!st.active)continue;const def=STRUCTURES[st.type];if(!def)continue;const x=Math.round(st.x),y=Math.round(st.y),grow=Math.min(1,st.born*4);
    ctx.globalAlpha=(st.life<1.5?Math.max(.2,st.life/1.5):1)*(.4+.6*grow);
-   if(def.kind==='turret'){if(pedArt)drawPedestalTurret(ctx,pedArt,st,x,y,grow);else if(truckArt&&st.type===truckDef.structureType)drawTruckTurret(ctx,truckArt,st.born,x,y,grow);else drawTurretBody(x,y,def.color,st.lookA,13*grow+3)}
+   if(def.kind==='turret'){ // Bucket-Truck Keys items render ONLY with the
+    // truck renderer; weapon-deployed turrets keep the pedestal pack.
+    if(truckArt&&truckDef&&st.type===truckDef.structureType)drawTruckTurret(ctx,truckArt,st.born,x,y,grow,st.lookA)
+    else if(pedArt)drawPedestalTurret(ctx,pedArt,st,x,y,grow)
+    else drawTurretBody(x,y,def.color,st.lookA,13*grow+3)}
    else if(def.kind==='block'){ctx.fillStyle='#fb923c';ctx.fillRect(x-st.r,y-8,st.r*2,16);ctx.fillStyle='#fff';for(let k=0;k<4;k++)ctx.fillRect(x-st.r+6+k*12,y-8,5,16);drawHardHat(x,y-14);drawEyes(x,y-2,st.lookA)}
    else if(def.kind==='trap'){ctx.fillStyle='#525252';ctx.fillRect(x-14,y-8,28,14);ctx.fillStyle='#ef4444';for(let k=0;k<5;k++){ctx.fillRect(x-12+k*6,y-8,3,6);ctx.fillRect(x-9+k*6,y-2,3,6)}drawHardHat(x,y-16);drawEyes(x,y-4,st.lookA)}
    else if(def.kind==='slow'){ctx.fillStyle='rgba(34,211,238,.12)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.strokeStyle='rgba(103,232,249,.55)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,st.r*.66*grow,0,4.6);ctx.stroke();drawEyes(x,y,st.lookA)}

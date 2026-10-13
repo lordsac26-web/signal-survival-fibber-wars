@@ -9,13 +9,24 @@ export function truckFrame(definition,born){
   if(!(definition.idleCycle>1))return {sx:0,sy:0};
   return {sx:Math.floor(Math.max(0,born||0)*definition.fps)%definition.idleCycle*definition.tileW,sy:0};
 }
-export function drawTruckTurret(ctx,art,born,x,y,grow=1){
+export function drawTruckTurret(ctx,art,born,x,y,grow=1,aim=0){
   const d=art.definition,{sx,sy}=truckFrame(d,born);
   const scale=d.worldSize*Math.max(.2,Math.min(1,grow||1))/d.tileW;
   const w=Math.round(d.tileW*scale),h=Math.round(d.tileH*scale);
+  const dx=Math.round(x-w/2),dy=Math.round(y-d.anchorY*scale);
   const previousSmoothing=ctx.imageSmoothingEnabled;ctx.imageSmoothingEnabled=false;
-  ctx.drawImage(art.atlas,sx,sy,d.tileW,d.tileH,Math.round(x-w/2),Math.round(y-d.anchorY*scale),w,h);
+  if(Math.cos(aim||0)<0){ // mirrored aim: flip the truck toward a left-side target
+    ctx.save();ctx.translate(Math.round(x),0);ctx.scale(-1,1);ctx.translate(-Math.round(x),0);
+    ctx.drawImage(art.atlas,sx,sy,d.tileW,d.tileH,Math.round(x-w/2),dy,w,h);
+    ctx.restore();
+  }else ctx.drawImage(art.atlas,sx,sy,d.tileW,d.tileH,dx,dy,w,h);
   ctx.imageSmoothingEnabled=previousSmoothing;
+}
+// Boom-tip muzzle for the truck: tile-local manifest muzzle (boom top), scaled
+// by worldSize/tileW, mirrored with the aim like the drawing.
+export function truckMuzzlePoint(d,x,y,lookA=0){
+  const s=d.worldSize/d.tileW,mirror=Math.cos(lookA||0)<0?-1:1;
+  return [x+mirror*(d.muzzle.x-d.tileW/2)*s,y-(d.anchorY-d.muzzle.y)*s];
 }
 
 // Pedestal Turret — multi-strip animated turret with 4 states:

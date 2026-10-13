@@ -19,8 +19,8 @@ const def2=enemySpriteDef('pete');
 test('processed strips match the definition, clean cells, manifest counts',()=>{
   assert.equal(def2.portraitW,124);assert.equal(def2.portraitH,124);assert.equal(def2.worldSize,58);
   assert.equal(def2.walkColumns,6);assert.equal(def2.walkLeftColumns,6);
-  assert.equal(def2.attackColumns,4);assert.equal(def2.specialColumns,8);
-  const strips=[['idle-front.png',124,124,1],['walk-side.png',744,124,6],['walk-left.png',744,124,6],['attack.png',496,124,4],['special.png',1120,140,8]];
+  assert.equal(def2.attackColumns,4);assert.equal(def2.specialColumns,7);
+  const strips=[['idle-front.png',124,124,1],['walk-side.png',744,124,6],['walk-left.png',744,124,6],['attack.png',496,124,4],['special.png',980,140,7]];
   for(const [name,w,h,cols] of strips){
     const img=decodePng(file('/assets/pete/'+name));
     assert.equal(img.width,w);assert.equal(img.height,h,name);
@@ -48,7 +48,7 @@ test('processed strips match the definition, clean cells, manifest counts',()=>{
   const manifest=JSON.parse(file('/assets/pete/animation.json'));
   assert.equal(manifest.frameWidth,124);assert.equal(manifest.frameHeight,124);
   assert.equal(manifest.walkSide.columns,6);assert.equal(manifest.walkLeft.columns,6);
-  assert.equal(manifest.attack.columns,4);assert.equal(manifest.special.columns,8);
+  assert.equal(manifest.attack.columns,4);assert.equal(manifest.special.columns,7);
   assert(manifest.notes.includes('component pass'));
 });
 

@@ -58,7 +58,7 @@ test('footer: XP readout, flash and Special/Deploy buttons live below the canvas
   // Root elements are flow buttons (intra-button absolute rings are fine).
   assert.match(sp, /className="flex size-16/);
   assert.doesNotMatch(sp, /className="absolute|bottom-\d+|right-\d+|md:bottom|md:left/);
-  assert.match(dp, /className="flex size-16/);
+  assert.match(dp, /className="(?:relative )?flex size-16/);
   assert.doesNotMatch(dp, /className="absolute bottom|bottom-40|bottom-6|left-5|left-6|md:bottom|md:left/);
   // Touch targets stay ≥64px in the footer (mobile readability preserved).
   assert.match(sp, /size-16/); assert.match(dp, /size-16/);

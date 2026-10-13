@@ -37,8 +37,9 @@ test('squirrel boss is a genuinely new wave-20 gate entry, not a reused stat blo
   assert.ok(!Object.keys(ENEMIES).includes('squirrel'),'squirrel must stay out of the ordinary spawn pool');
   assert.ok(bossWave(20)&&bossWave(30)&&bossWave(40));
   assert.ok(!bossWave(19)&&!bossWave(10)&&!bossWave(15)&&!bossWave(25));
-  assert.equal(SQUIRREL.hp,520);
-  assert.equal(SQUIRREL.damage,22);
+  // Elite boss tuning: +50% HP, +25% contact damage over the v1 block.
+  assert.equal(SQUIRREL.hp,780);
+  assert.equal(SQUIRREL.damage,27.5);
   assert.equal(SQUIRREL.speed,95);
   // 55° total cone, locked aim, 0.8s telegraph, 5s cooldown.
   assert.ok(Math.abs(SQUIRREL.cone.half-27.5*Math.PI/180)<1e-9);
@@ -48,7 +49,7 @@ test('squirrel boss is a genuinely new wave-20 gate entry, not a reused stat blo
   assert.equal(SQUIRREL.cone.windup,.8);
   assert.equal(SQUIRREL.cone.cooldown,5);
   // Standard wave-20 HP multiplier check for the report's numbers.
-  assert.ok(Math.abs(SQUIRREL.hp*(1+19*.19)-2397)<2);
+  assert.ok(Math.abs(SQUIRREL.hp*(1+19*.19)-3595.8)<2);
 });
 
 test('squirrel + don sprite definitions validate against their local manifests',async()=>{

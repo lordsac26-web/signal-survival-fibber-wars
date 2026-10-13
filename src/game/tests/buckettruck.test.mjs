@@ -34,7 +34,7 @@ test('engine wiring: the truck is exclusive to the Keys turretMount; the Boss si
   const read=p=>readFileSync(new URL('../../'+p,import.meta.url),'utf8');
   const engine=read('game/signalEngine.js');
   // structures pool: turretMount draws the truck
-  assert.match(engine,/drawTruckTurret\(ctx,truckArt,st\.born,x,y,grow\)/);assert.match(engine,/st\.type===truckDef\.structureType/);
+  assert.match(engine,/drawTruckTurret\(ctx,truckArt,st\.born,x,y,grow,st\.lookA\)/);assert.match(engine,/st\.type===truckDef\.structureType/);
   // turrets pool (signature/weapon turrets): NO truck reference at all
   assert.doesNotMatch(engine,/signatureWid/);assert.doesNotMatch(engine,/signature-bucket/);
   // helper branch with placeholder fallback, and the pedestal/placeholder bodies for all other turrets
