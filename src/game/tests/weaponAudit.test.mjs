@@ -47,7 +47,9 @@ test('attack-speed modifier divides each cooldown; pause freezes triggers and re
  enc.paused.current=false;pump(2);
  const total=triggers(enc.events,'Visual Fault Locator').length,sim=enc.state.time;
  assert.equal(frozen,before,'triggers fired while paused');
- assert(Math.abs(total-Math.floor(sim/(.28/1.5))-1)<=2,`total ${total} vs floor(${sim}/.187)-based count`);
+ // Fixed-step cooldowns quantize to whole 1/60s steps: .28/1.5=.18667 → 12 steps (.2s).
+ const period=Math.ceil((.28/1.5)/(1/60))*(1/60);
+ assert(Math.abs(total-Math.floor(sim/period)-1)<=1,`total ${total} vs quantized floor(${sim}/${period})-based count`);
  for(const t of triggers(enc.events,'Visual Fault Locator'))assert(Math.abs(t.scheduled-.28/1.5)<1e-6);
 });
 

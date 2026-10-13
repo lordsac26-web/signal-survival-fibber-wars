@@ -42,8 +42,10 @@ test('exact one-second coil, ONE ring at release, 12s cooldown from fire, 0.4s r
  assert.equal(s.cooldown,12);assert.equal(s.phase,'recover');assert.equal(s.remaining,.4);
  for(let i=0;i<23;i++)stepBend(s,1/60,near);assert.equal(s.phase,'recover');
  assert.equal(stepBend(s,1/60,near),null);assert.equal(s.phase,'chase');
- let fires=0;for(let i=0;i<721;i++)if(stepBend(s,1/60,near)==='fire')fires++;
- assert.equal(fires,1);assert.equal(s.phase,'chase');assert(s.cooldown>0&&s.cooldown<=12);
+ // 12s cooldown (decremented through recovery) + the next 1s coil: the second
+ // release lands at ~13s, so inside a 13s window there is exactly ONE fire.
+ let fires=0,coils=0;for(let i=0;i<780;i++){const act=stepBend(s,1/60,near);if(act==='fire')fires++;if(act==='coil')coils++}
+ assert.equal(fires,1);assert(coils<=1,'at most one re-coil in the window');assert(s.cooldown>0&&s.cooldown<=12);
 });
 
 test('guards: offscreen/far/dead-player never coil; killing mid-coil cancels the ring',()=>{
@@ -71,7 +73,7 @@ test('animation frames: coil poses 0-2, release 3/4, walk/idle/attack selection,
  s.phase='recover';s.coilT=-1;s.releaseF=3;f=bendFrame(art,s);assert.equal(f.sx,3*def.specialCellW);
  s.releaseF=4;f=bendFrame(art,s);assert.equal(f.sx,4*def.specialCellW);
  s.phase='chase';s.releaseF=-1;s.attack=.35;f=bendFrame(art,s);assert.equal(f.image,art.attack);assert.equal(f.sx,0);
- s.attack=0;f=bendFrame(art,s);assert.equal(f.image,art.atlas);
+ s.attack=0;s.moving=false;f=bendFrame(art,s);assert.equal(f.image,art.atlas);
  const calls=[];const ctx={imageSmoothingEnabled:true,save(){},restore(){},translate(...a){calls.push(['translate',...a])},scale(...a){calls.push(['scale',...a])},drawImage(...a){calls.push(['draw',...a])}};
  s.facing='left';drawBendSprite(ctx,art,s,100,200);
  assert.deepEqual(calls[0],['translate',100,200]);assert.deepEqual(calls[1],['scale',-1,1]);
