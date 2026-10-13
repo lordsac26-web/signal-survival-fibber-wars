@@ -164,6 +164,7 @@ bend:Object.freeze({
  sources:{sheet:'https://signalsurvival.base44.app/assets/bend/source.jpg'},
  extras:[['walk','/assets/bend/walk-side.png',895,134],['attack','/assets/bend/attack.png',868,138],['special','/assets/bend/special.png',920,128],['ring','/assets/bend/ring.png',116,92]],
  atlasW:672,atlasH:137,cellW:168,cellH:137,columns:4,idleFps:5,walkFps:9,attackFps:10,specialFps:5,
+ walkColumns:5,walkCellW:179,walkCellH:134,attackColumns:4,attackCellW:217,attackCellH:138,specialColumns:5,specialCellW:184,specialCellH:128,
  worldSize:93,anchorX:.5,anchorY:.5,portraitW:320,portraitH:252,baseFacing:'right',hurtTint:'rgba(251,113,133,.6)',
  manifestSpec:{frameWidth:168,frameHeight:137,'idle.columns':4,'walk.columns':5,'walk.facing':'right','attack.columns':4,'special.columns':5,'baseFacing':'right'}
 }),

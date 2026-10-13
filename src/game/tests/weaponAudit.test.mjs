@@ -70,7 +70,7 @@ test('balance audit: per-hit DPS inside the band; chain trio normalized; archety
  for(const a of WEAPON_ARCHETYPES){
   const [id,,pattern,,dmg,rate]=a;
   if(pattern==='turret'){ // per-sentry DPS instead of per-trigger DPS
-   const per=dmg/a[8].fire;assert(per>=20&&per<=40,`${id} per-sentry DPS ${per} outside 20-40`);
+   const per=dmg*(a[8].mode==='spread'?5:1)/a[8].fire;assert(per>=20&&per<=40,`${id} per-sentry DPS ${per} outside 20-40`);
    assert(a[8].cap<=3,`${id} cap above 3`);
    continue;
   }

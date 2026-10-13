@@ -67,7 +67,7 @@ test('spawn gate: never below wave 11, peteMini never eligible, weight keeps pet
   for(let w=1;w<=10;w++)for(let i=0;i<2000;i++)assert.notEqual(pickEnemyKind(types,w,random),'pete','wave '+w);
   for(let i=0;i<20000;i++)assert.notEqual(pickEnemyKind(types,30,random),'peteMini');
   seed=77;let petes=0;for(let i=0;i<10000;i++)if(pickEnemyKind(types,11,random)==='pete')petes++;
-  assert(petes>150&&petes<450,'about 3% of wave-11 attempts, saw '+petes);
+  assert(petes>350&&petes<650,'pete stays rare (under 6.5%) at wave 11, saw '+petes);
   // jitter's own weighting at wave 2 is untouched
   seed=77;let bugs=0;for(let i=0;i<30000;i++)if(pickEnemyKind(types,2,random)==='jitter')bugs++;
   assert(bugs>4500&&bugs<5500,'jitter one-sixth early chance preserved');

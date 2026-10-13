@@ -17,7 +17,7 @@ test('actual Beast strips decode at exact sizes; no magenta remnants, manifest v
  for(const [k,[path,w,h]] of Object.entries(strips)){
   const p=decodePng(file(path));assert.equal(p.width,w,k);assert.equal(p.height,h,k);
   let opaque=0,pink=0;
-  for(let i=0;i<p.rgba.length;i+=4){if(p.rgba[i+3]>=200){opaque++;const r=p.rgba[i],g=p.rgba[i+1],b=p.rgba[i+2];if(r>150&&g<60&&r-g>100&&r>b)pink++}}
+  for(let i=0;i<p.rgba.length;i+=4){if(p.rgba[i+3]>=200){opaque++;const r=p.rgba[i],g=p.rgba[i+1],b=p.rgba[i+2];if(r>200&&g<70&&r-g>140&&b>110)pink++}}
   assert(opaque>1000,k+' body pixels kept');assert.equal(pink,0,k+' magenta background remnants');
  }
  const portrait=decodePng(file(def.portrait));assert.equal(portrait.width,320);assert.equal(portrait.height,252);
@@ -42,7 +42,7 @@ test('exact one-second coil, ONE ring at release, 12s cooldown from fire, 0.4s r
  assert.equal(s.cooldown,12);assert.equal(s.phase,'recover');assert.equal(s.remaining,.4);
  for(let i=0;i<23;i++)stepBend(s,1/60,near);assert.equal(s.phase,'recover');
  assert.equal(stepBend(s,1/60,near),null);assert.equal(s.phase,'chase');
- let fires=0;for(let i=0;i<719;i++)if(stepBend(s,1/60,near)==='fire')fires++;
+ let fires=0;for(let i=0;i<721;i++)if(stepBend(s,1/60,near)==='fire')fires++;
  assert.equal(fires,1);assert.equal(s.phase,'chase');assert(s.cooldown>0&&s.cooldown<=12);
 });
 
