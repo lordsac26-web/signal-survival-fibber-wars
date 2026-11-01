@@ -1,4 +1,5 @@
 import { characterSprite, enemySpriteDef, structureSpriteDef } from '@/game/art/characterSprites';
+import { TOOL_ICON_ATLAS } from '@/game/art/toolAtlas';
 const cache=new Map();
 function image(url,width,height){return new Promise((resolve,reject)=>{
   const img=new globalThis.Image();
@@ -33,3 +34,9 @@ function preloadSprite(definition){
 export const preloadCharacterSprite=id=>preloadSprite(characterSprite(id));
 export const preloadEnemySprite=kind=>preloadSprite(enemySpriteDef(kind));
 export const preloadStructureSprite=id=>preloadSprite(structureSpriteDef(id));
+// Shared tool/item icon atlas (store, inventory, HUD bar, Field Guide). One
+// image for every menu icon: this loads and size-validates it once so the
+// first shop screen never flashes an empty icon; failures resolve to null and
+// each icon simply keeps its existing glyph.
+let toolAtlasPromise=null;
+export const preloadToolAtlas=()=>toolAtlasPromise || (toolAtlasPromise=image(TOOL_ICON_ATLAS.url,TOOL_ICON_ATLAS.width,TOOL_ICON_ATLAS.height).catch(()=>null));

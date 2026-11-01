@@ -4,6 +4,7 @@ import { WEAPON_ARCHETYPES } from '@/game/data/generation';
 import { CHALLENGES, ACHIEVEMENTS, LOADOUTS } from '@/game/data/unlocks';
 import CareerChallenges from '@/components/game/CareerChallenges';
 import OraclePortrait from '@/components/game/OraclePortrait';
+import ToolIcon from '@/components/game/ToolIcon';
 
 function Bar({ value, goal }) {
   return (
@@ -82,7 +83,7 @@ export default function GalleryScreen({ save, onBack }) {
         <div className="mt-3 grid gap-3 pb-6 sm:grid-cols-2 lg:grid-cols-3">
           {WEAPON_ARCHETYPES.map(w => (
             <div key={w[0]} className="rounded-xl border border-white/10 bg-slate-900/80 p-4">
-              <span className="mr-3 text-2xl">{w[7]}</span><b>{w[1]}</b>
+              <ToolIcon slug={w[0]} item={{icon:w[7]}} size={34} className="mr-3"/><b>{w[1]}</b>
               <p className="mt-2 text-sm text-slate-400">{w[2]} pattern • Thousands of possible shop names</p>
             </div>
           ))}
