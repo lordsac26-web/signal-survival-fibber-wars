@@ -2,6 +2,7 @@
 // Automated engine harness only — runtime/state evidence, never browser
 // visual verification.
 import test from 'node:test';
+import { enemyHpMultiplier } from '@/game/combat/difficulty';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { PETE } from '@/game/data/bosses';
@@ -95,13 +96,14 @@ test('engine: pete spawns at wave 11, one 30s pulse, independent half-HP mini, n
     const pete=peteAt.petes.find(p=>p.kind==='pete');
     const waveTime=peteAt.time;
     assert(pete.cloneT>0&&pete.cloneT<=PETE.cloneInterval,'clone clock armed');
-    assert(Math.abs(pete.hp-ENEMIES.pete.hp*(1+(10)*.28))<1,'wave-11 HP scaling: '+pete.hp);
+    assert(Math.abs(pete.hp-ENEMIES.pete.hp*enemyHpMultiplier(11,true))<1,'wave-11 HP scaling: '+pete.hp);
     // run until the pulse fires (cloneT wraps) and the mini appears
     enc.until(()=>enc.samples.some(s=>s.petes?.some(p=>p.kind==='peteMini')),Math.min(60,waveDurationLeft(waveTime)));
     const miniAt=enc.samples.findLast(s=>s.petes?.some(p=>p.kind==='peteMini'));
     const mini=miniAt.petes.find(p=>p.kind==='peteMini');
     const original=miniAt.petes.find(p=>p.kind==='pete');
-    assert(Math.abs(mini.hp/original.max*2-1)<.02,'mini is 50% of the original baseline');
+    assert(Math.abs(mini.hp/(ENEMIES.peteMini.hp*enemyHpMultiplier(11,false))-1)<.02,'mini uses its half-size baseline without the elite-only multiplier');
+    assert(Math.abs(original.max-ENEMIES.pete.hp*enemyHpMultiplier(11,true))<1);
     assert(mini.cloneT===0||mini.cloneT===undefined,'mini has no clone clock');
     assert(mini.index!==original.index,'independent entity');
     // minis never reproduce: 60 more seconds, mini count never exceeds cap

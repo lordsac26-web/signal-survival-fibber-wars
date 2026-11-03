@@ -40,7 +40,7 @@ test('ISR real maxHP cap: two or more deaths, first missing2 restores2, subseque
  const w=weapon();await controlled({width:375,height:667,configure:r=>{quiet(r);r.hp=98;r.maxHp=100;r.weapons=[w]}},h=>{
   h.until(()=>h.state?.shots.length>0,20);w.damage=1e6;h.input.current.special=true;pump(1/60);
   h.until(()=>h.events.some(e=>e.type==='outageHeal'),5);assert.equal(h.events.find(e=>e.type==='outageHeal').amount,2);
-  const kills=h.state.kills;h.until(()=>h.state.kills>kills,3);assert.equal(h.state.player.hp,100);assert.equal(h.state.player.maxHp,100);assert.equal(h.state.healed,2);assert.equal(h.events.filter(e=>e.type==='outageHeal').length,1);
+  const kills=h.state.kills;h.until(()=>h.state.kills>kills,8);assert.equal(h.state.player.hp,100);assert.equal(h.state.player.maxHp,100);assert.equal(h.state.healed,2);assert.equal(h.events.filter(e=>e.type==='outageHeal').length,1);
  });
 });
 for(const kind of ['weapon-turret','placed-structure'])test(`ISR real owned ${kind} death credit grants heal through the same guarded kill event`,async()=>{

@@ -27,7 +27,7 @@ test('outage kill healing: owned credited deaths only, +5 current HP, exact cap,
 });
 test('input/timer HUD and guarded owner-only kill hook; no spawn/attack/damage penalties or multiplayer credit path',()=>{
  const engine=readFileSync(new URL('../signalEngine.js',import.meta.url),'utf8');assert(engine.includes('function kill(e){if(!e.active)return;'));assert(engine.includes('outageKillHeal(p,specialTimer,true)'));
- assert(!engine.includes('outage?2.2'));assert(!engine.includes('powerMult'));assert(engine.includes('spawnDoubleChance(run.wave))'));assert(engine.includes('if(charId===\'isr\')slowMul=outageMovement(specialTimer,p.hp,slowMul)'));
+ assert(!engine.includes('outage?2.2'));assert(!engine.includes('powerMult'));assert(engine.includes('spawnDoubleChance(run.wave)'));assert(engine.includes('if(charId===\'isr\')slowMul=outageMovement(specialTimer,p.hp,slowMul)'));
  const arena=readFileSync(new URL('../../components/game/GameArena.jsx',import.meta.url),'utf8');assert(arena.includes("if (k === 'e') input.current.special = true"));
  const button=readFileSync(new URL('../../components/game/SpecialButton.jsx',import.meta.url),'utf8');assert(button.includes('onPointerDown'));assert(button.includes('if(ready)input.current.special=true'));assert(button.includes('hud.specialRemaining'));assert(button.includes('disabled={!ready}'));
  assert(readFileSync(new URL('../../pages/Multiplayer.jsx',import.meta.url),'utf8').includes('Nothing here connects players yet'));

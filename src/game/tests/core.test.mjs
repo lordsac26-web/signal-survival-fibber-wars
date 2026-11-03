@@ -10,6 +10,7 @@ import { TUNING, signalForLevel, spawnInterval, spawnDoubleChance, maxActiveEnem
 import { readFileSync } from 'node:fs';
 import { formatStat, itemDeltas } from '@/game/data/stats';
 import { supplyEstimate } from '@/game/data/balanceAudit';
+import { enemyHpMultiplier, enemyDamageMultiplier } from '@/game/combat/difficulty';
 import { activateSignature } from '@/game/combat/signatures';
 import { MEETING } from '@/game/combat/meetingInvite';
 import { validateProfile } from 'profileValidation';
@@ -65,17 +66,16 @@ test('item stat rolls scale with wave (capped at 2×)',()=>{
   assert(Math.abs(mid/early-(1+TUNING.itemStatWaveScale*7))<.08); // 1.42× at wave 8
   assert(Math.abs(capped/early-2)<.08); // already past the 2× cap at wave 20
 });
-test('rotator-style wave density: trickle pacing, 34-active ceiling, stat scaling replaces body count',()=>{
-  assert.equal(maxActiveEnemies(1),13);assert.equal(maxActiveEnemies(8),23);assert.equal(maxActiveEnemies(15),33);
-  assert.equal(maxActiveEnemies(20),34);assert.equal(maxActiveEnemies(40),34);
-  for(let w=2;w<=40;w++)assert(maxActiveEnemies(w)>=maxActiveEnemies(w-1));
+test('Phase 2 density: low cap, quadratic HP and threatening contact replace body count',()=>{
+  assert.equal(maxActiveEnemies(1),6);assert.equal(maxActiveEnemies(8),7);assert.equal(maxActiveEnemies(15),8);
+  assert.equal(maxActiveEnemies(20),9);assert.equal(maxActiveEnemies(40),12);assert.equal(maxActiveEnemies(100),14);
+  for(let w=2;w<=100;w++)assert(maxActiveEnemies(w)>=maxActiveEnemies(w-1));
   assert.equal(spawnInterval(20),.32);assert(Math.abs(spawnInterval(1)-.698)<1e-9);assert(spawnInterval(8)<spawnInterval(1));
-  assert.equal(spawnDoubleChance(20),.4);assert.equal(spawnDoubleChance(1),.03);
+  assert.equal(spawnDoubleChance(20),0);assert.equal(spawnDoubleChance(1),.03);
+  assert(Math.abs(enemyHpMultiplier(20)-16.465)<1e-8);assert(Math.abs(enemyDamageMultiplier(20)-3.28)<1e-8);
   const engine=readFileSync(new URL('../signalEngine.js',import.meta.url),'utf8');
-  assert(engine.includes('maxActiveEnemies(run.wave)'));
-  assert(engine.includes('spawnEnemy(null,true)'));
-  assert(engine.includes('base.hp*(1+(run.wave-1)*.28)'));
-  assert(engine.includes('base.damage*(1+(run.wave-1)*.05)'));
+  assert(engine.includes('maxActiveEnemies(run.wave)'));assert(engine.includes('spawnEnemy(null,true)'));
+  assert(engine.includes('scaledEnemy(base,run.wave)'));assert(engine.includes('enemyDamageMultiplier(run.wave,e.elite)'));
   assert(engine.includes('Math.ceil(dmg*.25)'));assert.equal(TUNING.dodgeCap,.5);
 });
 test('every remaining signature has an effect hook, Don grants four helpers, Admin books the table',()=>{for(const c of CHARACTERS){const r=run(c.id),p={x:327,y:412,inv:0};const calls=[];const api={area:(...a)=>calls.push(['area',...a]),launch:(...a)=>calls.push(['launch',...a]),heal:a=>calls.push(['heal',a]),turret:a=>{calls.push(['turret',a]);return true},barrier:()=>{calls.push(['barrier']);return true},table:()=>{calls.push(['table']);return true}};const timer=activateSignature(r,p,api);assert.notEqual(timer,null);if(c.id==='don')assert.equal(calls.filter(a=>a[0]==='turret').length,4);if(c.id==='admin'){assert.equal(calls.filter(a=>a[0]==='table').length,1,'Meeting Invite books the lure table');assert.equal(timer,MEETING.duration,'the signature timer is the 4s meeting; contact immunity is the engine-side decline')}}});
