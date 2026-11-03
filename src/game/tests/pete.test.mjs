@@ -106,7 +106,7 @@ test('engine: pete spawns at wave 11, one 30s pulse, independent half-HP mini, n
       if(p.y<90)dy=Math.max(dy,.35);if(p.y>710)dy=Math.min(dy,-.35);
       const m2=Math.hypot(dx,dy)||1;enc.input.current.x=dx/m2;enc.input.current.y=dy/m2;
     };
-    const steerUntil=(predicate,max)=>{for(let f=0;f<max*60;f++){steer(f);if(predicate())return;if(pump(1/60)===-1)throw Error('Engine stopped before condition')}throw Error('Condition did not occur')};
+    const steerUntil=(predicate,max)=>{for(let f=0;f<max*60;f++){steer(f);if(predicate())return;if(pump(1/60)!==-1)throw Error('Engine stopped before condition')}throw Error('Condition did not occur')};
     steerUntil(()=>enc.samples.some(s=>s.petes?.some(p=>p.kind==='pete')),55);
     const peteAt=enc.samples.find(s=>s.petes?.some(p=>p.kind==='pete'));
     const pete=peteAt.petes.find(p=>p.kind==='pete');
