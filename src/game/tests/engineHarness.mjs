@@ -54,9 +54,9 @@ export function baseRun(charId='oracle'){
  const run=createRun(characterById(charId),false,'startup-sim','startup-sim-run');run.wave=6;run.maxHp=2000;run.hp=2000;run.armor=4;return run;
 }
 export async function startEncounter({width,height,charId='oracle',configure=()=>{}}){
- const rec=makeRecordingCtx(),canvas=makeCanvas(width,height,rec),run=baseRun(charId),input={current:{x:0,y:0}},paused={current:false},events=[],samples=[];
+ const rec=makeRecordingCtx(),canvas=makeCanvas(width,height,rec),run=baseRun(charId),input={current:{x:0,y:0}},paused={current:false},events=[],samples=[],huds=[];
  configure(run);
  const arts=await Promise.all([preloadCharacterSprite(charId),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('packet'),preloadEnemySprite('jitter'),preloadEnemySprite('pete'),preloadEnemySprite('bend'),preloadEnemySprite('crosstalk'),preloadEnemySprite('attenuation'),preloadEnemySprite('rous')]);
- let finished=null;const cleanup=createSignalEngine(canvas,run,input,{hud(){},reach(){},flash(){},finish:r=>{finished=r},event:e=>events.push(e),inspect:s=>samples.push(s)},paused,...arts);
- return {rec,run,input,paused,events,samples,arts,cleanup,get finished(){return finished},get state(){return samples.at(-1)},until(predicate,max=30){for(let i=0;i<max*60;i++){if(predicate())return; if(pump(1/60)!==-1)throw Error('Engine stopped before condition')}throw Error('Condition did not occur')}};
+ let finished=null;const cleanup=createSignalEngine(canvas,run,input,{hud:h=>huds.push(h),reach(){},flash(){},finish:r=>{finished=r},event:e=>events.push(e),inspect:s=>samples.push(s)},paused,...arts);
+ return {rec,run,input,paused,events,samples,huds,arts,cleanup,get finished(){return finished},get state(){return samples.at(-1)},until(predicate,max=30){for(let i=0;i<max*60;i++){if(predicate())return; if(pump(1/60)!==-1)throw Error('Engine stopped before condition')}throw Error('Condition did not occur')}};
 }

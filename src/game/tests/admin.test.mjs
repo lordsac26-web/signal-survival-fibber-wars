@@ -239,7 +239,7 @@ test('engine: table in-bounds, contact damage declined for exactly 4s, lure redi
 test('engine: blast math — 8x combined weapon damage split evenly, applied once per enemy through the 0.75 multiplier', async () => {
   const e = await startEncounter({
     charId: 'admin', width: 1100, height: 800,
-    configure: run => { run.crit = 0; run.luck = 0; run.cleanliness = 0; run.spliceQuality = 0; run.hp = 3000; run.maxHp = 3000; }
+    configure: run => { run.crit = 0; run.luck = 0; run.cleanliness = 0; run.spliceQuality = 0; run.hp = 3000; run.maxHp = 3000; run.weapons[0].rate = 1000; }
   });
   try {
     e.until(() => e.state && e.state.foes.length >= 5 && e.state.foes.some(f => Math.hypot(f.x - e.state.player.x, f.y - e.state.player.y) < 150), 40);

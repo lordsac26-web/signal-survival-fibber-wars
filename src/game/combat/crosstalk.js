@@ -17,13 +17,13 @@ export function stepCritter(s,dt,{alive=true,playerAlive=true,dx=0,dy=0,visible=
   }
   return null;
 }
-export function critterVelocity(s,angle,speed){
-  if(s.phase==='lunge')return {x:Math.cos(s.angle)*CROSSTALK.lungeSpeed,y:Math.sin(s.angle)*CROSSTALK.lungeSpeed};
+export function critterVelocity(s,angle,speed,slow=1){
+  if(s.phase==='lunge')return {x:Math.cos(s.angle)*CROSSTALK.lungeSpeed*slow,y:Math.sin(s.angle)*CROSSTALK.lungeSpeed*slow};
   if(s.phase!=='chase')return {x:0,y:0};
   const side=Math.sin(s.clock*CROSSTALK.weaveHz)*CROSSTALK.weave;
   return {x:(Math.cos(angle)-Math.sin(angle)*side)*speed,y:(Math.sin(angle)+Math.cos(angle)*side)*speed};
 }
 export const critterContactReady=s=>s.phase==='chase'||(s.phase==='lunge'&&!s.struck);
 export function clampCritterLunge(e,bounds){
-  const m=30;e.x=Math.max(bounds.x+m,Math.min(bounds.x+bounds.width-m,e.x));e.y=Math.max(bounds.y+m,Math.min(bounds.y+bounds.height-m,e.y));
+  const m=36;e.x=Math.max(bounds.x+m,Math.min(bounds.x+bounds.width-m,e.x));e.y=Math.max(bounds.y+m,Math.min(bounds.y+bounds.height-m,e.y));
 }

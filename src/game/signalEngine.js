@@ -158,7 +158,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
  // itself and the player, and casts the telegraphed FEC cone between retreats.
  let bossSpawned=false;
  function spawnRouter(){if(!routerArt)return;const e=enemies.acquire();if(!e)return;const b=ROUS,m=60;
-  Object.assign(e,{kind:b.id,x:clamp(p.x+viewW*.35,camX+m,camX+viewW-m),y:clamp(p.y-viewH*.3,camY+m,camY+viewH-m),hp:b.hp*(1+(run.wave-1)*.19),max:b.hp*(1+(run.wave-1)*.19),speed:b.speed,damage:b.damage,r:b.r,value:Math.round(b.value*(1+TUNING.signalWaveScale*(run.wave-1))),color:b.color,elite:true,boss:true,dirty:false,sound:'boss',lastShot:-1,sprite:null,art:routerArt,anim:null,pud:null,sq:null,jit:null,mac:null,critter:null,caster:createConeState(ROUTER_ATTACK)});cb.flash(b.intro);cb.event?.({type:'bossSpawn',kind:b.id,time:duration-time});addShake(6)}
+  Object.assign(e,{kind:b.id,x:clamp(p.x+viewW*.35,camX+m,camX+viewW-m),y:clamp(p.y-viewH*.3,camY+100,camY+viewH-16),hp:b.hp*(1+(run.wave-1)*.19),max:b.hp*(1+(run.wave-1)*.19),speed:b.speed,damage:b.damage,r:b.r,value:Math.round(b.value*(1+TUNING.signalWaveScale*(run.wave-1))),color:b.color,elite:true,boss:true,dirty:false,sound:'boss',lastShot:-1,sprite:null,art:routerArt,anim:null,pud:null,sq:null,jit:null,mac:null,critter:null,caster:createConeState(ROUTER_ATTACK)});cb.flash(b.intro);cb.event?.({type:'bossSpawn',kind:b.id,time:duration-time});addShake(6)}
  function spawnBoss(){if(bossKind(run.wave)==='rous'){spawnRouter();return}if(!sqArt||!SQUIRREL)return;const e=enemies.acquire();if(!e)return;
   const edge=(Math.random()*4)|0,pad=60;e.kind=SQUIRREL.id;
   e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;
@@ -336,7 +336,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   // chomp + shove, snares slow — none of it touches the player.
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(!e.active)continue;const tgt=meeting.active?meeting:p;let a=Math.atan2(tgt.y-e.y,tgt.x-e.x),spd=e.speed;
    let slowMul=1;
-   if(e.caster){cancelHiddenCharge(e.caster,{x:camX,y:camY,width:viewW,height:viewH},e.boss?60:40);const c=e.boss?ROUTER_ATTACK:APPARITION,act=stepCone(e.caster,c,dt,{alive:e.hp>0,playerAlive:p.hp>0,x:e.x,y:e.y,tx:tgt.x,ty:tgt.y,shortSide:Math.min(viewW,viewH),visible:e.x>camX+55&&e.x<camX+viewW-55&&e.y>camY+55&&e.y<camY+viewH-55});
+   if(e.caster){cancelHiddenCharge(e.caster,{x:camX,y:camY,width:viewW,height:viewH},e.boss?60:40,e.boss?100:40,e.boss?16:40);const c=e.boss?ROUTER_ATTACK:APPARITION,act=stepCone(e.caster,c,dt,{alive:e.hp>0,playerAlive:p.hp>0,x:e.x,y:e.y,tx:tgt.x,ty:tgt.y,shortSide:Math.min(viewW,viewH),visible:e.x>camX+55&&e.x<camX+viewW-55&&e.y>camY+(e.boss?100:55)&&e.y<camY+viewH-(e.boss?16:55)});
     if(act)cb.event?.({type:'conePhase',kind:e.kind,phase:act,time:duration-time,index:e.poolIndex,powered:e.caster.poweredShot});
     if(act==='release'){const lands=consumeConeHit(e.caster,p.x,p.y,p.inv);if(lands){damagePlayer(e.caster.damage*(1+(run.wave-1)*.05));p.inv=.55}cb.event?.({type:'coneRelease',kind:e.kind,time:duration-time,hit:lands,cone:{...e.caster}})}}
    if(e.critter){const act=stepCritter(e.critter,dt,{alive:e.hp>0,playerAlive:p.hp>0,dx:tgt.x-e.x,dy:tgt.y-e.y,visible:e.x>camX+30&&e.x<camX+viewW-30&&e.y>camY+30&&e.y<camY+viewH-30});if(act)cb.event?.({type:'critterPhase',phase:act,time:duration-time,index:e.poolIndex})}
@@ -370,11 +370,11 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
    if(e.mac&&e.mac.phase!=='chase'){e.x=e.mac.rootX;e.y=e.mac.rootY}
    if(e.sq)({a,spd}=squirrelUpdate(e,dt));
    if(charId==='isr')slowMul=outageMovement(specialTimer,p.hp,slowMul);
-   const velocity=e.caster?casterVelocity(e.caster,e.boss?ROUTER_ATTACK:APPARITION,a,spd*slowMul,distance(p,e)):e.critter?critterVelocity(e.critter,a,spd*slowMul):e.mac?bendVelocity(e.mac,a,spd*slowMul):e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
+   const velocity=e.caster?casterVelocity(e.caster,e.boss?ROUTER_ATTACK:APPARITION,a,spd*slowMul,distance(p,e),Math.min(viewW,viewH)):e.critter?critterVelocity(e.critter,a,spd*slowMul,slowMul):e.mac?bendVelocity(e.mac,a,spd*slowMul):e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
    const mvx=velocity.x,mvy=velocity.y;
    if(cb.inspect&&charId==='isr')e.outageMotion={x:mvx,y:mvy,slow:slowMul};
    e.x+=mvx*dt;e.y+=mvy*dt;
-   if(e.caster){e.caster.vx=mvx;e.caster.vy=mvy;if(e.caster.phase==='chase'){const m=e.boss?60:40;e.x=clamp(e.x,camX+m,camX+viewW-m);e.y=clamp(e.y,camY+m,camY+viewH-m)}else{e.x=e.caster.x;e.y=e.caster.y}}
+   if(e.caster){e.caster.vx=mvx;e.caster.vy=mvy;if(e.caster.phase==='chase'){const m=e.boss?60:40;e.x=clamp(e.x,camX+m,camX+viewW-m);e.y=clamp(e.y,camY+(e.boss?100:m),camY+viewH-(e.boss?16:m))}else{e.x=e.caster.x;e.y=e.caster.y}}
    if(e.critter&&e.critter.phase==='lunge')clampCritterLunge(e,{x:camX,y:camY,width:viewW,height:viewH});
    // SQUIRREL RETREAT BOUNDS: phase-2 flee must keep the boss's full body and
    // collider inside the logical viewport — no clipping offscreen to hide.
