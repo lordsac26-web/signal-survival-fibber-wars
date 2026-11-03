@@ -117,7 +117,7 @@ test('wiring: engine has boss phases + FEC cone + tech sprite branch; placeholde
   assert.ok(guide.includes('DonPortrait'),"Field Guide must use Don's real portrait");
   assert.ok(guide.includes('VeteranPortrait')&&guide.includes('ClonePortrait')&&guide.includes('NomadPortrait'),'Field Guide must use new character portraits');
   const bosses=guideEntries().Bosses;
-  assert.equal(bosses.length,2); // Squirrel + Repeat Pete
+  assert.equal(bosses.length,3); // Squirrel + Repeat Pete + R.O.U.S.
   const squirrel=bosses.find(b=>b.id==='squirrel'),pete=bosses.find(b=>b.id==='pete');
   assert.ok(squirrel&&squirrel.title.includes('Squirrel')&&squirrel.body.includes('55')&&squirrel.body.includes('FEC'));
   assert.ok(pete&&pete.body.includes('30s'));

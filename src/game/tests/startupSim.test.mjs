@@ -107,7 +107,7 @@ test('runtime pause/reset contract: paused loop holds the timer (and sim time), 
 });
 
 for(const [width,height] of [[375,667],[1280,800]])test(`Jitter-specific real engine simulation ${width}×${height}: chase / melee / charge / nova / recovery`,async()=>{
- const random=Math.random;Math.random=()=>.49; // existing ordinary slot picks jitter, no extra spawn entry
+ const random=Math.random;Math.random=()=>.38; // wave-6 pool: jitter index 2 of 7; accepted half-weight gate
  let r;try{r=await session({width,height,seconds:40,jitterOnly:true})}finally{Math.random=random}
  assert.equal(r.stoppedAt,-1);assert(!r.finished);assert(r.jitterDraws.length>0);
  for(const draw of r.jitterDraws){assert(draw.slice(2).every(Number.isFinite));assert(draw[2]>=0&&draw[2]+draw[4]<=1200);assert(draw[3]>=0&&draw[3]+draw[5]<=800)}

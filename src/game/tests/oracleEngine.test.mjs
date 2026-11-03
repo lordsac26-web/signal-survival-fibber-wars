@@ -36,7 +36,7 @@ test('real engine damage selects cached hurt atlas, while another character neve
   const clean=createSignalEngine(canvas,run,input,{hud:noop,flash:noop,finish:noop},{current:false},art);let now=performance.now();
   try{for(let i=0;i<450 && !hurtDrawn;i++)nextFrame(now+=20);assert(hurtDrawn)}finally{clean();Math.random=oldRandom}
   let oracleDrawn=false;const otherCtx=context(image=>{if(image===art.atlas || image===art.hurt)oracleDrawn=true}),otherCanvas={getContext:()=>otherCtx,getBoundingClientRect:()=>bounds};
-  const other=createSignalEngine(otherCanvas,createRun(characterById('nomad'),false,123),input,{hud:noop,flash:noop,finish:noop},{current:false},art);
+  const other=createSignalEngine(otherCanvas,createRun(characterById('nomad'),false,123),input,{hud:noop,flash:noop,finish:noop},{current:false},{definition:CHARACTER_SPRITES.nomad,atlas:{id:'nomad-idle'},walk:{},walkLeft:{},attack:{},special:{}});
   try{nextFrame(performance.now()+20);assert.equal(oracleDrawn,false)}finally{other()}
   assert.throws(()=>createSignalEngine(canvas,run,input,{hud:noop,flash:noop,finish:noop}),/must be preloaded/);
 });

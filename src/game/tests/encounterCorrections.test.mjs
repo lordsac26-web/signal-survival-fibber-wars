@@ -7,7 +7,7 @@ const same=(p,d)=>p.poolIndex===d.index&&p.x===d.x&&p.y===d.y;
 const safe=run=>Object.assign(run,{weapons:[],armor:0,dodge:0,regen:0,crit:0,signalStrength:0,cleanliness:0,instakill:0});
 async function fixedRandom(value,fn){const original=Math.random;Math.random=()=>value;try{await fn()}finally{Math.random=original}}
 for(const [width,height] of [[375,667],[1280,800]]){
- test(`Pudding engine ${width}×${height}: actual cast/drop, +1/+4/+5s, world lock, contact/exit, pause`,()=>fixedRandom(.3,async()=>{
+ test(`Pudding engine ${width}×${height}: actual cast/drop, +1/+4/+5s, world lock, contact/exit, pause`,()=>fixedRandom(.2,async()=>{
   const clearTool={id:'clear-test',damage:0,range:1000,rangeProfile:'trace',pattern:'pierce',rate:.1,speed:1000,color:'#ffffff'};
   const h=await startEncounter({width,height,configure:r=>{safe(r);r.weapons=[clearTool]}});
   try{
@@ -44,7 +44,7 @@ for(const [width,height] of [[375,667],[1280,800]]){
    checkpoints.push({at:5,removed:true});console.log('AUTOMATED_PUDDLE_STATE_EVIDENCE',JSON.stringify({width,height,chargeAt:charge.time,dropAt:drop.time,checkpoints,contact:{damage:10,slow:.65,exitSlow:h.state.slow,postExpiryTicks:0},texture:[216,76],note:'Canvas commands validated, not browser-rasterized visual proof'}));
   }finally{h.cleanup()}
  }));
- test(`Veteran engine ${width}×${height}: exactly one burst at 2.5s, middle impact, coverage through charge, recovery/reset`,()=>fixedRandom(.3,async()=>{
+ test(`Veteran engine ${width}×${height}: exactly one burst at 2.5s, middle impact, coverage through charge, recovery/reset`,()=>fixedRandom(.2,async()=>{
   const tool={id:'timing-test',damage:0,range:0,pattern:'projectile',rate:999,color:'#ffffff'};
   const h=await startEncounter({width,height,charId:'veteran',configure:r=>{safe(r);r.weapons=[tool];r.damage=1;r.spliceQuality=0}});
   try{
@@ -65,7 +65,7 @@ for(const [width,height] of [[375,667],[1280,800]]){
   const fresh=await startEncounter({width,height,charId:'veteran',configure:safe});try{frames(3);assert.equal(fresh.state.specialTimer,0);assert(!fresh.events.some(e=>e.type==='knowledgeImpact'))}finally{fresh.cleanup()}
  }));
 }
-test('Pudding parent death cancels pre-drop cast but leaves a completed independent hazard; reset clears it',()=>fixedRandom(.3,async()=>{
+test('Pudding parent death cancels pre-drop cast but leaves a completed independent hazard; reset clears it',()=>fixedRandom(.2,async()=>{
  const tool={id:'death-test',damage:0,range:1000,rangeProfile:'trace',pattern:'pierce',rate:.1,speed:1000,color:'#ffffff'};
  const setup=r=>{safe(r);r.weapons=[tool]};
  const pre=await startEncounter({width:375,height:667,configure:setup});try{pre.until(()=>pre.events.some(e=>e.type==='puddingCharge'));tool.damage=1e6;frames(1);assert(!pre.events.some(e=>e.type==='puddleDrop'),'death during charge produced no hazard')}finally{pre.cleanup()}

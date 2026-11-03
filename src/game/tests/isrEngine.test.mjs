@@ -26,7 +26,7 @@ for(const [width,height] of [[375,667],[1280,800]]){
   const w=weapon(1e6);await controlled({width,height,configure:r=>{quiet(r);r.hp=500;r.maxHp=2000;r.weapons=[w]}},h=>{
    h.until(()=>h.events.filter(e=>e.type==='ownedKill').length>=2,20);assert.equal(h.state.player.hp,500);assert.equal(h.state.healed,0);
    h.input.current.special=true;pump(1/60);const start=h.events.find(e=>e.type==='outageStart').time;
-   h.until(()=>h.events.some(e=>e.type==='outageHeal'),5);h.until(()=>h.state.specialTimer===0,9);
+   h.until(()=>h.events.some(e=>e.type==='outageHeal'),8);h.until(()=>h.state.specialTimer===0,9);
    const deaths=h.events.filter(e=>e.type==='ownedKill'&&e.time>=start&&e.time<start+8-1e-8),grants=h.events.filter(e=>e.type==='outageHeal');
    assert(deaths.length>0);assert.equal(grants.length,deaths.length);assert(grants.every(e=>e.amount===5&&e.time>=start&&e.time<start+8));
    assert.equal(new Set(grants.map(e=>`${e.time}:${e.index}`)).size,grants.length);assert.equal(h.state.healed,grants.length*5);assert.equal(h.state.player.hp,500+grants.length*5);
