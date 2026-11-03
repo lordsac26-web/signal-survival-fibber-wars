@@ -10,7 +10,10 @@ if (typeof window !== 'undefined') preloadToolAtlas();
 // With no mapped cell (or a failed load) it falls back to the item's existing
 // glyph, so a card is never blank.
 export default function ToolIcon({ item, slug, size = 44, variant = 'A', className = '' }) {
-  const id = slug || toolSlugFor(item);
+  // A caller may pass an archetype id (Field Guide/Gallery/HUD pass `switch`)
+  // or a direct slug — both resolve through toolSlugFor, which now maps ids to
+  // v2 cells; the previous direct-cell lookup would have missed id-only slugs.
+  const id = toolSlugFor(slug || item);
   const cell = toolCell(id, variant);
   if (!cell) {
     return (

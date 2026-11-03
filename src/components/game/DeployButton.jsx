@@ -1,3 +1,5 @@
+import ToolIcon from '@/components/game/ToolIcon';
+
 // Mobile/touch place button for deployable structures. Mirrors SpecialButton:
 // shows the currently selected deployable, a cooldown ring, and fires the
 // engine's `deploy` input flag on press. Desktop users press Q.
@@ -13,7 +15,7 @@ export default function DeployButton({ hud, input }) {
       title={`${sel.name} — place (Q), switch (C)`}
       className="relative flex size-16 shrink-0 cursor-pointer flex-col items-center justify-center rounded-full border-4 border-amber-100 bg-slate-900 text-center font-black uppercase text-amber-200 shadow-[0_6px_0_#b45309] disabled:cursor-not-allowed disabled:border-slate-600 disabled:bg-slate-800 disabled:text-slate-500 sm:size-20"
     >
-      <span className="text-2xl leading-none">{sel.icon}</span>
+      <ToolIcon item={sel} size={28} />
       {sel.cd > 0
         ? <span className="text-sm tabular-nums">{Math.ceil(sel.cd)}</span>
         : <span className="text-[10px]">Q</span>}

@@ -65,7 +65,7 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, on
             title={`${d.name} — place with Q (C to switch)`}
             className={`pointer-events-auto relative flex size-10 cursor-pointer items-center justify-center rounded-lg border-2 text-xl ${d.selected ? 'border-amber-300 bg-slate-900' : 'border-white/20 bg-slate-950/75'}`}
           >
-            {d.icon}
+            <ToolIcon item={d} size={24} />
             {d.stacks > 1 && <span className="absolute -right-1 -top-1 rounded-full bg-amber-300 px-1 text-[10px] font-black text-slate-950">{d.stacks}</span>}
             {d.cd > 0 && (
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md text-xs font-black tabular-nums text-white" style={{ background: `conic-gradient(rgba(2,6,23,.8) ${(d.cd / d.cdMax) * 360}deg, rgba(2,6,23,.35) 0deg)` }}>
