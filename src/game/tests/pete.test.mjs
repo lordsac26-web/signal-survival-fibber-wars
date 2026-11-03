@@ -90,7 +90,7 @@ test('engine: pete spawns at wave 11, one 30s pulse, independent half-HP mini, n
   let seed=20261012;const realRandom=Math.random;
   Math.random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296};
   try{
-    const enc=await startEncounter({width:1280,height:800,configure:run=>{run.wave=11}});
+    const enc=await startEncounter({width:1280,height:800,configure:run=>{run.wave=11;run.hp=run.maxHp=100000;run.weapons=[{id:'clone-clock-fixture',name:'Close-range clearing fixture',pattern:'nova',range:1,damage:500,rate:.05,color:'#fff'}]}});
     enc.until(()=>enc.samples.some(s=>s.petes?.some(p=>p.kind==='pete')),55);
     const peteAt=enc.samples.find(s=>s.petes?.some(p=>p.kind==='pete'));
     const pete=peteAt.petes.find(p=>p.kind==='pete');

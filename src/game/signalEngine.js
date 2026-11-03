@@ -331,7 +331,7 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
 if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
  const requests=director.next(duration-time,activeFoeCount(),maxActiveEnemies(run.wave),heading);
  for(const request of requests)spawnEnemy(request.kind,false,request);
- spawn-=dt;if(spawn<=0){if(activeFoeCount()<maxActiveEnemies(run.wave)-director.reserved()){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)&&activeFoeCount()<maxActiveEnemies(run.wave)-director.reserved())spawnEnemy()}spawn=spawnInterval(run.wave)}grid.clear();
+ spawn-=dt;if(spawn<=0){if(activeFoeCount()<maxActiveEnemies(run.wave)-Math.max(director.reserved(),enemies.items.some(e=>e.active&&e.kind==='pete'&&e.cloneT<=1)?1:0)){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)&&activeFoeCount()<maxActiveEnemies(run.wave)-director.reserved())spawnEnemy()}spawn=spawnInterval(run.wave)}grid.clear();
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active)grid.insert(e)}
   structuresUpdate(dt); // mounts fire + pedestal buff, uses the freshly built enemy grid
   for(let i=0;i<run.weapons.length;i++){cooldowns[i]-=dt;const w=weaponOf(run.weapons[i]);if(w&&cooldowns[i]<=0){const scheduled=w.rate/(run.attackSpeed*(1+pedestalBuff));attack(w);cb.event?.({type:'weaponTrigger',weapon:w.name,index:i,scheduled});cooldowns[i]=scheduled}}
@@ -381,7 +381,7 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
    if(e.mac&&e.mac.phase!=='chase'){e.x=e.mac.rootX;e.y=e.mac.rootY}
    if(e.sq&&(!e.campCast||e.campCast.phase==='chase'))({a,spd}=squirrelUpdate(e,dt));
    const campBusy=(e.mac&&e.mac.phase!=='chase')||(e.sq&&(e.sq.wind>0||e.sq.cast>0));
-   if(e.campCast&&!campBusy){const cast=e.campCast,visible=e.x>camX+45&&e.x<camX+viewW-45&&e.y>camY+65&&e.y<camY+viewH-45;
+   if(e.campCast&&!campBusy){const cast=e.campCast;cancelHiddenCharge(cast,{x:camX,y:camY,width:viewW,height:viewH},45,65,45);const visible=e.x>camX+45&&e.x<camX+viewW-45&&e.y>camY+65&&e.y<camY+viewH-45;
     if((camp.active&&!meeting.active)||cast.phase!=='chase'){const act=stepCone(cast,e.campConfig,dt,{alive:e.hp>0,playerAlive:p.hp>0,x:e.x,y:e.y,tx:tgt.x,ty:tgt.y,shortSide:Math.min(viewW,viewH),visible});
      if(act==='release'){const lands=consumeConeHit(cast,p.x,p.y,p.inv);if(lands){damagePlayer(cast.damage);p.inv=.55}cb.event?.({type:'campCone',kind:e.kind,hit:lands,time:duration-time})}}
    }

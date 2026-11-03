@@ -35,7 +35,7 @@ export async function simulateCampaign(seed,moving,lastWave=30){
     const cleanup=createSignalEngine(canvas,run,input,{simulation:true,hud:h=>{hud=h},flash(){},finish:r=>{finished=r},event:e=>{if(e.type==='enemySpawn')peak=Math.max(peak,e.active);if(e.type==='campCone')cones++}},undefined,...art);
     try{pump(waveDuration(wave)*1.4+8,f=>{
       if(!hud)return;
-      if(moving){const angle=f/60*.75,tx=550+Math.cos(angle)*230,ty=400+Math.sin(angle)*180;input.current.x=tx-hud.position.x;input.current.y=ty-hud.position.y}
+      if(moving){const angle=f/60*1.4,tx=550+Math.cos(angle)*230,ty=400+Math.sin(angle)*180;input.current.x=tx-hud.position.x;input.current.y=ty-hud.position.y}
       if(hud.hp<hud.maxHp*.65&&hud.specialCooldown<=0)input.current.special=true;
     })}finally{cleanup()}
     if(!finished)throw Error(`Wave ${wave} did not finish`);
