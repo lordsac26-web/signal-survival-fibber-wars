@@ -132,7 +132,17 @@ test('engine: table in-bounds, contact damage declined for exactly 4s, lure redi
     configure: run => { run.wave = 1; run.regen = 0; run.crit = 0; run.luck = 0; run.cleanliness = 0; run.spliceQuality = 0; run.hp = 3000; run.maxHp = 3000; }
   });
   try {
-    e.until(() => e.samples.some(s => s.player.hp < 3000), 25); // first damage landed (wave 1: lag + pudding contact and goo)
+    // step away from the arena centre first: the table spawns ~46 units
+    // TOWARD the centre from the player, so off-centre guarantees the table
+    // lands away from them and the lure has a visible steering vector.
+    e.input.current.x = -1; e.input.current.y = -1;
+    pump(1.2);
+    e.input.current.x = 0; e.input.current.y = 0;
+    // wait until an impairment has actually closed in (wave 1: lag + pudding
+    // only, so the sole non-contact damage source below is a goo tick) — a
+    // fixed proximity gate, not a variable first-damage wait, keeps the whole
+    // meeting comfortably inside the 20s wave-1 budget.
+    e.until(() => e.state && e.state.foes.filter(f => Math.hypot(f.x - e.state.player.x, f.y - e.state.player.y) < 200).length >= 2, 10);
     e.input.current.special = true;
     e.until(() => e.events.some(ev => ev.type === 'meetingStart'), 5);
     const start = e.events.find(ev => ev.type === 'meetingStart');
@@ -145,31 +155,62 @@ test('engine: table in-bounds, contact damage declined for exactly 4s, lure redi
     pump(1.5);
     assert.equal(e.samples.length, pausedSamples, 'no fixed steps while paused');
     e.paused.current = false;
-    // walk into the lured crowd at the table so contact keeps knocking during the meeting
-    e.input.current.x = Math.sign(start.x - e.state.player.x);
-    e.input.current.y = Math.sign(start.y - e.state.player.y);
-    pump(.5);
+    // phase A: hold position away from the table — foes visibly steer to the
+    // table over the player while lured (lure evidence lives in phase A only;
+    // phase B walks the player into the crowd for contact).
+    pump(1.5);
+    const walkStart = e.samples.length;
+    // phase B: walk into the lured crowd at the table so contact keeps knocking during the meeting
+    // phase B: shadow the nearest lured foe at contact range (player ~200
+    // u/s vs foe 64) until the blast — contact events then fire continuously
+    // for the decline proof instead of depending on crowd convergence speed.
+    for (let k = 0; k < 180 && !e.events.some(ev => ev.type === 'meetingExplode'); k++) {
+      const s = e.state;
+      const f = s.foes.reduce((best, o) => !best || Math.hypot(o.x - s.player.x, o.y - s.player.y) < Math.hypot(best.x - s.player.x, best.y - s.player.y) ? o : best, null);
+      e.input.current.x = f ? Math.sign(f.x - s.player.x) : 0;
+      e.input.current.y = f ? Math.sign(f.y - s.player.y) : 0;
+      pump(1 / 60);
+    }
     e.input.current.x = 0; e.input.current.y = 0;
     e.until(() => e.events.some(ev => ev.type === 'meetingExplode'), 10);
     const window = e.samples.filter(s => s.meeting);
     assert.ok(window.length > 10, 'meeting samples recorded');
-    // Safe sample: no goo within reach of the player — at wave 1 the only
-    // non-contact damage source is a puddle tick, which needs adjacency.
-    const safe = s => !s.puddles.some(d => Math.hypot(d.x - s.player.x, d.y - s.player.y) < 45);
     const contact = s => s.foes.some(f => Math.hypot(f.x - s.player.x, f.y - s.player.y) < f.radius + s.player.r + 2);
-    assert.ok(window.some(s => safe(s) && contact(s)), 'an enemy was in contact range during the meeting');
+    assert.ok(window.some(contact), 'an enemy was in contact range during the meeting');
+    // Decline proof: at wave 1 the only non-contact damage source is a goo
+    // tick, and the engine records every tick (frame + exact amount). So ANY
+    // hp drop inside the meeting must match a recorded tick on the same
+    // frame for the same amount — a contact hit would be an unmatched drop.
+    let drops = 0;
     for (let i = 1; i < window.length; i++) {
       const a = window[i - 1], b = window[i];
-      if (safe(a) && safe(b)) assert.equal(b.player.hp, a.player.hp, 'contact damage declined between consecutive safe frames (regen 0)');
+      if (b.player.hp < a.player.hp) {
+        drops++;
+        const amount = a.player.hp - b.player.hp;
+        const tick = e.events.find(ev => ev.type === 'puddleTick' && Math.abs(ev.time - b.time) < 1e-9 && Math.abs(ev.damage - amount) < 1e-6);
+        assert.ok(tick, `hp drop ${amount.toFixed(2)} at t=${b.time.toFixed(2)} was a goo tick, not contact damage`);
+      }
     }
-    const lure = window.some(s => {
-      const foes = s.foes;
-      if (foes.length < 2) return false;
-      const dT = foes.reduce((acc, f) => acc + Math.hypot(f.x - s.meeting.x, f.y - s.meeting.y), 0);
-      const dP = foes.reduce((acc, f) => acc + Math.hypot(f.x - s.player.x, f.y - s.player.y), 0);
-      return dT < dP;
-    });
-    assert.ok(lure, 'enemies steered toward the table over the player while lured');
+    assert.ok(drops <= window.length, 'drop scan bounded');
+    // Lure evidence from phase A: for every foe that actually moved between
+    // consecutive hold-position samples, its displacement aligns more with
+    // the table direction than the player direction.
+    const phaseA = e.samples.slice(0, walkStart).filter(s => s.meeting);
+    let steered = 0, moved = 0;
+    for (let i = 1; i < phaseA.length; i++) {
+      const a = phaseA[i - 1], b = phaseA[i];
+      for (const f of a.foes) {
+        const g = b.foes.find(o => o.index === f.index);
+        if (!g) continue;
+        const dx = g.x - f.x, dy = g.y - f.y;
+        if (Math.hypot(dx, dy) < .5) continue; // arrived / separation shuffle
+        const tdx = a.meeting.x - f.x, tdy = a.meeting.y - f.y, tl = Math.hypot(tdx, tdy) || 1;
+        const pdx = a.player.x - f.x, pdy = a.player.y - f.y, pl = Math.hypot(pdx, pdy) || 1;
+        moved++;
+        if (dx * tdx / tl + dy * tdy / tl > dx * pdx / pl + dy * pdy / pl) steered++;
+      }
+    }
+    assert.ok(moved >= 10 && steered / moved > .5, `foes steered toward the table over the player while lured (${steered}/${moved})`);
     const explode = e.events.find(ev => ev.type === 'meetingExplode');
     assert.ok(near(explode.time - start.time, 4, 1 / 60 + 1e-3), `blast at exactly 4s (${explode.time - start.time})`);
     assert.equal(e.events.filter(ev => ev.type === 'meetingExplode').length, 1, 'one explosion per activation');
@@ -178,9 +219,20 @@ test('engine: table in-bounds, contact damage declined for exactly 4s, lure redi
     e.input.current.special = true;
     pump(2);
     assert.equal(e.events.filter(ev => ev.type === 'meetingStart').length, 1);
-    // after the meeting, damage resumes on the player standing in the crowd
+    // after the meeting, contact damage resumes: walk toward the nearest
+    // surviving foe (the blast cleared the crowd at the table) and confirm
+    // hp drops again without the meeting's decline.
     const hpAtExplosion = e.state.player.hp;
-    e.until(() => e.state.player.hp < hpAtExplosion, 12);
+    let guard = 0;
+    while (e.state.player.hp >= hpAtExplosion && guard++ < 20) {
+      const s = e.state, px = s.player.x, py = s.player.y;
+      const f = s.foes.reduce((best, o) => !best || Math.hypot(o.x - px, o.y - py) < Math.hypot(best.x - px, best.y - py) ? o : best, null);
+      e.input.current.x = f ? Math.sign(f.x - px) : 0;
+      e.input.current.y = f ? Math.sign(f.y - py) : 0;
+      pump(.5);
+    }
+    e.input.current.x = 0; e.input.current.y = 0;
+    assert.ok(e.state.player.hp < hpAtExplosion, `contact damage resumed after the meeting expired (${e.state.player.hp} < ${hpAtExplosion})`);
   } finally { e.cleanup(); }
 });
 
@@ -203,7 +255,8 @@ test('engine: blast math — 8x combined weapon damage split evenly, applied onc
     const blastSum = explode.share * explode.targets * .75;
     const delta = after.damageDealt - before.damageDealt;
     assert.ok(delta >= blastSum - 1e-9, `blast damage applied (${delta} vs ${blastSum})`);
-    assert.ok(near((delta - blastSum) % 6, 0, 1e-9), `remaining delta is whole stripper hits only (${delta - blastSum})`);
+    const rem = delta - blastSum;
+    assert.ok(Math.abs(rem - Math.round(rem / 6) * 6) < 1e-6, `remaining delta is whole stripper hits only (${rem})`);
     assert.ok(e.rec.record.some(r => r[0] === 'arc' && r[3] === MEETING.blastRadius), 'the exact blast radius was drawn as the ground telegraph');
   } finally { e.cleanup(); }
 });
@@ -221,7 +274,7 @@ test('engine: defeat plays the death strip briefly, then the unchanged game-over
     assert.ok(e.finished, 'game-over flow ran after the brief strip');
     assert.equal(e.finished.won, false);
     assert.equal(e.finished.hp, 0);
-    assert.ok(e.rec.record.some(r => r[0] === 'drawImage' && r[3] === 118 && r[4] === 88), 'the death strip was actually drawn');
+    assert.ok(e.rec.record.some(r => r[0] === 'drawImage' && r[4] === 118 && r[5] === 88), 'the death strip was actually drawn');
   } finally { e.cleanup(); }
 });
 

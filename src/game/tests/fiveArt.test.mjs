@@ -129,7 +129,7 @@ test('techSpriteAnimation: update decrements hurt and attack, increments clock',
 test('engine wiring: techSpriteAnimation imported and used for all tech characters',async()=>{
   const engine=await readFile(new URL('../../game/signalEngine.js',import.meta.url),'utf8');
   assert.ok(engine.includes('createTechAnimation')&&engine.includes('updateTechAnimation')&&engine.includes('drawTechSprite')&&engine.includes('drawTechEnemy'),'engine must import tech sprite functions');
-  assert.ok(engine.includes("['veteran','clone','don','nomad']"),'engine must have techChars list');
+  assert.ok(engine.includes("['veteran','clone','don','nomad','admin']"),'engine must have techChars list');
   assert.ok(engine.includes("e.kind==='dirty'&&blobArtDef"),'engine must create blob animation for dirty enemies');
   assert.ok(engine.includes("special.id==='sprint'?'chug'"),'engine must play chug sound for Nomad special');
   assert.ok(engine.includes("special.id==='clause'?'charge'"),'engine must play charge sound for Veteran special');

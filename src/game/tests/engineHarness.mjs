@@ -6,6 +6,12 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(fileURLToPath(import.meta.url),'../../../..');
 const pub=url=>path.join(root,'public',url.replace(/^https?:\/\/[^/]+/,''));
 let seq=1,now=-1;export const rafMap=new Map();
+// The mock clock is authoritative for the engine too: createSignalEngine
+// stamps last=performance.now() at creation, and a real-clock first-frame
+// delta (larger under parallel load) shifts every seeded Math.random stream
+// and flips deterministic spawn tests. performance.now() now reads the pump
+// clock (0 before the first pump), so the first frame is exactly one 1/60 step.
+Object.defineProperty(globalThis,'performance',{value:{now:()=>now<0?0:now},configurable:true,writable:true});
 globalThis.requestAnimationFrame=cb=>{const id=seq++;rafMap.set(id,cb);return id};
 globalThis.cancelAnimationFrame=id=>rafMap.delete(id);
 globalThis.ResizeObserver=class{observe(){}disconnect(){}};

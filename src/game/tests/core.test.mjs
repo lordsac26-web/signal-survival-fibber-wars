@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { formatStat, itemDeltas } from '@/game/data/stats';
 import { supplyEstimate } from '@/game/data/balanceAudit';
 import { activateSignature } from '@/game/combat/signatures';
+import { MEETING } from '@/game/combat/meetingInvite';
 import { validateProfile } from 'profileValidation';
 const run=(id='rookie')=>({...createRun(characterById(id),false,123456,`test-${id}`),signal:10000});
 const shop=()=>enterShop(run());
@@ -77,4 +78,4 @@ test('rotator-style wave density: trickle pacing, 34-active ceiling, stat scalin
   assert(engine.includes('base.damage*(1+(run.wave-1)*.05)'));
   assert(engine.includes('Math.ceil(dmg*.25)'));assert.equal(TUNING.dodgeCap,.5);
 });
-test('every signature has an effect hook, Don grants four helpers, Bucket grants one sentry',()=>{for(const c of CHARACTERS){const r=run(c.id),p={x:327,y:412,inv:0};const calls=[];const api={area:(...a)=>calls.push(['area',...a]),launch:(...a)=>calls.push(['launch',...a]),heal:a=>calls.push(['heal',a]),turret:a=>{calls.push(['turret',a]);return true},barrier:()=>{calls.push(['barrier']);return true}};assert.notEqual(activateSignature(r,p,api),null);if(c.id==='don')assert.equal(calls.filter(a=>a[0]==='turret').length,4);if(c.id==='bucket')assert.equal(calls.filter(a=>a[0]==='turret').length,1);if(c.id==='admin')assert.equal(p.inv,2.5)}});
+test('every signature has an effect hook, Don grants four helpers, Bucket grants one sentry, Admin books the table',()=>{for(const c of CHARACTERS){const r=run(c.id),p={x:327,y:412,inv:0};const calls=[];const api={area:(...a)=>calls.push(['area',...a]),launch:(...a)=>calls.push(['launch',...a]),heal:a=>calls.push(['heal',a]),turret:a=>{calls.push(['turret',a]);return true},barrier:()=>{calls.push(['barrier']);return true},table:()=>{calls.push(['table']);return true}};const timer=activateSignature(r,p,api);assert.notEqual(timer,null);if(c.id==='don')assert.equal(calls.filter(a=>a[0]==='turret').length,4);if(c.id==='bucket')assert.equal(calls.filter(a=>a[0]==='turret').length,1);if(c.id==='admin'){assert.equal(calls.filter(a=>a[0]==='table').length,1,'Meeting Invite books the lure table');assert.equal(timer,MEETING.duration,'the signature timer is the 4s meeting; contact immunity is the engine-side decline')}}});
