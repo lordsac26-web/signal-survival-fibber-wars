@@ -24,6 +24,8 @@ export function jitterVelocity(s,angle,speed){
 export const jitterPulseHits=(s,dist,inv)=>s.phase==='recover'&&inv<=0&&dist<=JITTER.radius;
 export function pickEnemyKind(types,wave,random=Math.random){
   const eligible=types.slice(0,Math.min(types.length,2+(wave/2|0))).filter(id=>id!=='peteMini');
+  // Reuse its single existing pool entry; wave-4 inclusion replaces an attempt.
+  if(wave>=4&&!eligible.includes('crosstalk'))eligible.push('crosstalk');
   if(wave>=PETE.minWave&&!eligible.includes('pete'))eligible.push('pete');
   // MACROBEND BEAST: explicit wave-4 gate (the slice alone would surface it at
   // wave 6) and the same half-weight gate the Jitter Bug uses.
