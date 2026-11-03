@@ -1,4 +1,5 @@
 import { characterById } from '@/game/data/characters';
+import { migrateCharacterId } from '@/game/progression/rosterMigration';
 import { WEAPONS } from '@/game/data/combat';
 import { applyMods, WEAPON_ARCHETYPES } from '@/game/data/generation';
 import { TUNING } from '@/game/data/tuning';
@@ -23,7 +24,9 @@ export function rebuildStats(run) {
 }
 export function normalizeRun(raw) {
   if (!raw) return null;
-  const c = characterById(raw.character?.id || raw.characterId);
+  const previousId=raw.character?.id || raw.characterId;
+  const migratedId=migrateCharacterId(previousId);
+  const c = characterById(migratedId);
   if (!c || !raw.runId || raw.hp <= 0 || !Number.isInteger(raw.wave) || raw.wave < 1) return null;
   const rankCap = c.id === 'clone' ? TUNING.cloneOverclockCap : TUNING.overclockRankCap;
   const weapons = [];
@@ -31,6 +34,7 @@ export function normalizeRun(raw) {
   if (!weapons.length) weapons.push(...c.start.map((id,i)=>normalizeWeapon({...WEAPONS[id],baseId:id,id:`${raw.runId}-starter-${i}`},i,rankCap)));
   const items = (raw.items || []).filter(i=>!i.baseId && !i.deploy && !i.premium);
   const next = {...raw,signal:raw.signal || 0,xp:raw.xp || 0,level:raw.level || 0,kills:raw.kills || 0,earnedSignal:raw.earnedSignal ?? raw.signal ?? 0,character:c,weapons,items,specialUnlocked:true,deployables:(raw.deployables || []).filter(d=>d.structure!==c.signatureStructure).map(d=>({...d,stacks:Math.min(TUNING.deployRankCap,d.stacks || 1)})),lockedIds:(raw.lockedIds || []).slice(0,TUNING.maxLocks)};
+  if(migratedId!==previousId && c.id!=='don')Object.assign(next,{specialCooldown:0,specialProgress:0,useAlt:false});
   if(c.id==='isr')next.specialCooldown=Math.min(c.special.cooldown,Math.max(0,raw.specialCooldown||0));
   if(next.shop) next.shop={...next.shop,offers:(next.shop.offers || []).map(i=>!i || !i.baseId || allowedWeapon(c,i) ? i : null)};
   next.lockedIds=next.lockedIds.filter(id=>next.shop?.offers?.some(i=>i?.id===id));

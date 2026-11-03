@@ -1,17 +1,20 @@
 import { CHARACTERS } from '@/game/data/characters';
+import { DEFAULT_CHARACTER_ID, migrateCharacterId } from '@/game/progression/rosterMigration';
 import { CHALLENGES, ACHIEVEMENTS, LOADOUTS, unlockMet } from '@/game/data/unlocks';
 import { normalizeRun } from '@/game/progression/runRules';
 import { appendSample } from '@/game/data/balanceAudit';
 import { bossWave } from '@/game/data/bosses';
 export const SAVE_VERSION = 4;
-export const freshProfile = () => ({version:SAVE_VERSION,highWave:0,highKills:0,runs:0,totalKills:0,deaths:0,bestSignal:0,healPeak:0,meleePeak:0,toolPeak:0,noBuyWave:0,highWaveByCharacter:{},killsByType:{},squirrelDefeated:false,unlocked:CHARACTERS.filter(c=>!c.unlock).map(c=>c.id),achievements:[],challenges:[],loadouts:[],discoveredTools:[],completedRunIds:[],summaries:[],checkpoint:null,selectedCharacter:'rookie',selectedLoadouts:{},settings:{muted:false,volume:.55},balanceSamples:[],updatedAt:0});
+export const freshProfile = () => ({version:SAVE_VERSION,highWave:0,highKills:0,runs:0,totalKills:0,deaths:0,bestSignal:0,healPeak:0,meleePeak:0,toolPeak:0,noBuyWave:0,highWaveByCharacter:{},killsByType:{},squirrelDefeated:false,unlocked:CHARACTERS.filter(c=>!c.unlock).map(c=>c.id),achievements:[],challenges:[],loadouts:[],discoveredTools:[],completedRunIds:[],summaries:[],checkpoint:null,selectedCharacter:DEFAULT_CHARACTER_ID,selectedLoadouts:{},settings:{muted:false,volume:.55},balanceSamples:[],updatedAt:0});
 const donId = id => ['dispatch','dave','dispatch_dave'].includes(id) ? 'don' : id;
 export function migrateProfile(raw = {}) {
   const p={...freshProfile(),...raw,version:SAVE_VERSION};
   p.squirrelDefeated=!!p.squirrelDefeated;
   p.unlocked=CHARACTERS.filter(c=>unlockMet(p,c)).map(c=>c.id);
   p.settings={muted:false,volume:.55,...raw.settings};p.settings.muted=!!p.settings.muted;p.settings.volume=Math.max(0,Math.min(1,Number(p.settings.volume) || 0));
-  p.selectedCharacter=donId(p.selectedCharacter);p.selectedLoadouts=Object.fromEntries(Object.entries(p.selectedLoadouts || {}).map(([id,v])=>[donId(id),v]));
+  p.selectedCharacter=migrateCharacterId(p.selectedCharacter);
+  if(!CHARACTERS.some(c=>c.id===p.selectedCharacter))p.selectedCharacter=DEFAULT_CHARACTER_ID;
+  p.selectedLoadouts=Object.fromEntries(Object.entries(p.selectedLoadouts || {}).map(([id,v])=>[donId(id),v]));
   p.highWaveByCharacter={...p.highWaveByCharacter,don:Math.max(p.highWaveByCharacter?.don || 0,p.highWaveByCharacter?.dispatch || 0,p.highWaveByCharacter?.dave || 0,p.highWaveByCharacter?.dispatch_dave || 0)};
   for(const id of ['dispatch','dave','dispatch_dave']) delete p.highWaveByCharacter[id];
   p.challenges=[...new Set([...(p.challenges || []),...((raw.version || 1)<4?(raw.unlocked || []).filter(id=>CHALLENGES.some(c=>c.id===id)):[])])];

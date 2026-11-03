@@ -31,7 +31,7 @@ function freshOffer(run,sequence){
   }
   if(!item){
     const pool=WEAPON_ARCHETYPES.filter(a=>a[2]!=='turret' && allowedWeapon(run.character,{pattern:a[2]}));
-    const preferred={bucket:['engineering','armor'],patty:['armor','maxHp'],cleaner:['lifeSteal','cleanliness','regen'],oracle:['range','crit'],frenzy:['attackSpeed','spliceQuality'],admin:['dodge','speed'],nomad:['speed','luck'],deadline:['speed','attackSpeed'],don:['maxHp','engineering']}[run.character.id] || ['damage','maxHp'];
+    const preferred={oracle:['range','crit'],admin:['dodge','speed'],nomad:['speed','luck'],don:['maxHp','engineering']}[run.character.id] || ['damage','maxHp'];
     const passivePool=STAT_MOD_POOL.concat(STAT_MOD_POOL.filter(m=>preferred.includes(m[0])));
     const weakerFamily=run.weapons.filter(w=>w.slotType==='melee').length>run.weapons.filter(w=>w.slotType==='ranged').length?'ranged':'melee';
     const synergy=run.character.id==='veteran'?pool.concat(pool.filter(a=>(['melee','chain','nova','orbiting'].includes(a[2])?'melee':'ranged')===weakerFamily)):pool;
