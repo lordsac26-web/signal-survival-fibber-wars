@@ -90,15 +90,31 @@ test('engine: pete spawns at wave 11, one 30s pulse, independent half-HP mini, n
   let seed=20261012;const realRandom=Math.random;
   Math.random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296};
   try{
-    const enc=await startEncounter({width:1280,height:800,configure:run=>{run.wave=11;run.hp=run.maxHp=100000;run.weapons=[{id:'clone-clock-fixture',name:'Close-range clearing fixture',pattern:'nova',range:1,damage:500,rate:.05,color:'#fff'}]}});
-    enc.until(()=>enc.samples.some(s=>s.petes?.some(p=>p.kind==='pete')),55);
+    // Kited scenario: the technician flees just faster than Pete (speed 100 vs
+    // Pete's ~69), so Pete trails outside the nova's reach and survives to
+    // file his 30-second pulse, while the faster chasers catch up, walk into
+    // the clearing nova and die — keeping spawn slots open so the stream keeps
+    // rolling and Pete arrives early in the wave.
+    const enc=await startEncounter({width:1280,height:800,configure:run=>{run.wave=11;run.hp=run.maxHp=100000;run.speed=100;run.weapons=[{id:'clone-clock-fixture',name:'Close-range clearing fixture',pattern:'nova',range:400,damage:500,rate:1,color:'#fff'}]}});
+    const steer=f=>{
+      const s=enc.state;if(!s)return;const p=s.player;let fx=0,fy=0,n=0;
+      for(const e of (s.foes||[])){const dx=p.x-e.x,dy=p.y-e.y,d=Math.hypot(dx,dy)||1;if(d<420){fx+=dx/d;fy+=dy/d;n++}}
+      for(const e of (s.petes||[])){const dx=p.x-e.x,dy=p.y-e.y,d=Math.hypot(dx,dy)||1;fx+=dx/d*6;fy+=dy/d*6;n+=6}
+      if(!n){const a=f/60*.5;fx=550+Math.cos(a)*380-p.x;fy=380+Math.sin(a)*380-p.y}
+      const m=Math.hypot(fx,fy)||1;let dx=fx/m,dy=fy/m;
+      if(p.x<90)dx=Math.max(dx,.35);if(p.x>1010)dx=Math.min(dx,-.35);
+      if(p.y<90)dy=Math.max(dy,.35);if(p.y>710)dy=Math.min(dy,-.35);
+      const m2=Math.hypot(dx,dy)||1;enc.input.current.x=dx/m2;enc.input.current.y=dy/m2;
+    };
+    const steerUntil=(predicate,max)=>{for(let f=0;f<max*60;f++){steer(f);if(predicate())return;if(pump(1/60)===-1)throw Error('Engine stopped before condition')}throw Error('Condition did not occur')};
+    steerUntil(()=>enc.samples.some(s=>s.petes?.some(p=>p.kind==='pete')),55);
     const peteAt=enc.samples.find(s=>s.petes?.some(p=>p.kind==='pete'));
     const pete=peteAt.petes.find(p=>p.kind==='pete');
     const waveTime=peteAt.time;
     assert(pete.cloneT>0&&pete.cloneT<=PETE.cloneInterval,'clone clock armed');
     assert(Math.abs(pete.hp-ENEMIES.pete.hp*enemyHpMultiplier(11,true))<1,'wave-11 HP scaling: '+pete.hp);
     // run until the pulse fires (cloneT wraps) and the mini appears
-    enc.until(()=>enc.samples.some(s=>s.petes?.some(p=>p.kind==='peteMini')),Math.min(60,waveDurationLeft(waveTime)));
+    steerUntil(()=>enc.samples.some(s=>s.petes?.some(p=>p.kind==='peteMini')),Math.min(60,waveDurationLeft(waveTime)));
     const miniAt=enc.samples.findLast(s=>s.petes?.some(p=>p.kind==='peteMini'));
     const mini=miniAt.petes.find(p=>p.kind==='peteMini');
     const original=miniAt.petes.find(p=>p.kind==='pete');
