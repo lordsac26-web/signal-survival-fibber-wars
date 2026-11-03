@@ -90,6 +90,16 @@ export function drawTechSprite(ctx,art,state,x,y){
   }else ctx.drawImage(img,f.sx,f.sy,fw,fh,Math.round(x-w*d.anchorX),Math.round(y-h*d.anchorY),Math.round(w),h);
   ctx.imageSmoothingEnabled=prev;
 }
+// Death strip (Admin): one 6th-row collapse pose, drawn foot-anchored with
+// the same scaling/mirroring contract as the live frames. The engine draws
+// frame `Math.floor(progress * columns)` once on defeat; it never loops.
+export function drawTechDeathFrame(ctx,art,frame,x,y){
+  const d=art.definition,cols=d.deathColumns||1,fw=d.deathCellW,fh=d.deathCellH,h=d.worldSize,w=h*fw/fh;
+  const k=Math.max(0,Math.min(cols-1,frame|0));
+  const prev=ctx.imageSmoothingEnabled;ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(art.death,k*fw,0,fw,fh,Math.round(x-w*d.anchorX),Math.round(y-h*d.anchorY),Math.round(w),h);
+  ctx.imageSmoothingEnabled=prev;
+}
 // Enemies are drawn CENTERED on their collision point (feet-anchor math stays
 // in the manifest for provenance), matching the Lag and Squirrel convention.
 export function drawTechEnemy(ctx,art,state,x,y,scale=1){

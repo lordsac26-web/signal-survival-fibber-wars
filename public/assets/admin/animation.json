@@ -1,0 +1,12 @@
+{
+  "frameWidth": 76,
+  "frameHeight": 118,
+  "idleFront": { "columns": 8 },
+  "walkSide": { "columns": 8, "facing": "right" },
+  "walkLeft": { "columns": 8, "facing": "left" },
+  "attack": { "columns": 7 },
+  "special": { "columns": 8 },
+  "death": { "columns": 7 },
+  "muzzle": { "x": 169, "y": 40 },
+  "fps": 8
+}

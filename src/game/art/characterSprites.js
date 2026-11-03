@@ -88,7 +88,29 @@ nomad:Object.freeze(tech('nomad',76,140,
   {atlasW:648,atlasH:138,cellW:72,cellH:138,frames:9},
   {atlasW:984,atlasH:138,cellW:164,cellH:138,frames:6,muzzle:{x:163,y:66,cellW:164,cellH:138}},
   {atlasW:1584,atlasH:138,cellW:198,cellH:138,frames:8}
-))
+)),
+admin:Object.freeze((()=>{
+  // No Accountability Admin — cut from the 1024x683 opaque-magenta source
+  // (exact-palette keying + bounded fringe recolour, magenta key + thin
+  // inter-frame divider removal). Strips: idle 8 (frames 6-7 are the
+  // mug-lift gestures), walk-right 8, walk-left 8 (genuine art, not a
+  // mirror), attack 7 (right-facing; the coffee splash extends forward; the
+  // mug muzzle is measured in the most-extended frame 4), special 8 — frames
+  // 0-2 are the solo phone/gesture activation frames the engine actually
+  // plays; the table/sit/explosion cells are never drawn over the runtime
+  // world table (Don group-frame precedent) — and the 7-frame death strip
+  // played once on defeat. All frames share a per-strip foot baseline and the
+  // body is anchored independently of splash/table effects.
+  const d=tech('admin',76,128,
+    {atlasW:608,atlasH:118,cellW:76,cellH:118,frames:8},
+    {atlasW:528,atlasH:107,cellW:66,cellH:107,frames:8},
+    {atlasW:496,atlasH:103,cellW:62,cellH:103,frames:8},
+    {atlasW:1624,atlasH:102,cellW:232,cellH:102,frames:7,muzzle:{x:169,y:40,cellW:232,cellH:102}},
+    {atlasW:1216,atlasH:125,cellW:152,cellH:125,frames:8});
+  d.extras.push(['death','/assets/admin/death.png',826,88]);
+  d.manifestSpec['death.columns']=7;
+  return Object.freeze({...d,specialActivationFrames:3,specialFps:2,specialDuration:4,deathColumns:7,deathCellW:118,deathCellH:88});
+})())
 });
 export const characterSprite=id=>CHARACTER_SPRITES[id]||null;
 

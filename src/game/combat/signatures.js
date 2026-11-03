@@ -1,6 +1,7 @@
 // Granted abilities operate only on engine-owned pools; no React frame updates.
 import { KNOWLEDGE_DUMP } from '@/game/combat/knowledgeDump';
 import { OUTAGE } from '@/game/combat/outage';
+import { MEETING } from '@/game/combat/meetingInvite';
 export function activateSignature(run,p,api){
   switch(run.character.special.id){
     case 'callback':api.area(300,80,'#67e8f9');return 0;
@@ -10,7 +11,7 @@ export function activateSignature(run,p,api){
     case 'fortify':return api.turret({mode:'pellet',index:0,life:8,damage:30,range:340,fire:.4,color:'#facc15'})?0:null;
     case 'crew':{let placed=0;for(let i=0;i<4;i++)if(api.turret({mode:'helper',index:i,life:8,damage:18,range:280,fire:.65,color:'#38bdf8'}))placed++;return placed?8:null} // 8s timer also drives the crew escalation sprite
     case 'frenzy':api.area(120,60,'#c084fc');return 5;
-    case 'meeting':p.inv=Math.max(p.inv,2.5);return 2.5;
+    case 'meeting':return api.table ? (api.table() ? MEETING.duration : null) : MEETING.duration; // engine spawns the table; the timer drives contact immunity, the lure and the 4s blast
     case 'barrier':return api.barrier()?0:null;
     case 'sprint':api.heal(40);return 5; // chug + heal + 1.8× speed for 5s
     case 'deadline':return 4;

@@ -21,7 +21,7 @@ import { createPuddingAnimation, updatePuddingAnimation, drawPuddingSprite } fro
 import { structureSpriteDef } from '@/game/art/characterSprites';
 import { SQUIRREL, bossWave, PETE } from '@/game/data/bosses';
 import { createSquirrelAnimation, updateSquirrelAnimation, squirrelRelease, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation';
-import { createTechAnimation, updateTechAnimation, drawTechSprite, drawTechEnemy } from '@/game/art/techSpriteAnimation';
+import { createTechAnimation, updateTechAnimation, drawTechSprite, drawTechEnemy, drawTechDeathFrame } from '@/game/art/techSpriteAnimation';
 import { JITTER, createJitterState, stepJitter, jitterVelocity, jitterPulseHits, pickEnemyKind } from '@/game/combat/jitter';
 import { drawJitterSprite } from '@/game/art/jitterSpriteAnimation';
 import { drawGroundPuddle, puddingFootPoint } from '@/game/art/groundPuddle';
@@ -31,6 +31,7 @@ import { createISRAnimation, updateISRAnimation } from '@/game/art/isrSpriteAnim
 import { drawISR, isrMuzzlePoint } from '@/game/art/drawISR';
 import { MACRO, createBendState, stepBend, bendVelocity } from '@/game/combat/macrobend';
 import { createBendAnimation, updateBendAnimation, drawBendSprite, drawBendRing } from '@/game/art/bendSpriteAnimation';
+import { MEETING, meetingTableSpot } from '@/game/combat/meetingInvite';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
 const clamp=(n,a,b)=>n<a?a:n>b?b:n;
@@ -55,7 +56,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  const ctx=canvas.getContext('2d',{alpha:false}),grid=new SpatialHash(96),charId=run.character.id;
  let dpr=Math.min(devicePixelRatio||1,2);
  if(run.character.id==='oracle'&&!characterArt)throw new Error('Oracle art must be preloaded before combat');
- const techChars=['veteran','clone','don','nomad'];const spriteState=characterArt?(charId==='isr'?createISRAnimation():run.character.id==='oracle'?createSpriteAnimation():techChars.includes(run.character.id)?createTechAnimation():null):null;
+ const techChars=['veteran','clone','don','nomad','admin'];const spriteState=characterArt?(charId==='isr'?createISRAnimation():run.character.id==='oracle'?createSpriteAnimation():techChars.includes(run.character.id)?createTechAnimation():null):null;
  const sqArt=squirrelArt&&squirrelArt.definition?squirrelArt:null;
  const petArt=peteArt&&peteArt.definition?peteArt:null;
  const lagArt=enemyArt&&enemyArt.definition?enemyArt:null;
@@ -65,6 +66,11 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  const pudArtDef=puddingArt&&puddingArt.definition?puddingArt:null;
  const bendArtDef=bendArt&&bendArt.definition?bendArt:null;
  const viewport={width:1100,height:800},signatureWeapon=SIGNATURE_RANGE_WEAPONS[run.character.special.id];
+ // MEETING INVITE (Admin): the table is an engine-owned world object —
+ // spawned fully inside the visible viewport and world, luring enemies while
+ // active, exploding exactly once at expiry. dying > 0 holds the Admin's
+ // death strip for DEATH_HOLD seconds before the unchanged game-over flow.
+ const meeting={active:false,x:0,y:0};const DEATH_HOLD=1.1;
  const areaFx={life:0,x:0,y:0,reach:0,angle:0,half:Math.PI,color:'#fff',limit:Infinity,originX:0,originY:0};
  const enemies=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,r:10,lastShot:-1}));
  const shots=new ObjectPool(320,i=>({poolIndex:i,active:false,x:0,y:0,prevX:0,prevY:0,originX:0,originY:0,maxReach:0,remaining:0,traveled:0,vx:0,vy:0,r:5,life:0,id:0,pen:0,mortar:false,pattern:'projectile',boom:false}));
@@ -80,7 +86,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  let puddleTickClock=0,puddleSlowMul=1;
  const W=1100,H=800,CLAUSE_RADIUS=260;
  let viewW=W,viewH=H,scale=1,camX=0,camY=0,last=performance.now(),acc=0,raf,spawn=0,hudClock=0,soundClock=0,shotId=0,over=false,stress=false,lowFx=false,separate=true,fps=60,fpsClock=0,frames=0,lastNumber=0;
- let slow=0,timeScale=1,shakeMag=0,clauseFired=false,burstCount=0;
+ let slow=0,timeScale=1,shakeMag=0,clauseFired=false,burstCount=0,dying=0,deathDone=false;
  const duration=waveDuration(run.wave);let time=duration,signal=run.signal,earnedSignal=run.earnedSignal||0,kills=run.kills,xp=run.xp||0,levels=0,specialCooldown=run.specialCooldown||0,specialTimer=0,damageDealt=run.damageDealt||0;const killsByType={...(run.killsByType||{})};
  let healed=run.healed||0,damageTaken=run.damageTaken||0,xpEarnedWave=0;const startKills=run.kills,startEarned=run.earnedSignal||0;
  const p={x:0,y:0,r:17,hp:run.hp,maxHp:run.maxHp,inv:0,regen:0};let hurtBoost=0,firstBlockUsed=false;const cooldowns=new Float32Array(run.weapons.length);
@@ -263,8 +269,27 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
  function signatureTurret(cfg){const t=turrets.acquire();if(!t)return false;const a=cfg.index*Math.PI/2,helper=cfg.mode==='helper';
   Object.assign(t,{x:p.x+(helper?Math.cos(a)*22:0),y:p.y+(helper?Math.sin(a)*22:0),wid:`signature-${run.character.id}`,mode:cfg.mode,helperIndex:cfg.index,color:cfg.color,born:0,inv:0,r:13,life:cfg.life,maxLife:cfg.life,fire:cfg.fire,fireCd:.15,damage:cfg.damage*(1+(run.engineering||0)*.01)*(1+(run.turretQuality||0)*.004),range:cfg.range,weapon:{range:cfg.range,pattern:'turret'},hp:cfg.mode==='helper'?crewHelperHp(run.wave,run.engineering):35+(run.engineering||0),lookA:0});return true}
  function signatureBarrier(){let count=0;for(const s of structures.items)if(s.active)count++;if(count>=structCap())return false;const st=structures.acquire();if(!st)return false;const d=STRUCTURES.barricade;Object.assign(st,{type:'barricade',x:p.x,y:p.y,born:0,life:d.life,maxLife:d.life,r:d.r,power:1,rearm:0,uses:0,fireCd:0,lookA:0});return true}
- function activateSpecial(){if(specialCooldown>0||p.hp<=0||over||(charId==='isr'&&specialTimer>0))return;const timer=activateSignature(run,p,{launch,area:(r,d,color)=>explode(p.x,p.y,d,color,effectiveRange(signatureWeapon,run,viewport)),heal:amount=>{const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+amount);healed+=p.hp-before},turret:signatureTurret,barrier:signatureBarrier});if(timer===null){cb.flash('NO PERMIT SPACE — TRY AGAIN');return}specialTimer=timer;if(charId==='isr'&&spriteState){spriteState.special=timer;spriteState.heal=0;cb.event?.({type:'outageStart',time:duration-time,duration:timer,cooldown:run.character.special.cooldown})}if(spriteState&&run.character.special.id==='clause'){spriteState.special=timer;clauseFired=false}specialCooldown=run.character.special.cooldown;sfx(run.character.special.id==='cash'?'cash':run.character.special.id==='outage'?'whistle':run.character.special.id==='clause'?'charge':run.character.special.id==='sprint'?'chug':'special');cb.flash(run.character.special.name.toUpperCase());addShake(5);particle(p.x,p.y,'#ffffff',lowFx?6:16);if(run.character.special.id==='cash'){for(let i=0;i<8;i++){let q=particles.acquire();if(q){q.x=p.x+(Math.random()-.5)*20;q.y=p.y+(Math.random()-.5)*20;q.vx=(Math.random()-.5)*200;q.vy=-100-Math.random()*100;q.life=.5;q.color='#22c55e'}}}}
+ function spawnMeetingTable(){if(meeting.active)return false;
+  const spot=meetingTableSpot(p.x,p.y,camX,camY,viewW,viewH,W,H);
+  meeting.active=true;meeting.x=Math.round(spot.x);meeting.y=Math.round(spot.y);
+  cb.event?.({type:'meetingStart',time:duration-time,x:meeting.x,y:meeting.y,radius:MEETING.blastRadius,duration:MEETING.duration});
+  sfx('deploy');particle(meeting.x,meeting.y,'#d6d3d1',lowFx?4:10);return true}
+ // ONE blast at expiry: total = 8x the Admin's combined current weapon
+ // damage (the same canonical numbers as Knowledge Dump), split evenly
+ // across every enemy inside the radius; bosses take the FULL share.
+ function meetingDamageVisitor(e){if(!e.active||!areaCanHit(e,queryX,queryY,queryR,queryArcAngle,queryArcHalf))return;hit(e,queryDamage,'#fbbf24',true);particle(e.x,e.y,'#ffffff',lowFx?2:5)}
+ function explodeMeeting(){const total=run.weapons.reduce((s,w)=>s+(weaponOf(w).damage||0),0)*MEETING.damageMult;
+  queryX=meeting.x;queryY=meeting.y;queryR=MEETING.blastRadius;queryArcAngle=0;queryArcHalf=Math.PI;burstCount=0;
+  grid.visit(meeting.x,meeting.y,MEETING.blastRadius,clauseCountVisitor);
+  if(burstCount){queryDamage=total/burstCount;grid.visit(meeting.x,meeting.y,MEETING.blastRadius,meetingDamageVisitor)}
+  queryColor='#fbbf24';showArea();particle(meeting.x,meeting.y,'#fbbf24',lowFx?8:24);addShake(8);sfx('burst');
+  cb.event?.({type:'meetingExplode',time:duration-time,x:meeting.x,y:meeting.y,radius:MEETING.blastRadius,total,share:burstCount?total/burstCount:0,targets:burstCount})}
+ function activateSpecial(){if(specialCooldown>0||p.hp<=0||over||meeting.active||(charId==='isr'&&specialTimer>0))return;  const timer=activateSignature(run,p,{table:spawnMeetingTable,launch,area:(r,d,color)=>explode(p.x,p.y,d,color,effectiveRange(signatureWeapon,run,viewport)),heal:amount=>{const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+amount);healed+=p.hp-before},turret:signatureTurret,barrier:signatureBarrier});if(timer===null){cb.flash('NO PERMIT SPACE — TRY AGAIN');return}specialTimer=timer;if(charId==='isr'&&spriteState){spriteState.special=timer;spriteState.heal=0;cb.event?.({type:'outageStart',time:duration-time,duration:timer,cooldown:run.character.special.cooldown})}if(spriteState&&run.character.special.id==='clause'){spriteState.special=timer;clauseFired=false}specialCooldown=run.character.special.cooldown;sfx(run.character.special.id==='cash'?'cash':run.character.special.id==='outage'?'whistle':run.character.special.id==='clause'?'charge':run.character.special.id==='sprint'?'chug':'special');cb.flash(run.character.special.name.toUpperCase());addShake(5);particle(p.x,p.y,'#ffffff',lowFx?6:16);if(run.character.special.id==='cash'){for(let i=0;i<8;i++){let q=particles.acquire();if(q){q.x=p.x+(Math.random()-.5)*20;q.y=p.y+(Math.random()-.5)*20;q.vx=(Math.random()-.5)*200;q.vy=-100-Math.random()*100;q.life=.5;q.color='#22c55e'}}}}
  function separateVisitor(other){const e=queryShot;if(!other.active||other===e)return;let dx=e.x-other.x,dy=e.y-other.y,d2=dx*dx+dy*dy,min=e.r+other.r;if(d2>0&&d2<min*min){const push=(min-Math.sqrt(d2))*.025;e.x+=dx*push;e.y+=dy*push}}
+ // Single completion funnel (wave clear or player defeat): harvest, the
+ // solo checkpoint payload, and the meeting/lure cleanup all run exactly
+ // once — the death-sequence hold calls the same complete(false).
+ function complete(won){if(deathDone)return;deathDone=true;meeting.active=false;const harvest=won?Math.round(run.harvesting||0):0;signal+=harvest;earnedSignal+=harvest;sfx(won?'clear':'death');cancelAnimationFrame(raf);cb.finish({...run,hp:Math.max(0,p.hp),signal,earnedSignal,kills,xp,pendingLevels:levels,specialProgress:0,specialUnlocked:true,specialCooldown,deployCds:{...deployCds},won,damageDealt:Math.round(damageDealt),healed:Math.round(healed),damageTaken:Math.round(damageTaken),killsByType,lastWaveMetrics:{duration:duration-Math.max(0,time),kills:kills-startKills,earnedSignal:earnedSignal-startEarned,xpEarned:+xpEarnedWave.toFixed(2),levelsGained:levels}})}
  function fixedUpdate(dt){const oldX=p.x,oldY=p.y;areaFx.life=Math.max(0,areaFx.life-dt);time-=dt;soundClock-=dt;hurtBoost=Math.max(0,hurtBoost-dt);p.inv=Math.max(0,p.inv-dt);specialCooldown=Math.max(0,specialCooldown-dt);specialTimer=Math.max(0,specialTimer-dt);if(charId==='isr'){if(specialTimer<1e-8)specialTimer=0;if(specialCooldown<1e-8)specialCooldown=0}if(specialTimer>0&&run.character.special.id==='clause'){const ce=KNOWLEDGE_DUMP.total-specialTimer;if(ce>=KNOWLEDGE_DUMP.charge-1e-8&&!clauseFired){clauseFired=true;cb.event?.({type:'knowledgeImpact',time:duration-time,remaining:specialTimer});// KNOWLEDGE DUMP: the old fixed-90
 // instakill burst is gone. At release the total is 30x the Veteran's
 // combined current weapon damage, split EVENLY across every impairment
@@ -272,7 +297,10 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
 // radius still plays the golden release so the pop reads. Damage then
 // flows through hit() (run.damage multipliers, crit, etc.), like every
 // other source.
- const total=run.weapons.reduce((s,w)=>s+(weaponOf(w).damage||0),0)*30;burstCount=0;queryX=p.x;queryY=p.y;queryR=CLAUSE_RADIUS;queryArcAngle=0;queryArcHalf=Math.PI;grid.visit(p.x,p.y,CLAUSE_RADIUS,clauseCountVisitor);if(burstCount){queryDamage=total/burstCount;grid.visit(p.x,p.y,CLAUSE_RADIUS,clauseDamageVisitor)}queryColor='#fbbf24';showArea();addShake(15);sfx('burst');particle(p.x,p.y,'#fbbf24',lowFx?10:30)}}if(specialTimer<=0)clauseFired=false;for(const k in deployCds)if(deployCds[k]>0)deployCds[k]=Math.max(0,deployCds[k]-dt);p.regen+=dt*run.regen;if(p.regen>=1){const h=p.regen|0,before=p.hp;p.hp=Math.min(p.maxHp,p.hp+h);healed+=p.hp-before;p.regen-=h} // PACKET-LOSS PUDDING hazards: expire on a game-time clock (frozen while
+ const total=run.weapons.reduce((s,w)=>s+(weaponOf(w).damage||0),0)*30;burstCount=0;queryX=p.x;queryY=p.y;queryR=CLAUSE_RADIUS;queryArcAngle=0;queryArcHalf=Math.PI;grid.visit(p.x,p.y,CLAUSE_RADIUS,clauseCountVisitor);if(burstCount){queryDamage=total/burstCount;grid.visit(p.x,p.y,CLAUSE_RADIUS,clauseDamageVisitor)}queryColor='#fbbf24';showArea();addShake(15);sfx('burst');particle(p.x,p.y,'#fbbf24',lowFx?10:30)}}if(specialTimer<=0)clauseFired=false;
+  // MEETING INVITE: exactly 4s after activation the table explodes once,
+  // then aggro returns to the player immediately (no permanent retargeting).
+  if(meeting.active&&specialTimer<=1e-6){meeting.active=false;explodeMeeting()}for(const k in deployCds)if(deployCds[k]>0)deployCds[k]=Math.max(0,deployCds[k]-dt);p.regen+=dt*run.regen;if(p.regen>=1){const h=p.regen|0,before=p.hp;p.hp=Math.min(p.maxHp,p.hp+h);healed+=p.hp-before;p.regen-=h} // PACKET-LOSS PUDDING hazards: expire on a game-time clock (frozen while
  // paused), the strongest slow applies once while inside, and damage runs on
  // ONE shared 0.5s tick clock that overlapping puddles never reset or stack.
  puddleSlowMul=1;
@@ -299,7 +327,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   // (50%) chance to ignore it entirely; signalStrength resists impairment damage.
   // STRUCTURES: barricades shove enemies out (local steering, tiny m), traps
   // chomp + shove, snares slow — none of it touches the player.
-  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(!e.active)continue;let a=Math.atan2(p.y-e.y,p.x-e.x),spd=e.speed;
+  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(!e.active)continue;const tgt=meeting.active?meeting:p;let a=Math.atan2(tgt.y-e.y,tgt.x-e.x),spd=e.speed;
    let slowMul=1;
    if(e.jit){const action=stepJitter(e.jit,dt,{alive:e.active&&e.hp>0,playerAlive:p.hp>0,dist:distance(p,e),targetDx:p.x-e.x,visible:e.x-JITTER.radius>=camX&&e.x+JITTER.radius<=camX+viewW&&e.y-JITTER.radius>=camY&&e.y+JITTER.radius<=camY+viewH});
     if(action==='charge'){e.jit.rootX=e.x;e.jit.rootY=e.y}
@@ -344,14 +372,23 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
     else updateLagAnimation(e.anim,mvx*dt,mvy*dt,dt,lagArt.definition)}
    else if(e.sq)updateSquirrelAnimation(e.sq,mvx,mvy,dt,sqArt.definition)
    if(separate&&(!e.jit||e.jit.phase==='chase')&&(!e.pud||e.pud.phase==='chase')&&(!e.mac||e.mac.phase==='chase')){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
-   if(distance(p,e)<p.r+e.r&&p.inv<=0&&(!e.jit||e.jit.phase==='chase')){if(e.jit&&e.jit.phase==='chase'){e.jit.melee=1/3;e.jit.facing=p.x<e.x?'left':'right'}if(e.anim){if(e.kind==='packet'){e.anim.melee=.34;e.anim.facing=p.x<e.x?'left':'right'}else e.anim.attack=.35}if(run.firstHitBlocked&&!firstBlockUsed){firstBlockUsed=true;cb.flash('FIRST HIT POLITELY DECLINED')}else damagePlayer(e.damage);p.inv=.55}}
+   if(distance(p,e)<p.r+e.r&&p.inv<=0&&(!e.jit||e.jit.phase==='chase')){if(e.jit&&e.jit.phase==='chase'){e.jit.melee=1/3;e.jit.facing=p.x<e.x?'left':'right'}if(e.anim){if(e.kind==='packet'){e.anim.melee=.34;e.anim.facing=p.x<e.x?'left':'right'}else e.anim.attack=.35}
+   // IN A MEETING: contact damage is declined (no i-frames consumed); enemy
+   // novas, cast rings, boss pellets and goo hazards still hurt normally.
+   if(meeting.active){/* declined */}
+   else if(run.firstHitBlocked&&!firstBlockUsed){firstBlockUsed=true;cb.flash('FIRST HIT POLITELY DECLINED');p.inv=.55}
+   else{damagePlayer(e.damage);p.inv=.55}}}
   for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(!d.active)continue;const dd=distance(p,d);if(dd<120*(run.character.pickupScale||1)){d.x+=(p.x-d.x)*dt*7;d.y+=(p.y-d.y)*dt*7}if(dd<p.r+10){signal+=d.value;earnedSignal+=d.value;xp+=d.value*TUNING.xpPickupFactor;xpEarnedWave+=d.value*TUNING.xpPickupFactor;sfx('pickup');pickups.release(d);while(xp>=signalForLevel(run.level+levels)){xp-=signalForLevel(run.level+levels);levels++;sfx('level');cb.flash('SIGNAL LEVEL UP!')}}}
   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(!q.active)continue;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=.94;q.vy*=.94;q.life-=dt;if(q.life<=0)particles.release(q)}for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;n.y-=25*dt;n.life-=dt;if(n.life<=0)numbers.release(n)}if(soundClock<=0){for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active){sfx(e.sound);break}}soundClock=.35+Math.random()*.35}
-  if((p.hp<=0||time<=0)&&!over){over=true;if(charId==='isr')clearOutage();const harvest=p.hp>0?Math.round(run.harvesting||0):0;signal+=harvest;earnedSignal+=harvest;sfx(p.hp<=0?'death':'clear');cancelAnimationFrame(raf);cb.finish({...run,hp:Math.max(0,p.hp),signal,earnedSignal,kills,xp,pendingLevels:levels,specialProgress:0,specialUnlocked:true,specialCooldown,deployCds:{...deployCds},won:p.hp>0,damageDealt:Math.round(damageDealt),healed:Math.round(healed),damageTaken:Math.round(damageTaken),killsByType,lastWaveMetrics:{duration:duration-Math.max(0,time),kills:kills-startKills,earnedSignal:earnedSignal-startEarned,xpEarned:+xpEarnedWave.toFixed(2),levelsGained:levels}})}
-  hudClock-=dt;if(hudClock<=0){let boss=null;for(let i=0;i<enemies.items.length;i++){const b=enemies.items[i];if(b.active&&b.sq){boss={name:SQUIRREL.name,hp:Math.max(0,b.hp),max:b.max,phase:b.sq.phase};break}}const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,earnedSignal,xp,xpTarget:signalForLevel(run.level+levels),level:run.level+levels,kills,boss,specialUnlocked:true,specialCooldown,specialName:run.character.special.name,characterId:charId,specialRemaining:charId==='isr'?specialTimer:0,fps:Math.round(fps),stress,viewport:{...viewport},weaponRanges:run.weapons.map(w=>effectiveRange(weaponOf(w),run,viewport)),signatureReach:signatureWeapon?effectiveRange(signatureWeapon,run,viewport):0,
+  if((p.hp<=0||time<=0)&&!over){over=true;if(charId==='isr')clearOutage();
+  // DEATH SEQUENCE: on a player defeat the Admin plays his 6th-row collapse
+  // strip briefly (any key skips it) before the unchanged game-over flow.
+  if(charId==='admin'&&characterArt&&characterArt.definition.deathColumns&&p.hp<=0){dying=DEATH_HOLD;sfx('death');cb.event?.({type:'deathSequence',time:duration-time})}
+  else{sfx(p.hp<=0?'death':'clear');complete(p.hp>0)}}
+  hudClock-=dt;if(hudClock<=0){let boss=null;for(let i=0;i<enemies.items.length;i++){const b=enemies.items[i];if(b.active&&b.sq){boss={name:SQUIRREL.name,hp:Math.max(0,b.hp),max:b.max,phase:b.sq.phase};break}}const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,earnedSignal,xp,xpTarget:signalForLevel(run.level+levels),level:run.level+levels,kills,boss,specialUnlocked:true,specialCooldown,specialName:run.character.special.name,characterId:charId,specialRemaining:(charId==='isr'||charId==='admin')?specialTimer:0,fps:Math.round(fps),stress,viewport:{...viewport},weaponRanges:run.weapons.map(w=>effectiveRange(weaponOf(w),run,viewport)),signatureReach:signatureWeapon?effectiveRange(signatureWeapon,run,viewport):0,
    deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,STRUCTURES[d.structure]),selected:i===depIdx})),structures:structCount,cap:structCap()}:null});hudClock=.1}
   // Opt-in automated-test observation only; GameArena supplies neither callback.
-  if(cb.inspect)cb.inspect({time:duration-time,player:{...p},slow:puddleSlowMul,specialTimer,specialCooldown,healed,kills,clauseFired,damageDealt,camX,camY,...(charId==='isr'?{enemies:enemies.items.filter(e=>e.active).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,speed:e.speed,boss:e.boss,hp:e.hp,motion:e.outageMotion})),shots:shots.items.filter(s=>s.active).map(s=>({id:s.id,originX:s.originX,originY:s.originY,vx:s.vx,vy:s.vy})),sprite:{...spriteState}}:{}),puddles:puddles.items.filter(d=>d.active).map(d=>({...d})),puddings:enemies.items.filter(e=>e.active&&e.pud).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,cast:{...e.pud}})),
+  if(cb.inspect)cb.inspect({time:duration-time,player:{...p},slow:puddleSlowMul,specialTimer,specialCooldown,healed,kills,clauseFired,damageDealt,camX,camY,meeting:meeting.active?{x:meeting.x,y:meeting.y,timer:specialTimer,radius:MEETING.blastRadius}:null,dying,...(charId==='isr'?{enemies:enemies.items.filter(e=>e.active).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,speed:e.speed,boss:e.boss,hp:e.hp,motion:e.outageMotion})),shots:shots.items.filter(s=>s.active).map(s=>({id:s.id,originX:s.originX,originY:s.originY,vx:s.vx,vy:s.vy})),sprite:{...spriteState}}:{}),puddles:puddles.items.filter(d=>d.active).map(d=>({...d})),puddings:enemies.items.filter(e=>e.active&&e.pud).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,cast:{...e.pud}})),
   petes:enemies.items.filter(e=>e.active&&(e.kind==='pete'||e.kind==='peteMini')).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cloneT:e.cloneT})),
   bends:enemies.items.filter(e=>e.active&&e.mac).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cast:{...e.mac}})),
   rings:foeShots.items.filter(s=>s.active&&s.ring).map(s=>({x:s.x,y:s.y,remaining:s.remaining,damage:s.damage})),
@@ -374,6 +411,16 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   // PACKET-LOSS PUDDING ground goo: translucent flattened goo + cyan packet
   // glints, ground-anchored at the saved drop spot, drawn under all actors.
   for(let i=0;i<puddles.items.length;i++){const d=puddles.items[i];if(!d.active||!pudArtDef||d.x<camX-140||d.x>camX+viewW+140||d.y<camY-90||d.y>camY+viewH+90)continue;drawGroundPuddle(ctx,puddingArt,d)}
+  // MEETING INVITE world object: the exact blast-radius ground telegraph
+  // (subtle fill + dashed ring, drawn for the whole 4s) and the round table
+  // with its empty chairs, hard hat and googly eyes (structure convention).
+  if(meeting.active){const tx=Math.round(meeting.x),ty=Math.round(meeting.y),tr=MEETING.tableRadius;
+   ctx.save();ctx.globalAlpha=.07;ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.arc(tx,ty,MEETING.blastRadius,0,7);ctx.fill();
+   ctx.globalAlpha=.34;ctx.strokeStyle='#fde68a';ctx.lineWidth=2;ctx.setLineDash([10,8]);ctx.beginPath();ctx.arc(tx,ty,MEETING.blastRadius,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore();
+   ctx.fillStyle='#4a2f14';ctx.beginPath();ctx.arc(tx,ty,tr,0,7);ctx.fill();
+   ctx.fillStyle='#8b5a2b';ctx.beginPath();ctx.arc(tx,ty,tr-5,0,7);ctx.fill();
+   for(let k=0;k<6;k++){const a=k*Math.PI/3+Math.PI/6,cx2=tx+Math.cos(a)*(tr+13),cy2=ty+Math.sin(a)*(tr+13);ctx.fillStyle='#92400e';ctx.fillRect(Math.round(cx2-6),Math.round(cy2-10),12,14);ctx.fillStyle='#3f2410';ctx.fillRect(Math.round(cx2-4),Math.round(cy2-16),8,6)}
+   drawHardHat(tx,ty-tr-4);drawEyes(tx,ty-tr*.25,Math.atan2(p.y-ty,p.x-tx))}
   // structures (under enemies): pop-in scale, fade out during the last 1.5s of life
   for(let i=0;i<structures.items.length;i++){const st=structures.items[i];if(!st.active)continue;const def=STRUCTURES[st.type];if(!def)continue;const x=Math.round(st.x),y=Math.round(st.y),grow=Math.min(1,st.born*4);
    ctx.globalAlpha=(st.life<1.5?Math.max(.2,st.life/1.5):1)*(.4+.6*grow);
@@ -403,7 +450,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;ctx.fillStyle=n.crit?'#fde047':'#fff';ctx.font=n.crit?'bold 18px Chivo':'bold 13px Chivo';ctx.fillText(n.value,Math.round(n.x),Math.round(n.y))}
   const px=Math.round(p.x),py=Math.round(p.y);
   const drawX=specialTimer>0&&run.character.id==='nomad'?p.x+Math.sin(performance.now()*.05)*2:p.x,drawY=specialTimer>0&&run.character.id==='nomad'?p.y+Math.cos(performance.now()*.05)*2:p.y;
-  if(spriteState){if(charId==='isr')drawISR(ctx,characterArt,spriteState,drawX,drawY);else if(run.character.id==='oracle')drawCharacterSprite(ctx,characterArt,spriteState,drawX,drawY);else drawTechSprite(ctx,characterArt,spriteState,drawX,drawY)}else {ctx.fillStyle=run.character.color;ctx.beginPath();ctx.arc(px,py,p.r,0,7);ctx.fill();ctx.fillStyle=run.character.vest;ctx.fillRect(px-14,py+2,28,16);ctx.fillStyle=run.character.belt;ctx.fillRect(px-15,py+11,30,5);ctx.fillStyle=run.character.color;ctx.fillRect(px-20,py-17,40,8);ctx.fillStyle='#fff';ctx.fillRect(px-8,py-5,6,7);ctx.fillRect(px+3,py-5,6,7);}if(specialTimer>0){const sid=run.character.special.id;if(sid==='clause'){const ci=Math.min(1,(KNOWLEDGE_DUMP.total-specialTimer)/KNOWLEDGE_DUMP.charge);
+  if(charId==='admin'&&dying>0&&characterArt){drawTechDeathFrame(ctx,characterArt,(DEATH_HOLD-dying)/DEATH_HOLD*characterArt.definition.deathColumns,drawX,drawY)}else if(spriteState){if(charId==='isr')drawISR(ctx,characterArt,spriteState,drawX,drawY);else if(run.character.id==='oracle')drawCharacterSprite(ctx,characterArt,spriteState,drawX,drawY);else drawTechSprite(ctx,characterArt,spriteState,drawX,drawY)}else {ctx.fillStyle=run.character.color;ctx.beginPath();ctx.arc(px,py,p.r,0,7);ctx.fill();ctx.fillStyle=run.character.vest;ctx.fillRect(px-14,py+2,28,16);ctx.fillStyle=run.character.belt;ctx.fillRect(px-15,py+11,30,5);ctx.fillStyle=run.character.color;ctx.fillRect(px-20,py-17,40,8);ctx.fillStyle='#fff';ctx.fillRect(px-8,py-5,6,7);ctx.fillRect(px+3,py-5,6,7);}if(specialTimer>0){const sid=run.character.special.id;if(sid==='clause'){const ci=Math.min(1,(KNOWLEDGE_DUMP.total-specialTimer)/KNOWLEDGE_DUMP.charge);
    // Radius telegraph: translucent filled circle + dashed ring at the exact
    // burst radius, following him (he creeps at 30% speed during charge —
    // not rooted). The ring brightens and pulses over the final second to
@@ -412,9 +459,9 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
     ctx.save();ctx.globalAlpha=.09+ci*.06+lock*.04;ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.arc(px,py,CLAUSE_RADIUS,0,7);ctx.fill();
     ctx.globalAlpha=.3+lock*.4+(lock>0?Math.sin(performance.now()*.025)*.08*lock:0);ctx.strokeStyle='#fde047';ctx.lineWidth=2;ctx.setLineDash([12,9]);ctx.beginPath();ctx.arc(px,py,CLAUSE_RADIUS,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
    if(!clauseFired){ctx.save();ctx.globalAlpha=.2+ci*.3;ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.arc(px,py-20,28+ci*15,0,7);ctx.fill();ctx.restore()}}else if(sid==='cash'){ctx.save();ctx.globalAlpha=.25+Math.sin(performance.now()*.01)*.05;ctx.fillStyle='#22c55e';ctx.beginPath();ctx.arc(px,py-20,25,0,7);ctx.fill();ctx.restore()}else if(sid==='sprint'){ctx.save();ctx.globalAlpha=.2+Math.sin(performance.now()*.008)*.08;ctx.fillStyle='#22d3ee';ctx.beginPath();ctx.arc(px,py-20,24,0,7);ctx.fill();ctx.restore()}else if(sid!=='outage'){ctx.strokeStyle='#fde047';ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,py,25+Math.sin(performance.now()*.02)*5,0,7);ctx.stroke()}}}
- function key(e){if(e.key==='F9'){stress=!stress;if(stress){for(let i=0;i<500;i++)spawnEnemy(null,true)}cb.flash(stress?'STRESS MODE: 500 IMPAIRMENTS':'STRESS MODE OFF')}} window.addEventListener('keydown',key);resize();sfx('wave');if(run.wave%5===0)sfx('boss');
+ function key(e){if(dying>0){dying=0;complete(false);return}if(e.key==='F9'){stress=!stress;if(stress){for(let i=0;i<500;i++)spawnEnemy(null,true)}cb.flash(stress?'STRESS MODE: 500 IMPAIRMENTS':'STRESS MODE OFF')}} window.addEventListener('keydown',key);resize();sfx('wave');if(run.wave%5===0)sfx('boss');
  function frame(now){
-  if(paused.current){last=now;if(!over)raf=requestAnimationFrame(frame);return}
+  if(paused.current){last=now;if(!over||dying>0)raf=requestAnimationFrame(frame);return}
   let delta=Math.min(MAX_DT,(now-last)/1000);last=now;
   slow=Math.max(0,slow-delta);
   const target=slow>0?.1:1;
@@ -422,8 +469,9 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   if(Math.abs(timeScale-target)<.005)timeScale=target;
   delta*=timeScale;
   acc+=delta;while(acc>=STEP&&!over){fixedUpdate(STEP);acc-=STEP}
+  if(over&&dying>0){dying=Math.max(0,dying-delta);if(dying<=0)complete(false)} // death strip hold (key skips)
   shakeMag*=Math.exp(-7*delta);if(shakeMag<.05)shakeMag=0;
-  draw();frames++;fpsClock+=delta;if(fpsClock>=1){fps=frames/fpsClock;frames=0;fpsClock=0;lowFx=fps<52;separate=fps>=42}if(!over)raf=requestAnimationFrame(frame)
+  draw();frames++;fpsClock+=delta;if(fpsClock>=1){fps=frames/fpsClock;frames=0;fpsClock=0;lowFx=fps<52;separate=fps>=42}if(!over||dying>0)raf=requestAnimationFrame(frame)
  }raf=requestAnimationFrame(frame);window.addEventListener('resize',resize);
  const observer=new ResizeObserver(resize);observer.observe(canvas);
  return()=>{over=true;if(charId==='isr')clearOutage();cancelAnimationFrame(raf);observer.disconnect();window.removeEventListener('resize',resize);window.removeEventListener('keydown',key)}
