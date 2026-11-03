@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createGenerator, WEAPON_ARCHETYPES } from '@/game/data/generation';
 import { createRun, rebuildStats, normalizeRun } from '@/game/progression/runRules';
 import { acquireItem, manualCombine } from '@/game/items/acquisition';
+import { scaleItem } from '@/game/items/itemScaling';
 import { tierId, combineStatus, canCombine } from '@/game/items/tiers';
 import { characterById } from '@/game/data/characters';
 import { upgradeChoices, pickUpgrade } from '@/game/progression/upgradeRules';
@@ -64,6 +65,13 @@ test('duplicate candidate respects Clone roll ceiling and two exact-price locks'
 });
 test('Overclocked shop injection is rejected and cannot spend Signal',()=>{
   const r=run(),item=tool('unsold','overclocked');assert.match(offerReason(r,item),/never sold/);assert.throws(()=>shopTransaction(shop(r,item),{type:'buy',offerId:item.id}),/never sold/);
+});
+test('combining replaces old additive and multiplicative bonuses without double application',()=>{
+  const item=scaleItem({id:'passive-a',name:'Slack Coils',baseStats:{mods:[{stat:'damage',value:.1},{stat:'speed',value:.1},{stat:'armor',value:2}]},rarity:'common'},'common');
+  const r=rebuildStats({...run(),items:[item,{...item,id:'passive-b'}]}),next=manualCombine(r,item.id);
+  assert.equal(next.items.length,1);assert(Math.abs(next.damage-(r.character.stats.damage+.135))<1e-8);
+  assert(Math.abs(next.speed-r.character.stats.speed*1.135)<1e-8);assert.equal(next.armor,2.7);
+  const restored=normalizeRun(JSON.parse(JSON.stringify(next)));assert.equal(restored.damage,next.damage);assert.equal(restored.speed,next.speed);
 });
 test('Field Guide covers every weapon/passive/deployable with the same previewable item contract',()=>{
   const entries=guideEntries();assert.equal(entries.Tools.length,20);assert.equal(entries.Passives.length,35);assert.equal(entries.Deployables.length,5);

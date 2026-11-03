@@ -67,7 +67,8 @@ test('legacy rarity migration, preserved rank bonuses, locked cost, server accep
   assert.equal(normalized.deployables[0].stacks,2);assert.equal(normalized.shop.offers[0].cost,123);
   assert.deepEqual(roundtrip,normalized);assert.doesNotThrow(()=>validateProfile({checkpoint:{phase:'shop',run:roundtrip}},'owner'));
 });
-test('Overclocked never randomly rolls, and Clone fresh rolls remain Basic/Rare',()=>{
+test('Overclocked never randomly rolls, Legendary wave gate holds, and Clone fresh rolls remain Basic/Rare',()=>{
+  const early=createGenerator(813,1);for(let i=0;i<600;i++)assert.notEqual(early.weapon().rarity,'legendary');
   for(const cap of [null,'Rare']){
     const generator=createGenerator(42,40,cap);
     for(let i=0;i<600;i++)for(const item of [generator.weapon(),generator.passive(),generator.deployable()]){
