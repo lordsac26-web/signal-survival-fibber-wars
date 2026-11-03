@@ -1,6 +1,6 @@
 import { createSignalEngine,makeCanvas,preloadCharacterSprite,preloadEnemySprite,preloadStructureSprite,pump } from '@/game/tests/engineHarness.mjs';
 import { seeded } from '@/game/data/generation';
-import { createRun } from '@/game/progression/runRules';
+import { createRun,rebuildStats } from '@/game/progression/runRules';
 import { characterById } from '@/game/data/characters';
 import { WEAPONS } from '@/game/data/combat';
 import { enterShop,shopTransaction,offerReason } from '@/game/shop/shopRules';
@@ -27,7 +27,8 @@ function intermission(run){
 export async function simulateCampaign(seed,moving,lastWave=30){
   const art=await arts(),realRandom=Math.random;Math.random=seeded(seed);const rows=[];
   let run=createRun(characterById('nomad'),false,seed,`phase2-${seed}-${moving}`),deathWave=null;
-  if(!moving)run.weapons=['vfl','otdr','power','stripper','cleaver','splicer'].map((id,i)=>({...WEAPONS[id],baseId:id,id:`camp-${i}`,mods:[],rarity:'common'}));
+  run.weapons=(moving?['vfl','otdr','power','stripper']:['vfl','otdr','power','stripper','cleaver','splicer']).map((id,i)=>({...WEAPONS[id],baseId:id,id:`fixture-${i}`,mods:[],rarity:'common'}));
+  run=rebuildStats({...run,items:[{id:'fixture-gear',name:'Average-build fixture',mods:[{stat:'maxHp',value:40},{stat:'armor',value:4},{stat:'speed',value:.1},{stat:'damage',value:.1}]}],hp:118});
   try{for(let wave=1;wave<=lastWave;wave++){
     let hud=null,finished=null,peak=0,cones=0;const input={current:{x:0,y:0}},canvas=makeCanvas(1100,800,{ctx:context()});
     rows.push({wave,dps:+estimateDps(run).toFixed(2),level:run.level,xp:run.xp,signal:run.signal,hp:run.hp,weapons:run.weapons.length});

@@ -8,7 +8,7 @@ import { ENEMIES,WEAPONS } from '@/game/data/combat';
 import { maxActiveEnemies,signalForLevel } from '@/game/data/tuning';
 const count=Number(process.env.PHASE2_SEEDS||12),seeds=Array.from({length:count},(_,i)=>7919*(i+1)+20261103);
 const median=values=>{const sorted=[...values].sort((a,b)=>a-b),mid=sorted.length/2;return sorted.length%2?sorted[Math.floor(mid)]:(sorted[mid-1]+sorted[mid])/2};
-test('Phase 2 seeded real-engine campaigns: stationary six-tool versus moving starter and legal purchases',{timeout:240000},async()=>{
+test('Phase 2 seeded real-engine campaigns: stationary six-tool versus moving average four-tool build, equal gear and legal purchases',{timeout:240000},async()=>{
  const campers=[],movers=[];
  for(const seed of seeds){campers.push(await simulateCampaign(seed,false));movers.push(await simulateCampaign(seed,true))}
  const medianDeath=median(campers.map(r=>r.deathWave??31)),reached20=movers.filter(r=>r.reached>=20).length;
