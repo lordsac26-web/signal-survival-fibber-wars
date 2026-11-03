@@ -1,15 +1,16 @@
 import { useRef, useState } from 'react';
 import { resumeAudio } from '@/game/audio';
 import { saveCheckpoint, recordRun, updateProfile } from '@/game/storage';
-import { createRun, normalizeRun, rebuildStats } from '@/game/progression/runRules';
+import { createRun, normalizeRun } from '@/game/progression/runRules';
 import { enterShop, shopTransaction } from '@/game/shop/shopRules';
-import { createGenerator } from '@/game/data/generation';
-export const upgradeChoices=run=>{const g=createGenerator(run.seed+run.level*3571+17,run.level);return [g.passive(run.luck),g.passive(run.luck),g.passive(run.luck)]};
+import { pickUpgrade, upgradeChoices } from '@/game/progression/upgradeRules';
+import { toast } from '@/components/ui/use-toast';
+export { upgradeChoices } from '@/game/progression/upgradeRules';
 export default function useSoloSession(profile){
   const [screen,setScreen]=useState('menu'),[run,setRun]=useState(null),[newUnlocks,setUnlocks]=useState([]);
   const current=useRef(null),phase=useRef('menu');
   const navigate=where=>{phase.current=where;setScreen(where)};
-  const assign=(value,where,persist=true)=>{const next=persist?saveCheckpoint(value,where):value;current.current=next;setRun(next);navigate(where)};
+  const assign=(value,where,persist=true)=>{const {combineNotices=[],...clean}=value;const next=persist?saveCheckpoint(clean,where):clean;current.current=next;setRun(next);navigate(where);for(const notice of combineNotices)toast({...notice,duration:3500,className:'combine-flash'})};
   const start=(c,useAlt,arenaTheme='classic')=>{
     const alt=useAlt && profile.loadouts.includes(`${c.id}:alt`);resumeAudio();
     const next={...createRun(c,alt,Math.floor(Math.random()*0x7fffffff)),useAlt:alt,arenaTheme};
@@ -24,7 +25,7 @@ export default function useSoloSession(profile){
   };
   const upgrade=item=>{
     const r=current.current;if(phase.current!=='upgrade' || !upgradeChoices(r).some(i=>i.id===item.id))return;
-    const next=rebuildStats({...r,level:r.level+1,pendingLevels:r.pendingLevels-1,items:[...r.items,{...item,levelUpgrade:true}]});
+    const next=pickUpgrade(r,item.id);
     const where=next.pendingLevels>0?'upgrade':'shop';assign(where==='shop'?enterShop(next):next,where);
   };
   const shopAction=event=>{const next=shopTransaction(current.current,event);assign(next,'shop')};

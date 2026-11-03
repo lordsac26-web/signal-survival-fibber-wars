@@ -116,6 +116,9 @@
   background-color: #24323b;
   background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0, rgba(255,255,255,.035) 12px, transparent 12px, transparent 24px);
 }
+.combine-flash { animation: combine-flash .65s ease-out; }
+@keyframes combine-flash { from { box-shadow: inset 0 0 0 3px hsl(var(--game-signal)); background-color: hsl(var(--game-signal) / .25); } to { box-shadow: inset 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .combine-flash { animation: none; } }
 .game-shake { animation: game-shake .12s linear; }
 @keyframes game-shake { 0%,100%{transform:translate(0)} 25%{transform:translate(-4px,2px)} 75%{transform:translate(4px,-2px)} }
 @media (prefers-reduced-motion: reduce) { .game-shake { animation: none; } }

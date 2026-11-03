@@ -1,13 +1,19 @@
-import { createGenerator, WEAPON_ARCHETYPES, STAT_MOD_POOL, seeded, RARITY } from '@/game/data/generation';
+import { createGenerator, WEAPON_ARCHETYPES, seeded } from '@/game/data/generation';
+import { passivePoolFor } from '@/game/shop/rollPools';
+import { tierId } from '@/game/items/tiers';
+import { normalizeItem, scaleItem } from '@/game/items/itemScaling';
+import { acquireItem, hasCombineTarget, manualCombine } from '@/game/items/acquisition';
+import { priceOffer } from '@/game/shop/itemPricing';
+import { ownedMatch, withVisitDuplicate } from '@/game/shop/duplicateOffers';
 import { DEPLOYABLES } from '@/game/data/structures';
 import { TUNING } from '@/game/data/tuning';
-import { allowedWeapon, legalLoadout, normalizeWeapon, rebuildStats } from '@/game/progression/runRules';
-// Contractor Clone: the premium card overclocks an owned RARE tool instead
-// (cloneOverclockCap = 3), and can never receive an Epic or Legendary item.
+import { allowedWeapon, legalLoadout, rebuildStats } from '@/game/progression/runRules';
+// Clone keeps Rare-only fresh rolls and Rare premium tune-ups (cap 3).
+// The shared combine ladder can still promote owned items above Rare.
 export const cloneOverclockCap=run=>run.character.id==='clone'?TUNING.cloneOverclockCap:TUNING.overclockRankCap;
 export const premiumTargets=run=>run.character.id==='clone'
-  ?run.weapons.filter(w=>w.rarity==='Rare' && (w.overclockRank || 0)<TUNING.cloneOverclockCap)
-  :run.weapons.filter(w=>w.rarity==='Epic' || (w.rarity==='Legendary' && (w.overclockRank || 0)<TUNING.overclockRankCap));
+  ?run.weapons.filter(w=>tierId(w.rarity)==='rare' && (w.overclockRank || 0)<TUNING.cloneOverclockCap)
+  :run.weapons.filter(w=>tierId(w.rarity)==='epic' || (tierId(w.rarity)==='legendary' && (w.overclockRank || 0)<TUNING.overclockRankCap));
 // ONE deployable turret WEAPON per character — an inventory cap, not an
 // active-unit cap. A second turret tool is blocked across ALL variants;
 // upgrades to the owned turret (premium overclock / rank caps) stay
@@ -15,61 +21,67 @@ export const premiumTargets=run=>run.character.id==='clone'
 // untouched (non-destructive); only new acquisitions are gated.
 export const ownedTurretCount=run=>run.weapons.filter(w=>w.pattern==='turret').length;
 function freshOffer(run,sequence){
-  const seed=(run.seed+run.wave*7919+sequence*104729)>>>0,r=seeded(seed),gen=createGenerator(seed+31,run.wave,run.character.id==='clone'?'Rare':null),chance=r();
+  const seed=(run.seed+run.wave*7919+sequence*104729)>>>0,r=seeded(seed),gen=createGenerator(seed+31,run.wave,run.character.id==='clone'?'rare':null),chance=r();
   let item;
   if(chance<TUNING.deployOfferChance){
-    const candidates=DEPLOYABLES.filter(d=>['turretMount','barricade'].includes(d.structure) && d.structure!==run.character.signatureStructure && ((run.deployables || []).find(o=>o.structure===d.structure)?.stacks || 0)<TUNING.deployRankCap);
-    const turrets=ownedTurretCount(run)?[]:WEAPON_ARCHETYPES.filter(a=>a[2]==='turret' && allowedWeapon(run.character,{pattern:a[2]}) && run.character.signatureStructure!=='turretMount'); // no turret offers once one tool is owned
+    const candidates=DEPLOYABLES.filter(d=>['turretMount','barricade'].includes(d.structure) && d.structure!==run.character.signatureStructure);
+    const turrets=ownedTurretCount(run)?[]:WEAPON_ARCHETYPES.filter(a=>a[2]==='turret' && allowedWeapon(run.character,{pattern:a[2]}) && run.character.signatureStructure!=='turretMount');
     if(candidates.length && (r()<.6 || !turrets.length)){
-      const d=candidates[Math.floor(r()*candidates.length)],rar=run.character.id==='clone'?'Rare':(r()<.8?'Rare':'Epic');
-      item={...d,id:`deploy-${sequence}`,deploy:true,rarity:rar,mods:[],cost:Math.round(TUNING.deployBasePrice*RARITY[rar].power*(1+((run.deployables || []).find(o=>o.structure===d.structure)?.stacks || 0)*.5))};
-    }else if(turrets.length){item=gen.weapon(run.luck,turrets,run.character.id==='clone'?'Rare':(r()<.8?'Rare':r()<.8?'Epic':'Legendary'));item.cost=Math.max(TUNING.deployBasePrice,Math.round(item.cost*2.8))}
-  } else if(chance<TUNING.deployOfferChance+TUNING.premiumOfferChance && premiumTargets(run).length){
+      const d=candidates[Math.floor(r()*candidates.length)],rar=run.character.id==='clone'?'rare':(r()<.8?'rare':'epic');
+      item=scaleItem({...d,id:`deploy-${sequence}`,deployId:d.id,deploy:true,rarity:rar,baseStats:{mods:[]},baseCost:TUNING.deployBasePrice},rar);
+    }else if(turrets.length)item=gen.weapon(run.luck,turrets,run.character.id==='clone'?'rare':(r()<.8?'rare':r()<.8?'epic':'legendary'));
+  }else if(chance<TUNING.deployOfferChance+TUNING.premiumOfferChance && premiumTargets(run).length){
     item=run.character.id==='clone'
-      ?{id:`premium-${sequence}`,premium:true,clone:true,name:'Overtime Overclock',icon:'↑',rarity:'Rare',mods:[],cost:Math.round(TUNING.premiumReferencePrice*TUNING.premiumPriceMultiplier),desc:'The clones bill by the hour: overclock one owned Rare tool up to 3 times for a large signal fee. Choose and preview before paying.'}
-      :{id:`premium-${sequence}`,premium:true,name:'OSHA Has Left the Chat',icon:'↑',rarity:'Legendary',mods:[],cost:Math.round(TUNING.premiumReferencePrice*TUNING.premiumPriceMultiplier),desc:'Promote one owned Epic, or overclock one owned Legendary. Choose and preview before paying.'};
+      ?{id:`premium-${sequence}`,premium:true,clone:true,name:'Overtime Overclock',icon:'↑',rarity:'rare',mods:[],cost:Math.round(TUNING.premiumReferencePrice*TUNING.premiumPriceMultiplier),desc:'Overclock one owned Rare tool up to 3 times. Choose and preview before paying.'}
+      :{id:`premium-${sequence}`,premium:true,name:'OSHA Has Left the Chat',icon:'↑',rarity:'legendary',mods:[],cost:Math.round(TUNING.premiumReferencePrice*TUNING.premiumPriceMultiplier),desc:'Promote one owned Epic, or overclock one owned Legendary. Choose and preview before paying.'};
   }
   if(!item){
     const pool=WEAPON_ARCHETYPES.filter(a=>a[2]!=='turret' && allowedWeapon(run.character,{pattern:a[2]}));
-    const preferred={oracle:['range','crit'],admin:['dodge','speed'],nomad:['speed','luck'],don:['maxHp','engineering']}[run.character.id] || ['damage','maxHp'];
-    const passivePool=STAT_MOD_POOL.concat(STAT_MOD_POOL.filter(m=>preferred.includes(m[0])));
+    const passivePool=passivePoolFor(run.character.id);
     const weakerFamily=run.weapons.filter(w=>w.slotType==='melee').length>run.weapons.filter(w=>w.slotType==='ranged').length?'ranged':'melee';
     const synergy=run.character.id==='veteran'?pool.concat(pool.filter(a=>(['melee','chain','nova','orbiting'].includes(a[2])?'melee':'ranged')===weakerFamily)):pool;
     item=r()<.55?gen.weapon(run.luck,synergy):gen.passive(run.luck,passivePool);
   }
-  // Brotato-style tier pricing: every offer's cost scales with the wave so
-  // the raw Signal flood in later waves can't trivially clear the shelf.
-  item.cost=Math.round(item.cost*(1+TUNING.priceWaveScale*(run.wave-1)));
-  return {...item,id:`${run.runId}:offer:${run.wave}:${sequence}:${item.id}`};
+  return {...priceOffer(item,run.wave),id:`${run.runId}:offer:${run.wave}:${sequence}:${item.id}`};
+}
+// Only the per-visit slot below can sell an exact owned-tier duplicate.
+// Rerolls do not manufacture another duplicate opportunity in that visit.
+function freshNonDuplicate(run,shop){
+  for(let attempt=0;attempt<200;attempt++){const item=freshOffer(run,++shop.sequence);if(!ownedMatch(run,item))return item}
+  return null;
 }
 export function enterShop(run){
   if(run.shop?.wave===run.wave)return run;
-  const old=run.shop?.offers || [],locked=run.lockedIds || [];let sequence=run.shop?.sequence || 0;
-  const offers=Array.from({length:TUNING.shopSlots},(_,index)=>{const item=old[index];return item && locked.includes(item.id) && !(item.pattern==='turret'&&ownedTurretCount(run))?item:freshOffer(run,++sequence)});
-  return {...run,shop:{wave:run.wave,offers,sequence,rerolls:0},lockedIds:locked.filter(id=>offers.some(o=>o?.id===id))};
+  const old=run.shop?.offers || [],locked=run.lockedIds || [],state={sequence:run.shop?.sequence || 0};
+  const fresh=Array.from({length:TUNING.shopSlots},(_,index)=>{const item=old[index];return item && locked.includes(item.id) && !(item.pattern==='turret'&&ownedTurretCount(run)&&!hasCombineTarget(run,item))?item:freshNonDuplicate(run,state)});
+  const {offers,sequence,duplicateOffered}=withVisitDuplicate(run,fresh,state.sequence,seeded((run.seed+run.wave*3571+851)>>>0));
+  return {...run,shop:{wave:run.wave,offers,sequence,rerolls:0,duplicateOffered},lockedIds:locked.filter(id=>offers.some(o=>o?.id===id))};
 }
 export function swapTargets(run,item){return run.weapons.filter(old=>legalLoadout(run.character,run.weapons.map(w=>w.id===old.id?item:w)))}
 export function offerReason(run,item){
   if(!item)return 'Offer already purchased.';
   if(item.baseId && !allowedWeapon(run.character,item))return `${run.character.restriction}-only technician.`;
-  if(item.baseId && item.pattern==='turret' && ownedTurretCount(run))return 'Only one deployable turret tool per technician — upgrade the one you own.';
-  if(item.deploy && (item.structure===run.character.signatureStructure || ((run.deployables || []).find(d=>d.structure===item.structure)?.stacks || 0)>=TUNING.deployRankCap))return 'Signature duplicate or loot rank cap reached.';
+  if(!item.premium && tierId(item.rarity)==='overclocked')return 'Overclocked items are combine-only, never sold.';
+  if(item.baseId && item.pattern==='turret' && ownedTurretCount(run) && !hasCombineTarget(run,item))return 'Only one deployable turret tool per technician — combine a matching tier or upgrade the one you own.';
+  if(item.deploy && item.structure===run.character.signatureStructure)return 'Signature duplicate.';
   if(item.premium && !premiumTargets(run).length)return run.character.id==='clone'?'Requires an owned Rare tool below its overclock cap.':'Requires an eligible Epic or Legendary tool.';
   if(run.signal<item.cost)return `Need ${item.cost-run.signal} more spendable Signal.`;
   return '';
 }
 export function premiumPreview(weapon,rankCap=TUNING.overclockRankCap){
-  if(!weapon || !['Rare','Epic','Legendary'].includes(weapon.rarity))throw new Error('Ineligible premium target');
-  if(weapon.rarity==='Epic')return {...weapon,rarity:'Legendary',damage:+(weapon.damage*(RARITY.Legendary.power/RARITY.Epic.power)).toFixed(2),name:`${weapon.name} • Management Approved`};
-  if((weapon.overclockRank || 0)>=rankCap)throw new Error('Overclock cap reached');
-  return {...weapon,damage:+(weapon.damage*1.1).toFixed(2),rate:+(weapon.rate*.95).toFixed(3),overclockRank:(weapon.overclockRank || 0)+1,name:`${weapon.name} • ${weapon.rarity==='Rare'?'Clone Overclocked':'OSHA Has Left the Chat'}`};
+  if(!weapon || !['rare','epic','legendary'].includes(tierId(weapon.rarity)))throw new Error('Ineligible premium target');
+  const item=normalizeItem(weapon);
+  if(item.rarity==='epic')return scaleItem({...item,name:`${item.name} • Management Approved`},'legendary');
+  if((item.overclockRank || 0)>=rankCap)throw new Error('Overclock cap reached');
+  return scaleItem({...item,overclockRank:(item.overclockRank || 0)+1,name:`${item.name} • ${item.rarity==='rare'?'Clone Overclocked':'OSHA Has Left the Chat'}`});
 }
 export function shopTransaction(run,event){
   if(!run.shop)throw new Error('Shop is not open');
+  if(event.type==='combine')return manualCombine(run,event.itemId);
   const shop={...run.shop,offers:[...run.shop.offers]},locks=[...(run.lockedIds || [])];
   if(event.type==='reroll'){
     const cost=TUNING.rerollBase+shop.rerolls*TUNING.rerollStep;if(run.signal<cost)throw new Error('Not enough spendable Signal');
-    shop.offers=shop.offers.map(i=>i && locks.includes(i.id)?i:freshOffer(run,++shop.sequence));shop.rerolls++;
+    shop.offers=shop.offers.map(i=>i && locks.includes(i.id)?i:freshNonDuplicate(run,shop));shop.rerolls++;
     return {...run,signal:run.signal-cost,shop};
   }
   const index=shop.offers.findIndex(i=>i?.id===event.offerId),item=shop.offers[index];if(!item)throw new Error('This offer has already changed or been purchased');
@@ -83,16 +95,7 @@ export function shopTransaction(run,event){
   if(item.premium){
     const target=premiumTargets(run).find(w=>w.id===event.weaponId);if(!target)throw new Error('Choose an eligible owned instance');
     next.weapons=run.weapons.map(w=>w.id===target.id?premiumPreview(w,cloneOverclockCap(run)):w);
-  }else if(item.baseId){
-    const tool=normalizeWeapon(item,0,cloneOverclockCap(run));
-    next.weapons=event.replaceId?run.weapons.map(w=>w.id===event.replaceId?tool:w):[...run.weapons,tool];
-    if(event.replaceId && !run.weapons.some(w=>w.id===event.replaceId))throw new Error('Replacement tool missing');
-    if(next.weapons.filter(w=>w.pattern==='turret').length>1)throw new Error('Only one deployable turret tool per technician — upgrade the one you own.'); // guards stale/locked offers and any UI bypass
-    if(!legalLoadout(run.character,next.weapons))throw new Error('Choose a compatible tool to replace; slot or family cap reached');
-  }else if(item.deploy){
-    const owned=(run.deployables || []).find(d=>d.structure===item.structure);
-    next.deployables=owned?run.deployables.map(d=>d.structure===item.structure?{...d,stacks:d.stacks+1}:d):[...(run.deployables || []),{...item,stacks:1}];
-  }else next.items=[...run.items,item];
+  }else next=acquireItem(next,item,{replaceId:event.replaceId});
   shop.offers[index]=null;
   next.meleePeak=Math.max(run.meleePeak || 0,next.weapons.filter(w=>w.slotType==='melee').length);next.toolPeak=Math.max(run.toolPeak || 0,next.weapons.length);
   return rebuildStats(next);

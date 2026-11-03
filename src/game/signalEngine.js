@@ -1,5 +1,6 @@
 import { ENEMIES, WEAPONS } from '@/game/data/combat';
 import { STRUCTURES } from '@/game/data/structures';
+import { deployStats } from '@/game/items/itemScaling';
 import ObjectPool from '@/game/performance/ObjectPool';
 import SpatialHash from '@/game/performance/SpatialHash';
 import { enemySprite } from '@/game/performance/spriteAtlas';
@@ -254,14 +255,14 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
    if(s.life<=0){particle(s.x,s.y,'#94a3b8',lowFx?2:4);structures.release(s);continue}
    activeStructs.push(s)}
   structCount=activeStructs.length;pedestalBuff=0;
-  for(let i=0;i<activeStructs.length;i++){const s=activeStructs[i],def=STRUCTURES[s.type];if(!def)continue;
+  for(let i=0;i<activeStructs.length;i++){const s=activeStructs[i],def=s.stats||STRUCTURES[s.type];if(!def)continue;
    if(def.kind==='turret'){s.fireCd-=dt;if(s.fireCd<=0){const reach=effectiveRange(def,run,viewport,'turret'),target=nearestAt(s.x,s.y,reach);if(target){let ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;const [mx,my]=truckArt&&truckDef&&s.type===truckDef.structureType?truckMuzzlePoint(truckDef,s.x,s.y,ang):pedArt?pedestalMuzzlePoint(pedArt.definition,s.x,s.y,ang):[s.x,s.y-14];ang=Math.atan2(target.y-my,target.x-mx);launch({damage:def.damage*(1+.2*(s.power-1))*(1+(run.engineering||0)*.01),range:def.range,pattern:'projectile',color:def.color},ang,mx,my,reach);sfx('snip');s.fireCd=def.fire}else s.fireCd=.15}}
    else if(def.kind==='buff'&&Math.hypot(p.x-s.x,p.y-s.y)<s.r)pedestalBuff=Math.max(pedestalBuff,def.buff+.05*(s.power-1))}}
  // Q-key placement: structure appears AT the player, respecting per-type
  // cooldown and the total permit cap (6 + Engineering/10).
  function placeStructure(){const list=run.deployables||[];if(!list.length)return;
   const idx=Math.min(Math.max(0,input.current.deploySel||0),list.length-1);
-  const item=list[idx],def=STRUCTURES[item.structure];if(!def)return;
+  const item=list[idx],def=deployStats(item);if(!def)return;
   if((deployCds[item.structure]||0)>0){cb.flash(`REBOOTING ${def.name.toUpperCase()} — ${Math.ceil(deployCds[item.structure])}s`);return}
   let count=0;for(let i=0;i<structures.items.length;i++)if(structures.items[i].active)count++;
   if(count>=structCap()){cb.flash('PERMIT LIMIT: TOO MUCH STRUCTURE');return}
@@ -269,7 +270,7 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
   const s=structures.acquire();if(!s){cb.flash('PERMIT LIMIT');return}
   s.active=true;s.type=item.structure;s.x=clamp(p.x,30,W-30);s.y=clamp(p.y,30,H-30);
   s.born=0;s.life=s.maxLife=def.life+(run.engineering||0)*.06;s.r=def.r;
-  s.power=Math.min(item.stacks||1,TUNING.deployRankCap);s.rearm=0;s.fireCd=.3;s.lookA=Math.random()*6.28;s.uses=def.uses||0;
+  s.stats=def;s.power=Math.min(item.stacks||1,TUNING.deployRankCap);s.rearm=0;s.fireCd=.3;s.lookA=Math.random()*6.28;s.uses=def.uses||0;
   deployCds[item.structure]=deployCdMax(item,def);
   sfx('deploy');particle(p.x,p.y,'#d6d3d1',lowFx?3:8);cb.flash(`${def.name.toUpperCase()} DEPLOYED`)}
  function novaSparks(x,y){const count=lowFx?4:8;for(let i=0;i<count;i++){const q=particles.acquire();if(!q)break;const a=i*Math.PI*2/count;Object.assign(q,{x:x+Math.cos(a)*JITTER.radius*.9,y:y+Math.sin(a)*JITTER.radius*.9,vx:0,vy:0,life:.2,color:'#67e8f9'})}}
@@ -361,7 +362,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
    // telegraph plays; one independent mini per pulse, only under the cap.
    if(e.kind==='pete'&&e.cloneT>0){e.cloneT-=dt;if(e.cloneT<=0){e.cloneT=PETE.cloneInterval;let minis=0;for(let i=0;i<enemies.items.length;i++){const o=enemies.items[i];if(o.active&&o.kind==='peteMini')minis++}
     if(minis<PETE.miniCap&&p.hp>0){spawnPeteMini(e);if(e.anim)e.anim.special=1.2}}}
-   for(let k=0;k<activeStructs.length;k++){const st=activeStructs[k];if(!st.active)continue;const def=STRUCTURES[st.type];if(!def)continue;
+   for(let k=0;k<activeStructs.length;k++){const st=activeStructs[k];if(!st.active)continue;const def=st.stats||STRUCTURES[st.type];if(!def)continue;
     if(def.kind==='block'){const dx=e.x-st.x,dy=e.y-st.y,sd=Math.hypot(dx,dy),min=st.r+e.r;if(sd<min){const push=(min-sd)*.55;e.x+=dx/(sd||1)*push;e.y+=dy/(sd||1)*push}}
     else if(def.kind==='trap'&&st.rearm<=0&&st.uses>0){const sd=Math.hypot(e.x-st.x,e.y-st.y);if(sd<st.r+e.r){st.rearm=.7;st.uses--;hit(e,def.chomp*(1+.2*(st.power-1)),'#f87171',false);const ba=Math.atan2(e.y-st.y,e.x-st.x);e.x+=Math.cos(ba)*22;e.y+=Math.sin(ba)*22;sfx('snip');if(st.uses<=0){particle(st.x,st.y,'#f87171',lowFx?2:6);structures.release(st);structCount--}}}
     else if(def.kind==='slow'){if(Math.hypot(e.x-st.x,e.y-st.y)<st.r)slowMul=Math.min(slowMul,1-(def.slow+.05*(st.power-1)))}}
@@ -399,7 +400,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   if(charId==='admin'&&characterArt&&characterArt.definition.deathColumns&&p.hp<=0){dying=DEATH_HOLD;sfx('death');cb.event?.({type:'deathSequence',time:duration-time})}
   else{sfx(p.hp<=0?'death':'clear');complete(p.hp>0)}}
   hudClock-=dt;if(hudClock<=0){let boss=null;for(let i=0;i<enemies.items.length;i++){const b=enemies.items[i];if(b.active&&(b.sq||b.kind==='rous')){boss={name:b.kind==='rous'?ROUS.name:SQUIRREL.name,hp:Math.max(0,b.hp),max:b.max,phase:b.sq?.phase||1};break}}const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,earnedSignal,xp,xpTarget:signalForLevel(run.level+levels),level:run.level+levels,kills,boss,specialUnlocked:true,specialCooldown,specialName:run.character.special.name,characterId:charId,specialRemaining:(charId==='isr'||charId==='admin')?specialTimer:0,fps:Math.round(fps),stress,viewport:{...viewport},weaponRanges:run.weapons.map(w=>effectiveRange(weaponOf(w),run,viewport)),signatureReach:signatureWeapon?effectiveRange(signatureWeapon,run,viewport):0,
-   deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,STRUCTURES[d.structure]),selected:i===depIdx})),structures:structCount,cap:structCap()}:null});hudClock=.1}
+   deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,deployStats(d)),selected:i===depIdx})),structures:structCount,cap:structCap()}:null});hudClock=.1}
   // Opt-in automated-test observation only; GameArena supplies neither callback.
   if(cb.inspect)cb.inspect({time:duration-time,player:{...p},slow:puddleSlowMul,specialTimer,specialCooldown,healed,kills,clauseFired,damageDealt,camX,camY,meeting:meeting.active?{x:meeting.x,y:meeting.y,timer:specialTimer,radius:MEETING.blastRadius}:null,dying,...(charId==='isr'?{enemies:enemies.items.filter(e=>e.active).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,speed:e.speed,boss:e.boss,hp:e.hp,motion:e.outageMotion})),shots:shots.items.filter(s=>s.active).map(s=>({id:s.id,originX:s.originX,originY:s.originY,vx:s.vx,vy:s.vy})),sprite:{...spriteState}}:{}),puddles:puddles.items.filter(d=>d.active).map(d=>({...d})),puddings:enemies.items.filter(e=>e.active&&e.pud).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,cast:{...e.pud}})),
   petes:enemies.items.filter(e=>e.active&&(e.kind==='pete'||e.kind==='peteMini')).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cloneT:e.cloneT})),
@@ -439,7 +440,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
    for(let k=0;k<6;k++){const a=k*Math.PI/3+Math.PI/6,cx2=tx+Math.cos(a)*(tr+13),cy2=ty+Math.sin(a)*(tr+13);ctx.fillStyle='#92400e';ctx.fillRect(Math.round(cx2-6),Math.round(cy2-10),12,14);ctx.fillStyle='#3f2410';ctx.fillRect(Math.round(cx2-4),Math.round(cy2-16),8,6)}
    drawHardHat(tx,ty-tr-4);drawEyes(tx,ty-tr*.25,Math.atan2(p.y-ty,p.x-tx))}
   // structures (under enemies): pop-in scale, fade out during the last 1.5s of life
-  for(let i=0;i<structures.items.length;i++){const st=structures.items[i];if(!st.active)continue;const def=STRUCTURES[st.type];if(!def)continue;const x=Math.round(st.x),y=Math.round(st.y),grow=Math.min(1,st.born*4);
+  for(let i=0;i<structures.items.length;i++){const st=structures.items[i];if(!st.active)continue;const def=st.stats||STRUCTURES[st.type];if(!def)continue;const x=Math.round(st.x),y=Math.round(st.y),grow=Math.min(1,st.born*4);
    ctx.globalAlpha=(st.life<1.5?Math.max(.2,st.life/1.5):1)*(.4+.6*grow);
    if(def.kind==='turret'){ // Bucket-Truck Keys items render ONLY with the
     // truck renderer; weapon-deployed turrets keep the pedestal pack.

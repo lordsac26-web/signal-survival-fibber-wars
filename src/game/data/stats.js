@@ -21,7 +21,7 @@ export const STAT_INFO = {
   cleanliness: { label: 'Cleanliness', kind: 'flat', desc: '+1% damage per point against dirty impairments (blobs, beasts).' },
   signalStrength: { label: 'Signal Integrity', kind: 'flat', desc: 'Contact damage reduction = min(40%, 0.3% × points), after Armor.' },
   spliceQuality: { label: 'Splice Quality', kind: 'flat', desc: '+0.4% damage per point. Pure craftsmanship.' },
-  luck: { label: 'Luck', kind: 'flat', desc: 'Shifts min(20, max(0,Luck) × 0.2) rarity-weight points out of Common. Additional pickup chance per kill = min(100%, Luck × 0.2%).' },
+  luck: { label: 'Luck', kind: 'flat', desc: 'Shifts min(20, max(0,Luck) × 0.2) rarity-weight points out of Basic. Additional pickup chance per kill = min(100%, Luck × 0.2%).' },
   instakill: { label: 'Instakill Chance', kind: 'percent', desc: 'Chance to terminate a non-boss instantly (Veteran base 1%). Ignored for bosses; neither the trait nor Knowledge Dump bypasses boss HP.' }
 };
 

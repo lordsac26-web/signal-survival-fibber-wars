@@ -23,7 +23,7 @@ test('all six selected ids and checkpoints remap without losing career, inventor
     const raw={version:4,runs:23,totalKills:4567,selectedCharacter:id,highWaveByCharacter:{[id]:14},summaries:[{characterId:id,runId:'past'}],loadouts:[`${id}:alt`],checkpoint:{phase:'shop',run}};
     const before=JSON.stringify(raw),p=migrateProfile(raw),n=p.checkpoint.run;
     assert.equal(JSON.stringify(raw),before);assert.equal(p.selectedCharacter,DEFAULT_CHARACTER_ID);assert.equal(p.runs,23);assert.equal(p.totalKills,4567);assert.equal(p.highWaveByCharacter[id],14);assert.equal(p.summaries[0].characterId,id);assert(p.loadouts.includes(`${id}:alt`));assert(!p.unlocked.includes(id));
-    assert.equal(n.character.id,'nomad');assert.equal(n.runId,run.runId);assert.equal(n.wave,9);assert.equal(n.signal,420);assert.equal(n.xp,17);assert.equal(n.weapons.length,6);assert.deepEqual(n.items,run.items);assert.deepEqual(n.lockedIds,['locked']);assert.equal(n.shop.offers[0].cost,123);assert.equal(n.deployables[0].structure,'turretMount');assert.equal(n.specialCooldown,0);
+    assert.equal(n.character.id,'nomad');assert.equal(n.runId,run.runId);assert.equal(n.wave,9);assert.equal(n.signal,420);assert.equal(n.xp,17);assert.equal(n.weapons.length,6);assert.deepEqual(n.items.map(({id,mods})=>({id,mods})),run.items);assert.equal(n.items[0].rarity,'common');assert.deepEqual(n.lockedIds,['locked']);assert.equal(n.shop.offers[0].cost,123);assert.equal(n.deployables[0].structure,'turretMount');assert.equal(n.specialCooldown,0);
     assert.doesNotThrow(()=>validateProfile(p,'owner',raw));assert.equal(normalizeRun(n).character.id,'nomad');
   }
 });

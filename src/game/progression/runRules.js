@@ -3,6 +3,7 @@ import { migrateCharacterId } from '@/game/progression/rosterMigration';
 import { WEAPONS } from '@/game/data/combat';
 import { applyMods, WEAPON_ARCHETYPES } from '@/game/data/generation';
 import { TUNING } from '@/game/data/tuning';
+import { normalizeItem } from '@/game/items/itemScaling';
 export const weaponSlot = w => ['melee','chain','nova','orbiting'].includes(w.pattern) ? 'melee' : 'ranged';
 export const allowedWeapon = (c, w) => c.restriction === 'any' || !c.restriction || weaponSlot(w) === c.restriction;
 export function legalLoadout(c, weapons) {
@@ -12,7 +13,7 @@ export function legalLoadout(c, weapons) {
 }
 export function normalizeWeapon(w, index = 0, rankCap = TUNING.overclockRankCap) {
   const obj = typeof w === 'string' ? {...WEAPONS[w],baseId:w} : {...w};
-  return {...obj,id:obj.id || `legacy-tool-${index}-${obj.baseId}`,slotType:weaponSlot(obj),rarity:obj.rarity || 'Common',mods:obj.mods || [],overclockRank:Math.min(rankCap,obj.overclockRank || 0)};
+  return normalizeItem({...obj,id:obj.id || `legacy-tool-${index}-${obj.baseId}`,slotType:weaponSlot(obj),rarity:obj.rarity || 'common',mods:obj.mods || [],overclockRank:Math.min(rankCap,obj.overclockRank || 0)});
 }
 export function rebuildStats(run) {
   let next = {...run,...run.character.stats,cleaningKillsHeal:0,bonusSignal:0,hitSpeedBoost:0,critKnockback:0,turretQuality:0,firstHitBlocked:0,spliceExplosion:0};
@@ -32,11 +33,11 @@ export function normalizeRun(raw) {
   const weapons = [];
   for (const value of raw.weapons || []) {const w=normalizeWeapon(value,weapons.length,rankCap);if(WEAPON_ARCHETYPES.some(a=>a[0]===w.baseId && a[2]===w.pattern) && allowedWeapon(c,w) && legalLoadout(c,[...weapons,w])) weapons.push(w)}
   if (!weapons.length) weapons.push(...c.start.map((id,i)=>normalizeWeapon({...WEAPONS[id],baseId:id,id:`${raw.runId}-starter-${i}`},i,rankCap)));
-  const items = (raw.items || []).filter(i=>!i.baseId && !i.deploy && !i.premium);
-  const next = {...raw,signal:raw.signal || 0,xp:raw.xp || 0,level:raw.level || 0,kills:raw.kills || 0,earnedSignal:raw.earnedSignal ?? raw.signal ?? 0,character:c,weapons,items,specialUnlocked:true,deployables:(raw.deployables || []).filter(d=>d.structure!==c.signatureStructure).map(d=>({...d,stacks:Math.min(TUNING.deployRankCap,d.stacks || 1)})),lockedIds:(raw.lockedIds || []).slice(0,TUNING.maxLocks)};
+  const items = (raw.items || []).filter(i=>!i.baseId && !i.deploy && !i.premium).map((i,index)=>normalizeItem({...i,id:i.id || `${raw.runId}:legacy-passive:${index}`}));
+  const next = {...raw,signal:raw.signal || 0,xp:raw.xp || 0,level:raw.level || 0,kills:raw.kills || 0,earnedSignal:raw.earnedSignal ?? raw.signal ?? 0,character:c,weapons,items,specialUnlocked:true,deployables:(raw.deployables || []).filter(d=>d.structure!==c.signatureStructure).map((d,index)=>normalizeItem({...d,deploy:true,id:d.id || `${raw.runId}:legacy-deploy:${index}`,stacks:Math.min(TUNING.deployRankCap,d.stacks || 1)})),lockedIds:(raw.lockedIds || []).slice(0,TUNING.maxLocks)};
   if(migratedId!==previousId && c.id!=='don')Object.assign(next,{specialCooldown:0,specialProgress:0,useAlt:false});
   if(c.id==='isr')next.specialCooldown=Math.min(c.special.cooldown,Math.max(0,raw.specialCooldown||0));
-  if(next.shop) next.shop={...next.shop,offers:(next.shop.offers || []).map(i=>!i || !i.baseId || allowedWeapon(c,i) ? i : null)};
+  if(next.shop) next.shop={...next.shop,offers:(next.shop.offers || []).map(i=>!i?null:i.baseId&&!allowedWeapon(c,i)?null:normalizeItem(i))};
   next.lockedIds=next.lockedIds.filter(id=>next.shop?.offers?.some(i=>i?.id===id));
   return rebuildStats(next);
 }
