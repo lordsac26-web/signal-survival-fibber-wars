@@ -4,6 +4,7 @@ import { tierId } from '@/game/items/tiers';
 import { normalizeItem, scaleItem } from '@/game/items/itemScaling';
 import { acquireItem, hasCombineTarget, manualCombine } from '@/game/items/acquisition';
 import { priceOffer } from '@/game/shop/itemPricing';
+import { rerollCost, buyHealing } from '@/game/shop/economy';
 import { ownedMatch, withVisitDuplicate } from '@/game/shop/duplicateOffers';
 import { DEPLOYABLES } from '@/game/data/structures';
 import { TUNING } from '@/game/data/tuning';
@@ -65,7 +66,7 @@ export function offerReason(run,item){
   if(item.baseId && item.pattern==='turret' && ownedTurretCount(run) && !hasCombineTarget(run,item))return 'Only one deployable turret tool per technician — combine a matching tier or upgrade the one you own.';
   if(item.deploy && item.structure===run.character.signatureStructure)return 'Signature duplicate.';
   if(item.premium && !premiumTargets(run).length)return run.character.id==='clone'?'Requires an owned Rare tool below its overclock cap.':'Requires an eligible Epic or Legendary tool.';
-  if(run.signal<item.cost)return `Need ${item.cost-run.signal} more spendable Signal.`;
+  if(run.signal<item.cost)return `Need ${Math.ceil(item.cost-run.signal)} more spendable Signal.`;
   return '';
 }
 export function premiumPreview(weapon,rankCap=TUNING.overclockRankCap){
@@ -78,9 +79,10 @@ export function premiumPreview(weapon,rankCap=TUNING.overclockRankCap){
 export function shopTransaction(run,event){
   if(!run.shop)throw new Error('Shop is not open');
   if(event.type==='combine')return manualCombine(run,event.itemId);
+  if(event.type==='heal')return buyHealing(run);
   const shop={...run.shop,offers:[...run.shop.offers]},locks=[...(run.lockedIds || [])];
   if(event.type==='reroll'){
-    const cost=TUNING.rerollBase+shop.rerolls*TUNING.rerollStep;if(run.signal<cost)throw new Error('Not enough spendable Signal');
+    const cost=rerollCost(run.wave,shop.rerolls);if(run.signal<cost)throw new Error('Not enough spendable Signal');
     shop.offers=shop.offers.map(i=>i && locks.includes(i.id)?i:freshNonDuplicate(run,shop));shop.rerolls++;
     return {...run,signal:run.signal-cost,shop};
   }

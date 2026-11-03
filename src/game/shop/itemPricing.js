@@ -1,6 +1,6 @@
-import { TUNING } from '@/game/data/tuning';
+import { wavePriceMultiplier } from '@/game/shop/economy';
 import { tierPrice } from '@/game/items/tiers';
 export function priceOffer(item,wave){
   const cost=item.premium?item.cost:tierPrice(item.baseCost,item.rarity);
-  return {...item,cost:Math.round(cost*(1+TUNING.priceWaveScale*(wave-1)))};
+  return {...item,cost:Math.round(cost*wavePriceMultiplier(wave))};
 }

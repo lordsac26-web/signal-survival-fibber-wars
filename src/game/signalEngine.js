@@ -37,6 +37,10 @@ import { createCritterState, stepCritter, critterVelocity, critterContactReady, 
 import drawCrosstalk from '@/game/art/crosstalkSpriteAnimation';
 import { APPARITION, ROUTER_ATTACK, createConeState, stepCone, consumeConeHit, casterVelocity, cancelHiddenCharge } from '@/game/combat/coneAttack';
 import drawConeEnemy from '@/game/art/drawConeEnemy';
+import { scaledEnemy, enemyDamageMultiplier } from '@/game/combat/difficulty';
+import { createEncounterDirector, perimeterSpawn } from '@/game/combat/encounterDirector';
+import { CAMP_ATTACK, createCampState, updateCamp, campVelocity } from '@/game/combat/antiCamp';
+import drawCampCone from '@/game/art/drawCampCone';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
 const clamp=(n,a,b)=>n<a?a:n>b?b:n;
@@ -94,6 +98,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  let slow=0,timeScale=1,shakeMag=0,clauseFired=false,burstCount=0,dying=0,deathDone=false;
  const duration=waveDuration(run.wave);let time=duration,signal=run.signal,earnedSignal=run.earnedSignal||0,kills=run.kills,xp=run.xp||0,levels=0,specialCooldown=run.specialCooldown||0,specialTimer=0,damageDealt=run.damageDealt||0;const killsByType={...(run.killsByType||{})};
  let healed=run.healed||0,damageTaken=run.damageTaken||0,xpEarnedWave=0;const startKills=run.kills,startEarned=run.earnedSignal||0;
+ const director=createEncounterDirector(run.wave),camp=createCampState(550,400);let heading=0;
  const p={x:0,y:0,r:17,hp:run.hp,maxHp:run.maxHp,inv:0,regen:0};let hurtBoost=0,firstBlockUsed=false;const cooldowns=new Float32Array(run.weapons.length);
  let queryX=0,queryY=0,queryR=0,queryDamage=0,queryColor='#fff',queryShot=null,queryHits=0,queryStruct=null,nearestBest=null,nearestDist=0;
  let queryLimit=Infinity,queryOriginX=0,queryOriginY=0,queryArcAngle=0,queryArcHalf=Math.PI;
@@ -131,11 +136,11 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
  function nearest(range){queryX=p.x;queryY=p.y;nearestBest=null;nearestDist=range;grid.visit(p.x,p.y,range,nearestVisitor);return nearestBest}
  function nearestAt(x,y,range){queryX=x;queryY=y;nearestBest=null;nearestDist=range;grid.visit(x,y,range,nearestVisitor);return nearestBest}
  function activeFoeCount(){let n=0;for(let i=0;i<enemies.items.length;i++)if(enemies.items[i].active)n++;return n}
- function spawnEnemy(kind,force){if(!force&&activeFoeCount()>=maxActiveEnemies(run.wave))return;const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||pickEnemyKind(TYPES,run.wave)],edge=(Math.random()*4)|0,pad=35;e.kind=kind||TYPES[TYPES.indexOf(base)];if(!e.kind){for(let i=0;i<TYPES.length;i++)if(ENEMIES[TYPES[i]]===base)e.kind=TYPES[i]}e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;// DENSITY REBALANCE: fewer simultaneous bodies (see maxActiveEnemies) are
-// compensated with steeper per-wave HP scaling (.19 → .28) plus a new
-// contact-damage scale. The boss keeps its own literal .19 scaling untouched.
-e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage*(1+(run.wave-1)*.05);e.r=base.r;e.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
- e.art=null;e.anim=null;e.pud=null;e.sq=null;e.jit=null;e.mac=null;e.critter=null;e.caster=null;e.boss=false;
+ function spawnEnemy(kind,force,request={}){if(!force&&activeFoeCount()>=maxActiveEnemies(run.wave))return;const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||pickEnemyKind(TYPES,run.wave)],edge=request.edge??((Math.random()*4)|0),pad=35;e.kind=kind||Object.keys(ENEMIES).find(id=>ENEMIES[id]===base);
+ if(request.angle!==undefined)Object.assign(e,perimeterSpawn(p,{x:camX,y:camY,width:viewW,height:viewH},request.angle,pad));
+ else{e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+(request.edge!==undefined?.5:Math.random())*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+(request.edge!==undefined?.5:Math.random())*viewH}
+ Object.assign(e,scaledEnemy(base,run.wave));e.r=base.r;e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
+ e.art=null;e.anim=null;e.pud=null;e.sq=null;e.jit=null;e.mac=null;e.critter=null;e.caster=null;e.campCast=null;e.boss=false;
  if(e.kind==='attenuation'){let live=0;for(const o of enemies.items)if(o!==e&&o.active&&o.kind==='attenuation')live++;if(live>=APPARITION.maxActive){enemies.release(e);return}e.caster=createConeState(APPARITION);e.art=apparitionArt}
  if(e.kind==='crosstalk'){e.critter=createCritterState();e.art=critterArt}
  if(e.kind==='jitter'&&jitterArt){e.art=jitterArt;e.jit=createJitterState()}
@@ -147,28 +152,30 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
  if((e.kind==='pete'||e.kind==='peteMini')&&petArt){e.art=petArt;e.anim=createTechAnimation();if(e.kind==='pete')e.cloneT=PETE.cloneInterval}
   // MACROBEND BEAST: chase state machine + animation; the cast ring spawns
   // from the stepBend 'fire' action inside the enemy loop.
-  if(e.kind==='bend'&&bendArt){e.art=bendArt;e.anim=createBendAnimation();e.mac=createBendState()}}
- function spawnPeteMini(src){const m=enemies.acquire();if(!m)return;const base=ENEMIES.peteMini;
+  if(e.kind==='bend'&&bendArt){e.art=bendArt;e.anim=createBendAnimation();e.mac=createBendState()}
+  if(e.elite&&!e.caster){e.campConfig={...CAMP_ATTACK,damage:e.damage};e.campCast=createConeState(e.campConfig)}
+  cb.event?.({type:'enemySpawn',kind:e.kind,time:duration-time,tag:request.tag||'ordinary',edge:request.edge,x:e.x,y:e.y,hp:e.hp,damage:e.damage,active:activeFoeCount(),forced:!!force});return e;}
+ function spawnPeteMini(src){if(activeFoeCount()>=maxActiveEnemies(run.wave))return;const m=enemies.acquire();if(!m)return;const base=ENEMIES.peteMini;
   m.kind='peteMini';m.x=clamp(src.x+(Math.random()<.5?-1:1)*26,20,W-20);m.y=clamp(src.y+(Math.random()<.5?-1:1)*26,20,H-20);
-  m.hp=base.hp*(1+(run.wave-1)*.28);m.max=m.hp;m.speed=base.speed*(1+(run.wave-1)*.025);m.damage=base.damage*(1+(run.wave-1)*.05);m.r=base.r;
-  m.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));m.color=base.color;m.elite=false;m.dirty=false;m.sound=base.sound;m.lastShot=-1;m.sprite=enemySprite(m.kind,base);
-  m.art=null;m.anim=null;m.pud=null;m.sq=null;m.jit=null;m.mac=null;m.critter=null;m.caster=null;m.boss=false;m.cloneT=0;
+  Object.assign(m,scaledEnemy(base,run.wave,false));m.r=base.r;
+  m.color=base.color;m.elite=false;m.dirty=false;m.sound=base.sound;m.lastShot=-1;m.sprite=enemySprite(m.kind,base);
+  m.art=null;m.anim=null;m.pud=null;m.sq=null;m.jit=null;m.mac=null;m.critter=null;m.caster=null;m.campCast=null;m.boss=false;m.cloneT=0;
   if(petArt){m.art=petArt;m.anim=createTechAnimation()}}
  // SQUIRREL BOSS: spawns at the wave-20 gate (then every 10 waves). Phase 1
  // chases the player; at <=50% HP it flees, keeps other impairments between
  // itself and the player, and casts the telegraphed FEC cone between retreats.
  let bossSpawned=false;
  function spawnRouter(){if(!routerArt)return;const e=enemies.acquire();if(!e)return;const b=ROUS,m=60;
-  Object.assign(e,{kind:b.id,x:clamp(p.x+viewW*.35,camX+m,camX+viewW-m),y:clamp(p.y-viewH*.3,camY+100,camY+viewH-16),hp:b.hp*(1+(run.wave-1)*.19),max:b.hp*(1+(run.wave-1)*.19),speed:b.speed,damage:b.damage,r:b.r,value:Math.round(b.value*(1+TUNING.signalWaveScale*(run.wave-1))),color:b.color,elite:true,boss:true,dirty:false,sound:'boss',lastShot:-1,sprite:null,art:routerArt,anim:null,pud:null,sq:null,jit:null,mac:null,critter:null,caster:createConeState(ROUTER_ATTACK)});cb.flash(b.intro);cb.event?.({type:'bossSpawn',kind:b.id,time:duration-time});addShake(6)}
+  Object.assign(e,{kind:b.id,x:clamp(p.x+viewW*.35,camX+m,camX+viewW-m),y:clamp(p.y-viewH*.3,camY+100,camY+viewH-16),...scaledEnemy(b,run.wave,true),r:b.r,color:b.color,elite:true,boss:true,dirty:false,sound:'boss',lastShot:-1,sprite:null,art:routerArt,anim:null,pud:null,sq:null,jit:null,mac:null,critter:null,campCast:null,caster:createConeState(ROUTER_ATTACK)});cb.flash(b.intro);cb.event?.({type:'bossSpawn',kind:b.id,time:duration-time});addShake(6)}
  function spawnBoss(){if(bossKind(run.wave)==='rous'){spawnRouter();return}if(!sqArt||!SQUIRREL)return;const e=enemies.acquire();if(!e)return;
   const edge=(Math.random()*4)|0,pad=60;e.kind=SQUIRREL.id;
   e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;
-  e.hp=SQUIRREL.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=SQUIRREL.speed*(1+(run.wave-1)*.025);e.damage=SQUIRREL.damage;e.r=SQUIRREL.r;e.value=Math.round(SQUIRREL.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=SQUIRREL.color;e.elite=true;e.boss=true;e.dirty=false;e.sound='boss';e.lastShot=-1;e.sprite=null;e.art=null;e.anim=null;e.pud=null;e.jit=null;e.mac=null;e.critter=null;e.caster=null;
+  Object.assign(e,scaledEnemy(SQUIRREL,run.wave,true));e.r=SQUIRREL.r;e.campConfig={...CAMP_ATTACK,damage:e.damage};e.campCast=createConeState(e.campConfig);e.color=SQUIRREL.color;e.elite=true;e.boss=true;e.dirty=false;e.sound='boss';e.lastShot=-1;e.sprite=null;e.art=null;e.anim=null;e.pud=null;e.jit=null;e.mac=null;e.critter=null;e.caster=null;
   e.sq={...createSquirrelAnimation(),art:sqArt,phase:1,castCd:2,wind:0,cast:0,aim:0};
   cb.flash(SQUIRREL.intro);addShake(6)}
  function fireCone(e){const c=SQUIRREL.cone,step=c.pellets>1?c.half*2/(c.pellets-1):0;
   for(let k=0;k<c.pellets;k++){const a=e.sq.aim+(k-(c.pellets-1)/2)*step,f=foeShots.acquire();if(!f)break;
-   f.x=f.prevX=e.x;f.y=f.prevY=e.y;f.vx=Math.cos(a)*c.speed;f.vy=Math.sin(a)*c.speed;f.remaining=c.range;f.traveled=0;f.life=c.range/c.speed+.5;f.damage=c.damage;f.r=6;f.ring=false;sfx('packet')}
+   f.x=f.prevX=e.x;f.y=f.prevY=e.y;f.vx=Math.cos(a)*c.speed;f.vy=Math.sin(a)*c.speed;f.remaining=c.range;f.traveled=0;f.life=c.range/c.speed+.5;f.damage=c.damage*enemyDamageMultiplier(run.wave,true);f.r=6;f.ring=false;sfx('packet')}
   addShake(3)}
   // MACROBEND BEAST cast: ONE ring released instantly at the end of the 1s
   // coil — direction locks to the beast's pose at release and never tracks.
@@ -321,7 +328,10 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
   updateCamera();
   if(!bossSpawned&&bossWave(run.wave)){bossSpawned=true;spawnBoss()}
   // Outage affects locomotion ONLY: ordinary spawn attempts, double chance and caps stay unchanged.
-spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave))spawnEnemy();spawn=spawnInterval(run.wave)}grid.clear();
+if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
+ const requests=director.next(duration-time,activeFoeCount(),maxActiveEnemies(run.wave),heading);
+ for(const request of requests)spawnEnemy(request.kind,false,request);
+ spawn-=dt;if(spawn<=0){if(activeFoeCount()<maxActiveEnemies(run.wave)-director.reserved()){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)&&activeFoeCount()<maxActiveEnemies(run.wave)-director.reserved())spawnEnemy()}spawn=spawnInterval(run.wave)}grid.clear();
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active)grid.insert(e)}
   structuresUpdate(dt); // mounts fire + pedestal buff, uses the freshly built enemy grid
   for(let i=0;i<run.weapons.length;i++){cooldowns[i]-=dt;const w=weaponOf(run.weapons[i]);if(w&&cooldowns[i]<=0){const scheduled=w.rate/(run.attackSpeed*(1+pedestalBuff));attack(w);cb.event?.({type:'weaponTrigger',weapon:w.name,index:i,scheduled});cooldowns[i]=scheduled}}
@@ -339,15 +349,15 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
    let slowMul=1;
    if(e.caster){cancelHiddenCharge(e.caster,{x:camX,y:camY,width:viewW,height:viewH},e.boss?60:40,e.boss?100:40,e.boss?16:40);const c=e.boss?ROUTER_ATTACK:APPARITION,act=stepCone(e.caster,c,dt,{alive:e.hp>0,playerAlive:p.hp>0,x:e.x,y:e.y,tx:tgt.x,ty:tgt.y,shortSide:Math.min(viewW,viewH),visible:e.x>camX+55&&e.x<camX+viewW-55&&e.y>camY+(e.boss?100:55)&&e.y<camY+viewH-(e.boss?16:55)});
     if(act)cb.event?.({type:'conePhase',kind:e.kind,phase:act,time:duration-time,index:e.poolIndex,powered:e.caster.poweredShot});
-    if(act==='release'){const lands=consumeConeHit(e.caster,p.x,p.y,p.inv);if(lands){damagePlayer(e.caster.damage*(1+(run.wave-1)*.05));p.inv=.55}cb.event?.({type:'coneRelease',kind:e.kind,time:duration-time,hit:lands,cone:{...e.caster}})}}
+    if(act==='release'){const lands=consumeConeHit(e.caster,p.x,p.y,p.inv);if(lands){damagePlayer(e.caster.damage*enemyDamageMultiplier(run.wave,e.elite));p.inv=.55}cb.event?.({type:'coneRelease',kind:e.kind,time:duration-time,hit:lands,cone:{...e.caster}})}}
    if(e.critter){const act=stepCritter(e.critter,dt,{alive:e.hp>0,playerAlive:p.hp>0,dx:tgt.x-e.x,dy:tgt.y-e.y,visible:e.x>camX+30&&e.x<camX+viewW-30&&e.y>camY+30&&e.y<camY+viewH-30});if(act)cb.event?.({type:'critterPhase',phase:act,time:duration-time,index:e.poolIndex})}
    if(e.jit){const action=stepJitter(e.jit,dt,{alive:e.active&&e.hp>0,playerAlive:p.hp>0,dist:distance(p,e),targetDx:p.x-e.x,visible:e.x-JITTER.radius>=camX&&e.x+JITTER.radius<=camX+viewW&&e.y-JITTER.radius>=camY&&e.y+JITTER.radius<=camY+viewH});
     if(action==='charge'){e.jit.rootX=e.x;e.jit.rootY=e.y}
-    if(action==='fire'){if(jitterPulseHits(e.jit,distance(p,e),p.inv)){damagePlayer(JITTER.damage*(1+(run.wave-1)*.05));p.inv=.55}novaSparks(e.x,e.y);sfx('spark')}
+    if(action==='fire'){if(jitterPulseHits(e.jit,distance(p,e),p.inv)){damagePlayer(JITTER.damage*enemyDamageMultiplier(run.wave,e.elite));p.inv=.55}novaSparks(e.x,e.y);sfx('spark')}
    }
    // MACROBEND BEAST: state-machine step; 'coil' saves the root pose, 'fire'
    // releases the ring from the same spot. Rooted through coil AND recovery.
-   if(e.mac){const act=stepBend(e.mac,dt,{alive:e.active&&e.hp>0,playerAlive:p.hp>0,dist:distance(p,e),visible:e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40,targetDx:p.x-e.x});
+   if(e.mac&&(!e.campCast||e.campCast.phase==='chase')){const act=stepBend(e.mac,dt,{alive:e.active&&e.hp>0,playerAlive:p.hp>0,dist:distance(p,e),visible:e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40,targetDx:p.x-e.x});
     if(act==='coil'){e.mac.rootX=e.x;e.mac.rootY=e.y;cb.event?.({type:'macrobendCoil',time:duration-time,index:e.poolIndex,x:e.x,y:e.y})}
     if(act==='fire')bendRing(e)}
    // PACKET-LOSS PUDDING cast: within range + on screen + cooldown ready →
@@ -369,9 +379,14 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
    if(e.pud&&e.pud.phase==='telegraph'){e.x=e.pud.rootX;e.y=e.pud.rootY}
    if(e.jit&&e.jit.phase!=='chase'){e.x=e.jit.rootX;e.y=e.jit.rootY}
    if(e.mac&&e.mac.phase!=='chase'){e.x=e.mac.rootX;e.y=e.mac.rootY}
-   if(e.sq)({a,spd}=squirrelUpdate(e,dt));
+   if(e.sq&&(!e.campCast||e.campCast.phase==='chase'))({a,spd}=squirrelUpdate(e,dt));
+   const campBusy=(e.mac&&e.mac.phase!=='chase')||(e.sq&&(e.sq.wind>0||e.sq.cast>0));
+   if(e.campCast&&!campBusy){const cast=e.campCast,visible=e.x>camX+45&&e.x<camX+viewW-45&&e.y>camY+65&&e.y<camY+viewH-45;
+    if((camp.active&&!meeting.active)||cast.phase!=='chase'){const act=stepCone(cast,e.campConfig,dt,{alive:e.hp>0,playerAlive:p.hp>0,x:e.x,y:e.y,tx:tgt.x,ty:tgt.y,shortSide:Math.min(viewW,viewH),visible});
+     if(act==='release'){const lands=consumeConeHit(cast,p.x,p.y,p.inv);if(lands){damagePlayer(cast.damage);p.inv=.55}cb.event?.({type:'campCone',kind:e.kind,hit:lands,time:duration-time})}}
+   }
    if(charId==='isr')slowMul=outageMovement(specialTimer,p.hp,slowMul);
-   const velocity=e.caster?casterVelocity(e.caster,e.boss?ROUTER_ATTACK:APPARITION,a,spd*slowMul,distance(p,e),Math.min(viewW,viewH)):e.critter?critterVelocity(e.critter,a,spd*slowMul,slowMul):e.mac?bendVelocity(e.mac,a,spd*slowMul):e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
+   const velocity=e.campCast&&e.campCast.phase!=='chase'?{x:0,y:0}:e.elite&&camp.active&&!meeting.active&&!campBusy&&!e.caster?campVelocity(e,tgt,spd*slowMul,Math.min(viewW,viewH)):e.caster?casterVelocity(e.caster,e.boss?ROUTER_ATTACK:APPARITION,a,spd*slowMul,distance(p,e),Math.min(viewW,viewH)):e.critter?critterVelocity(e.critter,a,spd*slowMul,slowMul):e.mac?bendVelocity(e.mac,a,spd*slowMul):e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
    const mvx=velocity.x,mvy=velocity.y;
    if(cb.inspect&&charId==='isr')e.outageMotion={x:mvx,y:mvy,slow:slowMul};
    e.x+=mvx*dt;e.y+=mvy*dt;
@@ -385,7 +400,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
     else if(e.mac&&bendArtDef)updateBendAnimation(e.anim,mvx,mvy,dt,e.mac)
     else updateLagAnimation(e.anim,mvx*dt,mvy*dt,dt,lagArt.definition)}
    else if(e.sq)updateSquirrelAnimation(e.sq,mvx,mvy,dt,sqArt.definition)
-   if(separate&&(!e.caster||e.caster.phase==='chase')&&(!e.critter||e.critter.phase==='chase')&&(!e.jit||e.jit.phase==='chase')&&(!e.pud||e.pud.phase==='chase')&&(!e.mac||e.mac.phase==='chase')){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
+   if(separate&&(!e.campCast||e.campCast.phase==='chase')&&(!e.caster||e.caster.phase==='chase')&&(!e.critter||e.critter.phase==='chase')&&(!e.jit||e.jit.phase==='chase')&&(!e.pud||e.pud.phase==='chase')&&(!e.mac||e.mac.phase==='chase')){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
    if(distance(p,e)<p.r+e.r&&p.inv<=0&&(!e.critter||critterContactReady(e.critter))&&(!e.jit||e.jit.phase==='chase')){if(e.critter&&e.critter.phase==='lunge'){e.critter.struck=true;cb.event?.({type:'critterStrike',time:duration-time,index:e.poolIndex})}if(e.jit&&e.jit.phase==='chase'){e.jit.melee=1/3;e.jit.facing=p.x<e.x?'left':'right'}if(e.anim){if(e.kind==='packet'){e.anim.melee=.34;e.anim.facing=p.x<e.x?'left':'right'}else e.anim.attack=.35}
    // IN A MEETING: contact damage is declined (no i-frames consumed); enemy
    // novas, cast rings, boss pellets and goo hazards still hurt normally.
@@ -432,6 +447,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   // MEETING INVITE world object: the exact blast-radius ground telegraph
   // (subtle fill + dashed ring, drawn for the whole 4s) and the round table
   // with its empty chairs, hard hat and googly eyes (structure convention).
+  for(const enemy of enemies.items)if(enemy.active&&enemy.campCast)drawCampCone(ctx,enemy.campCast);
   if(meeting.active){const tx=Math.round(meeting.x),ty=Math.round(meeting.y),tr=MEETING.tableRadius;
    ctx.save();ctx.globalAlpha=.07;ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.arc(tx,ty,MEETING.blastRadius,0,7);ctx.fill();
    ctx.globalAlpha=.34;ctx.strokeStyle='#fde68a';ctx.lineWidth=2;ctx.setLineDash([10,8]);ctx.beginPath();ctx.arc(tx,ty,MEETING.blastRadius,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore();
@@ -489,7 +505,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   acc+=delta;while(acc>=STEP&&!over){fixedUpdate(STEP);acc-=STEP}
   if(over&&dying>0){dying=Math.max(0,dying-delta);if(dying<=0)complete(false)} // death strip hold (key skips)
   shakeMag*=Math.exp(-7*delta);if(shakeMag<.05)shakeMag=0;
-  draw();frames++;fpsClock+=delta;if(fpsClock>=1){fps=frames/fpsClock;frames=0;fpsClock=0;lowFx=fps<52;separate=fps>=42}if(!over||dying>0)raf=requestAnimationFrame(frame)
+  if(!cb.simulation)draw();frames++;fpsClock+=delta;if(fpsClock>=1){fps=frames/fpsClock;frames=0;fpsClock=0;lowFx=fps<52;separate=fps>=42}if(!over||dying>0)raf=requestAnimationFrame(frame)
  }raf=requestAnimationFrame(frame);window.addEventListener('resize',resize);
  const observer=new ResizeObserver(resize);observer.observe(canvas);
  return()=>{over=true;if(charId==='isr')clearOutage();cancelAnimationFrame(raf);observer.disconnect();window.removeEventListener('resize',resize);window.removeEventListener('keydown',key)}

@@ -29,6 +29,6 @@ export default function useSoloSession(profile){
     const where=next.pendingLevels>0?'upgrade':'shop';assign(where==='shop'?enterShop(next):next,where);
   };
   const shopAction=event=>{const next=shopTransaction(current.current,event);assign(next,'shop')};
-  const nextWave=()=>{if(phase.current!=='shop')return;const r=current.current;assign({...r,wave:r.wave+1,hp:Math.min(r.maxHp,r.hp+Math.ceil(r.maxHp*.22))},'game',false)};
+  const nextWave=()=>{if(phase.current!=='shop')return;const r=current.current;assign({...r,wave:r.wave+1},'game',false)};
   return {screen,run,newUnlocks,navigate,start,newRun,resume,finish,upgrade,shopAction,nextWave};
 }
