@@ -32,4 +32,7 @@ export const PETE=Object.freeze({
   flavor:"Pete is the ticket that keeps reopening. He reports the same outage every thirty seconds, and every report peels off the clipboard as its own smaller, independent Pete. The minis chase and hit on their own, never duplicate further, and the paperwork caps at five of them at once.",
   counter:"Focus the original: its 30-second pulse telegraphs with the ring pose. Minis cap at five, so the paperwork is finite — but the original never stops filing."
 });
+export const ROUS=Object.freeze({id:'rous',name:'R.O.U.S. - Router of Unusual Size',color:'#facc15',hp:1100,speed:48,damage:32,r:32,value:30,intro:'A ROUTER OF UNUSUAL SIZE HAS JOINED THE NETWORK'});
 export const bossWave=wave=>wave>=20&&wave%10===0;
+// One boss per existing gate: Squirrel 20/40/60; Router 30/50/70.
+export const bossKind=wave=>bossWave(wave)?(wave%20===10?'rous':'squirrel'):null;

@@ -10,9 +10,9 @@ export default function useSoloSession(profile){
   const current=useRef(null),phase=useRef('menu');
   const navigate=where=>{phase.current=where;setScreen(where)};
   const assign=(value,where,persist=true)=>{const next=persist?saveCheckpoint(value,where):value;current.current=next;setRun(next);navigate(where)};
-  const start=(c,useAlt)=>{
+  const start=(c,useAlt,arenaTheme='classic')=>{
     const alt=useAlt && profile.loadouts.includes(`${c.id}:alt`);resumeAudio();
-    const next={...createRun(c,alt,Math.floor(Math.random()*0x7fffffff)),useAlt:alt};
+    const next={...createRun(c,alt,Math.floor(Math.random()*0x7fffffff)),useAlt:alt,arenaTheme};
     saveCheckpoint(next,'ready');assign(next,'game',false);
   };
   const newRun=()=>{if(profile.checkpoint && !window.confirm('Start a new run and discard the resumable solo checkpoint? Career history stays.'))return;updateProfile(p=>({...p,checkpoint:null}));navigate('select')};

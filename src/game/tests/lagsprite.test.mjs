@@ -108,7 +108,7 @@ test('loader resolves lag art once and rejects unknown kinds; real engine spawns
     const fakeArt={definition:lag,atlas:{id:'lag-atlas'},attack:{id:'lag-attack'}};
     const draws=[],ctx=context((...args)=>{if(args[0]===fakeArt.atlas || args[0]===fakeArt.attack){assert.equal(ctx.imageSmoothingEnabled,false);draws.push(args)}});
     const canvas={getContext:()=>ctx,getBoundingClientRect:()=>({width:390,height:700})};
-    const run=createRun(characterById('rookie'),false,123);run.weapons=[];run.dodge=0;run.hp=run.maxHp=10000;
+    const run=createRun(characterById('nomad'),false,123);run.weapons=[];run.dodge=0;run.hp=run.maxHp=10000;
     const oldRandom=Math.random;Math.random=()=>0;const input={current:{x:0,y:0}};
     const clean=createSignalEngine(canvas,run,input,{hud:noop,flash:noop,finish:noop},{current:false},null,fakeArt);
     try{

@@ -4,6 +4,7 @@ import { preloadCharacterSprite, preloadEnemySprite, preloadStructureSprite } fr
 import GameHUD from '@/components/game/GameHUD';
 import TouchControls from '@/components/game/TouchControls';
 import MatchFooter from '@/components/game/MatchFooter';
+import { preloadArenaFloor } from '@/game/art/arenaFloor';
 import StatsScreen from '@/components/game/StatsScreen'; // NEW: the Brotato-style stat sheet overlay
 
 export default function GameArena({ run, onFinish }) {
@@ -62,12 +63,12 @@ export default function GameArena({ run, onFinish }) {
     // Character art (Oracle or Dispatch Don), the Lag Sprite enemy art, the
     // Bucket-Truck turret art, and the Squirrel boss art load in parallel;
     // a failure blocks start with a retry.
-    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadEnemySprite('packet'),preloadEnemySprite('jitter'),preloadEnemySprite('pete'),preloadEnemySprite('bend')]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt,jitterArt,peteArt,bendArt])=>{
+    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadEnemySprite('packet'),preloadEnemySprite('jitter'),preloadEnemySprite('pete'),preloadEnemySprite('bend'),preloadEnemySprite('crosstalk'),preloadEnemySprite('attenuation'),preloadEnemySprite('rous'),preloadArenaFloor(run.arenaTheme)]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor])=>{
       if(disposed)return;
       clean=createSignalEngine(canvas.current,run,input,{
         hud:setHud,reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,
         flash:t=>{setFlash(t);setTimeout(()=>setFlash(''),1400)}
-      },paused,art,lagArt,truckArt,squirrelArt,blobArt,pedestalArt,puddingArt,jitterArt,peteArt,bendArt);
+      },paused,art,lagArt,truckArt,squirrelArt,blobArt,pedestalArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor);
       setArtStatus('');
     }).catch(error=>{if(!disposed)setArtStatus(error.message)});
 

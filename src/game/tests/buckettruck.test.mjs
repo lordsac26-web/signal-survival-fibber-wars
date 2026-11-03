@@ -44,7 +44,7 @@ test('engine wiring: the truck is exclusive to the Keys turretMount; the Boss si
   assert.equal(def.atlas,'/assets/buckettruck/turret.png');assert.equal(def.portrait,'/assets/buckettruck/icon.png');
   // the only scoped user of the truck art; other turrets/structures keep drawTurretBody
   assert.equal(DEPLOYABLES.find(d=>d.id==='bucket_keys').structure,'turretMount');
-  assert.equal(characterById('bucket').special.id,'fortify');
+  assert.equal(characterById('bucket'),undefined,'the player Boss is retired, not the Keys item');
   // Field Guide no longer shows the truck portrait on the Boss's character card
   const guide=read('pages/FieldGuide.jsx');
   assert.doesNotMatch(guide,/StructurePortrait/);
@@ -91,12 +91,12 @@ test('real engine draws the truck ONLY for the Keys turretMount; the Boss signat
       let now=performance.now();for(let i=0;i<44;i++)nextFrame(now+=20);
       const trucks=draws.filter(d=>d[0]===fakeArt.atlas);clean();Math.random=oldRandom;return trucks};
     try{
-      // Boss signature: 'fortify' places one signature-bucket sentry → placeholder, NOT the truck
-      const sig=createRun(characterById('bucket'),false,123);sig.weapons=[];sig.hp=sig.maxHp=10000;
+      // Don's surviving signature helpers must never borrow the Keys art.
+      const sig=createRun(characterById('don'),false,123);sig.weapons=[];sig.hp=sig.maxHp=10000;
       const sigTrucks=boot(sig,{current:{x:0,y:0,special:true}});
       assert.equal(sigTrucks.length,0,'signature turret must NOT draw the truck');
       // Shop deployable: Bucket Truck Keys → turretMount structure → truck art
-      const dep=createRun(characterById('rookie'),false,123);dep.weapons=[];dep.dodge=0;dep.hp=dep.maxHp=10000;
+      const dep=createRun(characterById('nomad'),false,123);dep.weapons=[];dep.dodge=0;dep.hp=dep.maxHp=10000;
       dep.deployables=[{structure:'turretMount',name:'Bucket Truck Keys',icon:'🔑',stacks:1}];
       const depTrucks=boot(dep,{current:{x:0,y:0,deploy:true}});
       assert(depTrucks.length>0,'turretMount structure never drew the truck');

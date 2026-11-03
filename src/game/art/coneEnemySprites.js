@@ -1,0 +1,4 @@
+const definition=(id,counts,extra,worldSize,anchorY)=>Object.freeze({atlas:`/assets/${id}/idle.png`,portrait:`/assets/${id}/portrait.png`,manifest:`/assets/${id}/animation.json`,atlasW:1024,atlasH:128,cellW:128,cellH:128,columns:8,portraitW:128,portraitH:128,worldSize,anchorY,counts,extras:[...Object.entries(counts).filter(([k])=>k!=='idle').map(([k,n])=>[k,`/assets/${id}/${k}.png`,128*n,128]),...extra],manifestSpec:{id,frameWidth:128,frameHeight:128,...Object.fromEntries(Object.entries(counts).map(([k,n])=>[`counts.${k}`,n]))}});
+export const apparitionSprite=definition('attenuation',{idle:8,right:8,left:8,attack:7,focus:8},[['wave','/assets/attenuation/wave.png',128,104]],72,70);
+export const routerSprite=definition('rous',{idle:8,right:8,left:8,up:8,windup:7,fire:8},[['beam','/assets/rous/beam.png',1024,112]],104,120);
+export default {apparitionSprite,routerSprite};

@@ -12,6 +12,7 @@ export function validateProfile(data,userId,previous=null) {
     if(!['ready','shop','upgrade'].includes(p.checkpoint.phase))throw new Error('Unknown checkpoint boundary');
     const r=p.checkpoint.run,c=rename(r?.character?.id);if(!r || !ids.includes(c) || typeof r.runId!=='string' || r.runId.length>80 || !Number.isInteger(r.wave) || r.wave<1 || r.wave>10000 || !Number.isFinite(r.hp) || r.hp<=0) throw new Error('Invalid solo checkpoint');
     if(previous?.checkpoint?.run?.runId===r.runId && rename(previous.checkpoint.run.character?.id)!==c)throw new Error('Character cannot change midway through a run');
+    if(retired.includes(r.character.id)){r.character={id:c,name:'Night-Shift Nomad'};r.specialCooldown=0;r.specialProgress=0;r.useAlt=false}
     r.character.id=c;if(c==='don')r.character.name='Dispatch Don';r.specialUnlocked=true;
     if(!Array.isArray(r.weapons) || r.weapons.length>(c==='veteran'?8:c==='admin'?4:6) || new Set(r.weapons.map(w=>w.id)).size!==r.weapons.length) throw new Error('Tool slots or duplicate instance ids invalid');
     if(r.weapons.some(w=>!w || typeof w.id!=='string' || patterns[w.baseId]!==w.pattern || !Number.isFinite(w.damage) || w.damage<0 || !Number.isFinite(w.rate) || w.rate<=0 || (c==='oracle'&&melee(w)))) throw new Error('Forbidden or malformed weapon');

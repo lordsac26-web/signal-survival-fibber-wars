@@ -14,7 +14,7 @@ import { drawProjectile } from '@/game/performance/drawProjectile';
 const oracle=CHARACTER_SPRITES.oracle;
 const file=path=>readFileSync(new URL('../../../public'+path,import.meta.url));
 const weapon={baseId:'power',pattern:'projectile',range:330};
-const run=(id='rookie',bonus=0)=>({character:characterById(id),range:characterById(id).stats.range+bonus});
+const run=(id='clone',bonus=0)=>({character:characterById(id),range:characterById(id).stats.range+bonus});
 const view=(w,h,z=1)=>updateVisibleViewport({},w,h,z);
 const shot=(reach=100,speed=10000)=>({x:0,y:0,prevX:0,prevY:0,originX:0,originY:0,vx:speed,vy:0,maxReach:reach,remaining:reach,traveled:0,life:100,r:5});
 
@@ -78,9 +78,9 @@ test('logical desktop/mobile/orientation/zoom ranges are bounded and DPR-indepen
   for(const [width,height] of [[1280,720],[390,700],[700,390]])for(const zoom of [1,2,Math.max(1,width/1100,height/800)]){
     const viewport=view(width,height,zoom),short=Math.min(viewport.width,viewport.height);
     for(const dpr of [1,2,3]){
-      const baseline=effectiveRange(weapon,run(),viewport),enhanced=effectiveRange(weapon,run('rookie',1),viewport),oracleW={baseId:'otdr',range:520,pattern:'pierce'},oracleR=effectiveRange(oracleW,run('oracle'),viewport),oracleUp=effectiveRange(oracleW,run('oracle',1),viewport),melee=effectiveRange({baseId:'cleaver',range:92,pattern:'melee'},run(),viewport);
+      const baseline=effectiveRange(weapon,run(),viewport),enhanced=effectiveRange(weapon,run('clone',1),viewport),oracleW={baseId:'otdr',range:520,pattern:'pierce'},oracleR=effectiveRange(oracleW,run('oracle'),viewport),oracleUp=effectiveRange(oracleW,run('oracle',1),viewport),melee=effectiveRange({baseId:'cleaver',range:92,pattern:'melee'},run(),viewport);
       assert(baseline<=.30*short);assert(enhanced<=.42*short+1e-8);assert(oracleR<=.44*short);assert(oracleUp<=.44*short+1e-8);assert(oracleR>baseline);assert(melee<baseline*.6);
-      const meleeUpgraded=effectiveRange({baseId:'cleaver',range:92,pattern:'melee'},run('rookie',1),viewport);assert(meleeUpgraded<=.18*short+1e-8);
+      const meleeUpgraded=effectiveRange({baseId:'cleaver',range:92,pattern:'melee'},run('clone',1),viewport);assert(meleeUpgraded<=.18*short+1e-8);
       assert.equal(effectiveRange(weapon,run(),view(width,height,zoom,dpr)),baseline);
       if(dpr===1 && zoom===Math.max(1,width/1100,height/800))examples.push({css:[width,height],zoom,shortWorld:short,old:{ordinary:330,ordinaryUpgraded:660,oracle:702,oracleUpgraded:1222,melee:92,meleeUpgraded:184},new:{ordinary:baseline,ordinaryUpgraded:enhanced,oracle:oracleR,oracleUpgraded:oracleUp,melee,meleeUpgraded}});
     }

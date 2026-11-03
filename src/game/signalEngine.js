@@ -19,7 +19,7 @@ import { drawCrewHelper, crewMuzzle } from '@/game/art/crewHelper';
 import { PUDDING, initPuddingState, stepPuddingState, puddleMitigation } from '@/game/combat/puddles';
 import { createPuddingAnimation, updatePuddingAnimation, drawPuddingSprite } from '@/game/art/puddingSpriteAnimation';
 import { structureSpriteDef } from '@/game/art/characterSprites';
-import { SQUIRREL, bossWave, PETE } from '@/game/data/bosses';
+import { SQUIRREL, ROUS, bossWave, bossKind, PETE } from '@/game/data/bosses';
 import { createSquirrelAnimation, updateSquirrelAnimation, squirrelRelease, drawSquirrelSprite } from '@/game/art/squirrelSpriteAnimation';
 import { createTechAnimation, updateTechAnimation, drawTechSprite, drawTechEnemy, drawTechDeathFrame } from '@/game/art/techSpriteAnimation';
 import { JITTER, createJitterState, stepJitter, jitterVelocity, jitterPulseHits, pickEnemyKind } from '@/game/combat/jitter';
@@ -34,6 +34,8 @@ import { createBendAnimation, updateBendAnimation, drawBendSprite, drawBendRing 
 import { MEETING, meetingTableSpot } from '@/game/combat/meetingInvite';
 import { createCritterState, stepCritter, critterVelocity, critterContactReady, clampCritterLunge } from '@/game/combat/crosstalk';
 import drawCrosstalk from '@/game/art/crosstalkSpriteAnimation';
+import { APPARITION, ROUTER_ATTACK, createConeState, stepCone, consumeConeHit, casterVelocity, cancelHiddenCharge } from '@/game/combat/coneAttack';
+import drawConeEnemy from '@/game/art/drawConeEnemy';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
 const clamp=(n,a,b)=>n<a?a:n>b?b:n;
@@ -54,7 +56,7 @@ const weaponOf=w=>typeof w==='string'?WEAPONS[w]:w;
 // structures (Q key) live in the `structures` pool. Both integrate with the
 // enemy spatial hash for targeting, and structure-vs-enemy steering is a small
 // per-enemy loop over the (tiny) active-structure list — no repathing, no O(n²).
-export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null,puddingArt=null,jitterArt=null,peteArt=null,bendArt=null,critterArt=null){
+export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null,puddingArt=null,jitterArt=null,peteArt=null,bendArt=null,critterArt=null,apparitionArt=null,routerArt=null,arenaFloor=null){
  const ctx=canvas.getContext('2d',{alpha:false}),grid=new SpatialHash(96),charId=run.character.id;
  let dpr=Math.min(devicePixelRatio||1,2);
  if(run.character.id==='oracle'&&!characterArt)throw new Error('Oracle art must be preloaded before combat');
@@ -132,7 +134,8 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
 // compensated with steeper per-wave HP scaling (.19 → .28) plus a new
 // contact-damage scale. The boss keeps its own literal .19 scaling untouched.
 e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*.025);e.damage=base.damage*(1+(run.wave-1)*.05);e.r=base.r;e.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
- e.art=null;e.anim=null;e.pud=null;e.sq=null;e.jit=null;e.mac=null;e.critter=null;e.boss=false;
+ e.art=null;e.anim=null;e.pud=null;e.sq=null;e.jit=null;e.mac=null;e.critter=null;e.caster=null;e.boss=false;
+ if(e.kind==='attenuation'){let live=0;for(const o of enemies.items)if(o!==e&&o.active&&o.kind==='attenuation')live++;if(live>=APPARITION.maxActive){enemies.release(e);return}e.caster=createConeState(APPARITION);e.art=apparitionArt}
  if(e.kind==='crosstalk'){e.critter=createCritterState();e.art=critterArt}
  if(e.kind==='jitter'&&jitterArt){e.art=jitterArt;e.jit=createJitterState()}
  if(e.kind==='lag'&&lagArt){e.art=lagArt;e.anim=createLagAnimation()}if(e.kind==='dirty'&&blobArtDef){e.art=blobArtDef;e.anim=createTechAnimation();e.anim.special=.5}
@@ -148,16 +151,18 @@ e.hp=base.hp*(1+(run.wave-1)*.28);e.max=e.hp;e.speed=base.speed*(1+(run.wave-1)*
   m.kind='peteMini';m.x=clamp(src.x+(Math.random()<.5?-1:1)*26,20,W-20);m.y=clamp(src.y+(Math.random()<.5?-1:1)*26,20,H-20);
   m.hp=base.hp*(1+(run.wave-1)*.28);m.max=m.hp;m.speed=base.speed*(1+(run.wave-1)*.025);m.damage=base.damage*(1+(run.wave-1)*.05);m.r=base.r;
   m.value=Math.round(base.value*(1+TUNING.signalWaveScale*(run.wave-1)));m.color=base.color;m.elite=false;m.dirty=false;m.sound=base.sound;m.lastShot=-1;m.sprite=enemySprite(m.kind,base);
-  m.art=null;m.anim=null;m.pud=null;m.sq=null;m.jit=null;m.mac=null;m.critter=null;m.boss=false;m.cloneT=0;
+  m.art=null;m.anim=null;m.pud=null;m.sq=null;m.jit=null;m.mac=null;m.critter=null;m.caster=null;m.boss=false;m.cloneT=0;
   if(petArt){m.art=petArt;m.anim=createTechAnimation()}}
  // SQUIRREL BOSS: spawns at the wave-20 gate (then every 10 waves). Phase 1
  // chases the player; at <=50% HP it flees, keeps other impairments between
  // itself and the player, and casts the telegraphed FEC cone between retreats.
  let bossSpawned=false;
- function spawnBoss(){if(!sqArt||!SQUIRREL)return;const e=enemies.acquire();if(!e)return;
+ function spawnRouter(){if(!routerArt)return;const e=enemies.acquire();if(!e)return;const b=ROUS,m=60;
+  Object.assign(e,{kind:b.id,x:clamp(p.x+viewW*.35,camX+m,camX+viewW-m),y:clamp(p.y-viewH*.3,camY+m,camY+viewH-m),hp:b.hp*(1+(run.wave-1)*.19),max:b.hp*(1+(run.wave-1)*.19),speed:b.speed,damage:b.damage,r:b.r,value:Math.round(b.value*(1+TUNING.signalWaveScale*(run.wave-1))),color:b.color,elite:true,boss:true,dirty:false,sound:'boss',lastShot:-1,sprite:null,art:routerArt,anim:null,pud:null,sq:null,jit:null,mac:null,critter:null,caster:createConeState(ROUTER_ATTACK)});cb.flash(b.intro);cb.event?.({type:'bossSpawn',kind:b.id,time:duration-time});addShake(6)}
+ function spawnBoss(){if(bossKind(run.wave)==='rous'){spawnRouter();return}if(!sqArt||!SQUIRREL)return;const e=enemies.acquire();if(!e)return;
   const edge=(Math.random()*4)|0,pad=60;e.kind=SQUIRREL.id;
   e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;
-  e.hp=SQUIRREL.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=SQUIRREL.speed*(1+(run.wave-1)*.025);e.damage=SQUIRREL.damage;e.r=SQUIRREL.r;e.value=Math.round(SQUIRREL.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=SQUIRREL.color;e.elite=true;e.boss=true;e.dirty=false;e.sound='boss';e.lastShot=-1;e.sprite=null;e.art=null;e.anim=null;e.pud=null;e.jit=null;
+  e.hp=SQUIRREL.hp*(1+(run.wave-1)*.19);e.max=e.hp;e.speed=SQUIRREL.speed*(1+(run.wave-1)*.025);e.damage=SQUIRREL.damage;e.r=SQUIRREL.r;e.value=Math.round(SQUIRREL.value*(1+TUNING.signalWaveScale*(run.wave-1)));e.color=SQUIRREL.color;e.elite=true;e.boss=true;e.dirty=false;e.sound='boss';e.lastShot=-1;e.sprite=null;e.art=null;e.anim=null;e.pud=null;e.jit=null;e.mac=null;e.critter=null;e.caster=null;
   e.sq={...createSquirrelAnimation(),art:sqArt,phase:1,castCd:2,wind:0,cast:0,aim:0};
   cb.flash(SQUIRREL.intro);addShake(6)}
  function fireCone(e){const c=SQUIRREL.cone,step=c.pellets>1?c.half*2/(c.pellets-1):0;
@@ -331,6 +336,9 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   // chomp + shove, snares slow — none of it touches the player.
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(!e.active)continue;const tgt=meeting.active?meeting:p;let a=Math.atan2(tgt.y-e.y,tgt.x-e.x),spd=e.speed;
    let slowMul=1;
+   if(e.caster){cancelHiddenCharge(e.caster,{x:camX,y:camY,width:viewW,height:viewH},e.boss?60:40);const c=e.boss?ROUTER_ATTACK:APPARITION,act=stepCone(e.caster,c,dt,{alive:e.hp>0,playerAlive:p.hp>0,x:e.x,y:e.y,tx:tgt.x,ty:tgt.y,shortSide:Math.min(viewW,viewH),visible:e.x>camX+55&&e.x<camX+viewW-55&&e.y>camY+55&&e.y<camY+viewH-55});
+    if(act)cb.event?.({type:'conePhase',kind:e.kind,phase:act,time:duration-time,index:e.poolIndex,powered:e.caster.poweredShot});
+    if(act==='release'){const lands=consumeConeHit(e.caster,p.x,p.y,p.inv);if(lands){damagePlayer(e.caster.damage*(1+(run.wave-1)*.05));p.inv=.55}cb.event?.({type:'coneRelease',kind:e.kind,time:duration-time,hit:lands,cone:{...e.caster}})}}
    if(e.critter){const act=stepCritter(e.critter,dt,{alive:e.hp>0,playerAlive:p.hp>0,dx:tgt.x-e.x,dy:tgt.y-e.y,visible:e.x>camX+30&&e.x<camX+viewW-30&&e.y>camY+30&&e.y<camY+viewH-30});if(act)cb.event?.({type:'critterPhase',phase:act,time:duration-time,index:e.poolIndex})}
    if(e.jit){const action=stepJitter(e.jit,dt,{alive:e.active&&e.hp>0,playerAlive:p.hp>0,dist:distance(p,e),targetDx:p.x-e.x,visible:e.x-JITTER.radius>=camX&&e.x+JITTER.radius<=camX+viewW&&e.y-JITTER.radius>=camY&&e.y+JITTER.radius<=camY+viewH});
     if(action==='charge'){e.jit.rootX=e.x;e.jit.rootY=e.y}
@@ -362,10 +370,11 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
    if(e.mac&&e.mac.phase!=='chase'){e.x=e.mac.rootX;e.y=e.mac.rootY}
    if(e.sq)({a,spd}=squirrelUpdate(e,dt));
    if(charId==='isr')slowMul=outageMovement(specialTimer,p.hp,slowMul);
-   const velocity=e.critter?critterVelocity(e.critter,a,spd*slowMul):e.mac?bendVelocity(e.mac,a,spd*slowMul):e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
+   const velocity=e.caster?casterVelocity(e.caster,e.boss?ROUTER_ATTACK:APPARITION,a,spd*slowMul,distance(p,e)):e.critter?critterVelocity(e.critter,a,spd*slowMul):e.mac?bendVelocity(e.mac,a,spd*slowMul):e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
    const mvx=velocity.x,mvy=velocity.y;
    if(cb.inspect&&charId==='isr')e.outageMotion={x:mvx,y:mvy,slow:slowMul};
    e.x+=mvx*dt;e.y+=mvy*dt;
+   if(e.caster){e.caster.vx=mvx;e.caster.vy=mvy;if(e.caster.phase==='chase'){const m=e.boss?60:40;e.x=clamp(e.x,camX+m,camX+viewW-m);e.y=clamp(e.y,camY+m,camY+viewH-m)}else{e.x=e.caster.x;e.y=e.caster.y}}
    if(e.critter&&e.critter.phase==='lunge')clampCritterLunge(e,{x:camX,y:camY,width:viewW,height:viewH});
    // SQUIRREL RETREAT BOUNDS: phase-2 flee must keep the boss's full body and
    // collider inside the logical viewport — no clipping offscreen to hide.
@@ -375,7 +384,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
     else if(e.mac&&bendArtDef)updateBendAnimation(e.anim,mvx,mvy,dt,e.mac)
     else updateLagAnimation(e.anim,mvx*dt,mvy*dt,dt,lagArt.definition)}
    else if(e.sq)updateSquirrelAnimation(e.sq,mvx,mvy,dt,sqArt.definition)
-   if(separate&&(!e.critter||e.critter.phase==='chase')&&(!e.jit||e.jit.phase==='chase')&&(!e.pud||e.pud.phase==='chase')&&(!e.mac||e.mac.phase==='chase')){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
+   if(separate&&(!e.caster||e.caster.phase==='chase')&&(!e.critter||e.critter.phase==='chase')&&(!e.jit||e.jit.phase==='chase')&&(!e.pud||e.pud.phase==='chase')&&(!e.mac||e.mac.phase==='chase')){queryShot=e;grid.visit(e.x,e.y,e.r+28,separateVisitor)}
    if(distance(p,e)<p.r+e.r&&p.inv<=0&&(!e.critter||critterContactReady(e.critter))&&(!e.jit||e.jit.phase==='chase')){if(e.critter&&e.critter.phase==='lunge'){e.critter.struck=true;cb.event?.({type:'critterStrike',time:duration-time,index:e.poolIndex})}if(e.jit&&e.jit.phase==='chase'){e.jit.melee=1/3;e.jit.facing=p.x<e.x?'left':'right'}if(e.anim){if(e.kind==='packet'){e.anim.melee=.34;e.anim.facing=p.x<e.x?'left':'right'}else e.anim.attack=.35}
    // IN A MEETING: contact damage is declined (no i-frames consumed); enemy
    // novas, cast rings, boss pellets and goo hazards still hurt normally.
@@ -389,11 +398,12 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   // strip briefly (any key skips it) before the unchanged game-over flow.
   if(charId==='admin'&&characterArt&&characterArt.definition.deathColumns&&p.hp<=0){dying=DEATH_HOLD;sfx('death');cb.event?.({type:'deathSequence',time:duration-time})}
   else{sfx(p.hp<=0?'death':'clear');complete(p.hp>0)}}
-  hudClock-=dt;if(hudClock<=0){let boss=null;for(let i=0;i<enemies.items.length;i++){const b=enemies.items[i];if(b.active&&b.sq){boss={name:SQUIRREL.name,hp:Math.max(0,b.hp),max:b.max,phase:b.sq.phase};break}}const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,earnedSignal,xp,xpTarget:signalForLevel(run.level+levels),level:run.level+levels,kills,boss,specialUnlocked:true,specialCooldown,specialName:run.character.special.name,characterId:charId,specialRemaining:(charId==='isr'||charId==='admin')?specialTimer:0,fps:Math.round(fps),stress,viewport:{...viewport},weaponRanges:run.weapons.map(w=>effectiveRange(weaponOf(w),run,viewport)),signatureReach:signatureWeapon?effectiveRange(signatureWeapon,run,viewport):0,
+  hudClock-=dt;if(hudClock<=0){let boss=null;for(let i=0;i<enemies.items.length;i++){const b=enemies.items[i];if(b.active&&(b.sq||b.kind==='rous')){boss={name:b.kind==='rous'?ROUS.name:SQUIRREL.name,hp:Math.max(0,b.hp),max:b.max,phase:b.sq?.phase||1};break}}const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,earnedSignal,xp,xpTarget:signalForLevel(run.level+levels),level:run.level+levels,kills,boss,specialUnlocked:true,specialCooldown,specialName:run.character.special.name,characterId:charId,specialRemaining:(charId==='isr'||charId==='admin')?specialTimer:0,fps:Math.round(fps),stress,viewport:{...viewport},weaponRanges:run.weapons.map(w=>effectiveRange(weaponOf(w),run,viewport)),signatureReach:signatureWeapon?effectiveRange(signatureWeapon,run,viewport):0,
    deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,STRUCTURES[d.structure]),selected:i===depIdx})),structures:structCount,cap:structCap()}:null});hudClock=.1}
   // Opt-in automated-test observation only; GameArena supplies neither callback.
   if(cb.inspect)cb.inspect({time:duration-time,player:{...p},slow:puddleSlowMul,specialTimer,specialCooldown,healed,kills,clauseFired,damageDealt,camX,camY,meeting:meeting.active?{x:meeting.x,y:meeting.y,timer:specialTimer,radius:MEETING.blastRadius}:null,dying,...(charId==='isr'?{enemies:enemies.items.filter(e=>e.active).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,speed:e.speed,boss:e.boss,hp:e.hp,motion:e.outageMotion})),shots:shots.items.filter(s=>s.active).map(s=>({id:s.id,originX:s.originX,originY:s.originY,vx:s.vx,vy:s.vy})),sprite:{...spriteState}}:{}),puddles:puddles.items.filter(d=>d.active).map(d=>({...d})),puddings:enemies.items.filter(e=>e.active&&e.pud).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,cast:{...e.pud}})),
   petes:enemies.items.filter(e=>e.active&&(e.kind==='pete'||e.kind==='peteMini')).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cloneT:e.cloneT})),
+  casters:enemies.items.filter(e=>e.active&&e.caster).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,cast:{...e.caster}})),
   critters:enemies.items.filter(e=>e.active&&e.critter).map(e=>({index:e.poolIndex,x:e.x,y:e.y,cast:{...e.critter}})),
   bends:enemies.items.filter(e=>e.active&&e.mac).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cast:{...e.mac}})),
   rings:foeShots.items.filter(s=>s.active&&s.ring).map(s=>({x:s.x,y:s.y,remaining:s.remaining,damage:s.damage})),
@@ -410,6 +420,8 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
   ctx.setTransform(zoom,0,0,zoom,Math.round((sx-camX)*zoom),Math.round((sy-camY)*zoom));
   ctx.fillStyle='#172d32';ctx.fillRect(camX-24,camY-24,viewW+48,viewH+48);
   ctx.strokeStyle='rgba(83,211,190,.08)';ctx.lineWidth=1;for(let x=Math.floor(camX/48)*48;x<camX+viewW;x+=48){ctx.beginPath();ctx.moveTo(x,camY-24);ctx.lineTo(x,camY+viewH+24);ctx.stroke()}for(let y=Math.floor(camY/48)*48;y<camY+viewH;y+=48){ctx.beginPath();ctx.moveTo(camX-24,y);ctx.lineTo(camX+viewW+24,y);ctx.stroke()}
+  // Pre-scaled world bitmap, beneath every pickup, hazard, structure and actor.
+  if(arenaFloor)ctx.drawImage(arenaFloor,0,0);
   ctx.strokeStyle='rgba(103,232,249,.25)';ctx.lineWidth=2;ctx.strokeRect(0,0,W,H);
   if(areaFx.life>0){ctx.save();if(areaFx.limit!==Infinity){ctx.beginPath();ctx.arc(Math.round(areaFx.originX),Math.round(areaFx.originY),areaFx.limit,0,Math.PI*2);ctx.clip()}ctx.globalAlpha=areaFx.life/.12*.4;ctx.strokeStyle=areaFx.color;ctx.lineWidth=2;ctx.beginPath();const x=Math.round(areaFx.x),y=Math.round(areaFx.y);if(areaFx.half<Math.PI)ctx.moveTo(x,y);ctx.arc(x,y,areaFx.reach,areaFx.angle-areaFx.half,areaFx.angle+areaFx.half);if(areaFx.half<Math.PI)ctx.closePath();ctx.stroke();ctx.restore()}
   ctx.fillStyle='#67e8f9';for(let i=0;i<pickups.items.length;i++){const d=pickups.items[i];if(d.active&&d.x>camX-8&&d.x<camX+viewW+8&&d.y>camY-8&&d.y<camY+viewH+8)ctx.fillRect(Math.round(d.x)-4,Math.round(d.y)-4,8,8)}
@@ -446,7 +458,7 @@ spawn-=dt;if(spawn<=0){spawnEnemy();if(Math.random()<spawnDoubleChance(run.wave)
     if(run.character.id==='don'&&specialTimer>0&&characterArt&&characterArt.crewInd)drawCrewHelper(ctx,characterArt,t);else drawHelper(ctx,Math.round(t.x),Math.round(t.y),t.color)}
    else if(t.weaponTurret&&pedArt)drawPedestalTurret(ctx,pedArt,t,Math.round(t.x),Math.round(t.y),grow); // weapon-deployed turrets share the splice-pedestal pack
    else drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
-  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.art&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40){if(e.critter)drawCrosstalk(ctx,critterArt,e.critter,e.x,e.y);else if(e.jit)drawJitterSprite(ctx,jitterArt,e.jit,e.x,e.y,e.jit.phase==='chase');else if(e.art===puddingArt)drawPuddingSprite(ctx,puddingArt,e.anim,e.x,e.y);else if(e.art===blobArtDef)drawTechEnemy(ctx,e.art,e.anim,e.x,e.y);else if(petArt&&(e.kind==='pete'||e.kind==='peteMini'))drawTechEnemy(ctx,petArt,e.anim,e.x,e.y,e.kind==='peteMini'?PETE.miniScale:1);else if(e.mac&&bendArtDef)drawBendSprite(ctx,bendArtDef,e.anim,e.x,e.y);else drawLagSprite(ctx,e.art,e.anim,e.x,e.y)}}
+  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.art&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40){if(e.caster)drawConeEnemy(ctx,e.art,e.caster,e.x,e.y);else if(e.critter)drawCrosstalk(ctx,critterArt,e.critter,e.x,e.y);else if(e.jit)drawJitterSprite(ctx,jitterArt,e.jit,e.x,e.y,e.jit.phase==='chase');else if(e.art===puddingArt)drawPuddingSprite(ctx,puddingArt,e.anim,e.x,e.y);else if(e.art===blobArtDef)drawTechEnemy(ctx,e.art,e.anim,e.x,e.y);else if(petArt&&(e.kind==='pete'||e.kind==='peteMini'))drawTechEnemy(ctx,petArt,e.anim,e.x,e.y,e.kind==='peteMini'?PETE.miniScale:1);else if(e.mac&&bendArtDef)drawBendSprite(ctx,bendArtDef,e.anim,e.x,e.y);else drawLagSprite(ctx,e.art,e.anim,e.x,e.y)}}
   for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&!e.art&&e.kind===kind&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40)ctx.drawImage(e.sprite,Math.round(e.x-e.sprite.width/2),Math.round(e.y-e.sprite.height/2))}}
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.sq&&e.x>camX-90&&e.x<camX+viewW+90&&e.y>camY-90&&e.y<camY+viewH+90)drawSquirrelSprite(ctx,e.sq.art,e.sq,e.x,e.y)}
   for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>camX-28&&s.x<camX+viewW+28&&s.y>camY-28&&s.y<camY+viewH+28)drawProjectile(ctx,s)}

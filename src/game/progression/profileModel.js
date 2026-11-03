@@ -3,7 +3,7 @@ import { DEFAULT_CHARACTER_ID, migrateCharacterId } from '@/game/progression/ros
 import { CHALLENGES, ACHIEVEMENTS, LOADOUTS, unlockMet } from '@/game/data/unlocks';
 import { normalizeRun } from '@/game/progression/runRules';
 import { appendSample } from '@/game/data/balanceAudit';
-import { bossWave } from '@/game/data/bosses';
+import { bossKind } from '@/game/data/bosses';
 export const SAVE_VERSION = 4;
 export const freshProfile = () => ({version:SAVE_VERSION,highWave:0,highKills:0,runs:0,totalKills:0,deaths:0,bestSignal:0,healPeak:0,meleePeak:0,toolPeak:0,noBuyWave:0,highWaveByCharacter:{},killsByType:{},squirrelDefeated:false,unlocked:CHARACTERS.filter(c=>!c.unlock).map(c=>c.id),achievements:[],challenges:[],loadouts:[],discoveredTools:[],completedRunIds:[],summaries:[],checkpoint:null,selectedCharacter:DEFAULT_CHARACTER_ID,selectedLoadouts:{},settings:{muted:false,volume:.55},balanceSamples:[],updatedAt:0});
 const donId = id => ['dispatch','dave','dispatch_dave'].includes(id) ? 'don' : id;
@@ -31,7 +31,7 @@ export function completeRun(profile,run) {
   // Clearing a boss wave (20, 30, …) with a surviving truck marks the Squirrel
   // as defeated for the ISR's unlock; gated technicians unlock on the same
   // completion that meets their milestone.
-  if(run.won && bossWave(run.wave)) next.squirrelDefeated=true;
+  if(run.won && bossKind(run.wave)==='squirrel') next.squirrelDefeated=true;
   const newUnlocks=[];
   for(const [field,list,type] of [['challenges',CHALLENGES,'challenge'],['achievements',ACHIEVEMENTS,'achievement'],['loadouts',LOADOUTS,'toolkit']]) {
     next[field]=[...next[field]];
