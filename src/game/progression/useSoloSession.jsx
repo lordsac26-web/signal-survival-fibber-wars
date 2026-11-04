@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { resumeAudio } from '@/game/audio';
 import { saveCheckpoint, recordRun, updateProfile } from '@/game/storage';
 import { createRun, normalizeRun } from '@/game/progression/runRules';
+import { applyStartingKit } from '@/game/progression/startingKit';
 import { enterShop, shopTransaction } from '@/game/shop/shopRules';
 import { pickUpgrade, upgradeChoices } from '@/game/progression/upgradeRules';
 import { toast } from '@/components/ui/use-toast';
@@ -14,6 +15,11 @@ export default function useSoloSession(profile){
   const start=(c,useAlt,arenaTheme='classic')=>{
     const alt=useAlt && profile.loadouts.includes(`${c.id}:alt`);resumeAudio();
     const next={...createRun(c,alt,Math.floor(Math.random()*0x7fffffff)),useAlt:alt,arenaTheme};
+    current.current=next;setRun(next);navigate('loadout'); // tool choice first; nothing persists until it is confirmed
+  };
+  const confirmKit=pickedIds=>{
+    if(phase.current!=='loadout')return;
+    const next=applyStartingKit(current.current,pickedIds);
     saveCheckpoint(next,'ready');assign(next,'game',false);
   };
   const newRun=()=>{if(profile.checkpoint && !window.confirm('Start a new run and discard the resumable solo checkpoint? Career history stays.'))return;updateProfile(p=>({...p,checkpoint:null}));navigate('select')};
@@ -30,5 +36,5 @@ export default function useSoloSession(profile){
   };
   const shopAction=event=>{const next=shopTransaction(current.current,event);assign(next,'shop')};
   const nextWave=()=>{if(phase.current!=='shop')return;const r=current.current;assign({...r,wave:r.wave+1},'game',false)};
-  return {screen,run,newUnlocks,navigate,start,newRun,resume,finish,upgrade,shopAction,nextWave};
+  return {screen,run,newUnlocks,navigate,start,confirmKit,newRun,resume,finish,upgrade,shopAction,nextWave};
 }

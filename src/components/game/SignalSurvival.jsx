@@ -4,6 +4,7 @@ import useSoloSession from '@/game/progression/useSoloSession';
 import SaveStatus from '@/components/game/SaveStatus';
 import MenuScreen from '@/components/game/MenuScreen';
 import CharacterSelect from '@/components/game/CharacterSelect';
+import LoadoutScreen from '@/components/game/LoadoutScreen';
 import GameArena from '@/components/game/GameArena';
 import UpgradeScreen from '@/components/game/UpgradeScreen';
 import ShopScreen from '@/components/game/ShopScreen';
@@ -18,6 +19,7 @@ export default function SignalSurvival({ownerId}) {
   if(s.screen==='menu')content=<MenuScreen save={state.profile} onPlay={s.newRun} onContinue={s.resume} onGallery={()=>s.navigate('gallery')}/>;
   else if(s.screen==='gallery')content=<GalleryScreen save={state.profile} onBack={()=>s.navigate('menu')}/>;
   else if(s.screen==='select')content=<CharacterSelect save={state.profile} onBack={()=>s.navigate('menu')} onSelect={s.start}/>;
+  else if(s.screen==='loadout')content=<LoadoutScreen run={s.run} onConfirm={s.confirmKit} onBack={()=>s.navigate('select')}/>;
   else if(s.screen==='game')content=<GameArena key={`${s.run.runId}-${s.run.wave}`} run={s.run} onFinish={s.finish}/>;
   else if(s.screen==='upgrade')content=<UpgradeScreen key={`${s.run.wave}-${s.run.level}`} run={s.run} onPick={s.upgrade}/>;
   else if(s.screen==='shop')content=<ShopScreen run={s.run} onAction={s.shopAction} onContinue={s.nextWave} onProfile={()=>s.navigate('menu')}/>;

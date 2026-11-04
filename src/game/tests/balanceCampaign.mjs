@@ -1,6 +1,7 @@
 import { createSignalEngine,makeCanvas,preloadCharacterSprite,preloadEnemySprite,preloadStructureSprite,pump } from '@/game/tests/engineHarness.mjs';
 import { seeded } from '@/game/data/generation';
 import { createRun,rebuildStats } from '@/game/progression/runRules';
+import { applyStartingKit } from '@/game/progression/startingKit';
 import { characterById } from '@/game/data/characters';
 import { WEAPONS } from '@/game/data/combat';
 import { enterShop,shopTransaction,offerReason } from '@/game/shop/shopRules';
@@ -24,10 +25,16 @@ function intermission(run){
   if(run.weapons.length<3&&run.signal>=rerollCost(run.wave)*3)run=shopTransaction(run,{type:'reroll'});
   return {...run,wave:run.wave+1};
 }
-export async function simulateCampaign(seed,moving,lastWave=30){
+// `starter` runs the opening exactly as the loadout screen plays it: the one
+// picked Basic tool is the whole wave-1 kit; from the first intermission on
+// it keeps a slot in the average build (displacing one fixture tool so total
+// tool count matches the verified baseline).
+export async function simulateCampaign(seed,moving,lastWave=30,starter=null){
   const art=await arts(),realRandom=Math.random;Math.random=seeded(seed);const rows=[];
-  let run=createRun(characterById('nomad'),false,seed,`phase2-${seed}-${moving}`),deathWave=null;
-  run.weapons=(moving?['vfl','otdr','power','stripper']:['vfl','otdr','power','stripper','cleaver','splicer']).map((id,i)=>({...WEAPONS[id],baseId:id,id:`fixture-${i}`,mods:[],rarity:'common'}));
+  let run=createRun(characterById('nomad'),false,seed,`phase2-${seed}-${moving}${starter?`-${starter.baseId}`:''}`),deathWave=null;
+  const fixture=(moving?['vfl','otdr','power','stripper']:['vfl','otdr','power','stripper','cleaver','splicer']).map((id,i)=>({...WEAPONS[id],baseId:id,id:`fixture-${i}`,mods:[],rarity:'common'}));
+  if(starter)run=applyStartingKit(run,[starter.id]);
+  else run.weapons=fixture;
   run=rebuildStats({...run,items:[{id:'fixture-gear',name:'Average-build fixture',mods:[{stat:'maxHp',value:40},{stat:'armor',value:4},{stat:'speed',value:.1},{stat:'damage',value:.1}]}],hp:118});
   try{for(let wave=1;wave<=lastWave;wave++){
     let hud=null,finished=null,peak=0,cones=0;const input={current:{x:0,y:0}},canvas=makeCanvas(1100,800,{ctx:context()});
@@ -40,7 +47,9 @@ export async function simulateCampaign(seed,moving,lastWave=30){
     })}finally{cleanup()}
     if(!finished)throw Error(`Wave ${wave} did not finish`);
     rows.at(-1).kills=finished.lastWaveMetrics.kills;rows.at(-1).peak=peak;rows.at(-1).campCones=cones;rows.at(-1).earned=finished.lastWaveMetrics.earnedSignal;
-    run=finished;if(!run.won){deathWave=wave;break}run=intermission(run);
+    run=finished;if(!run.won){deathWave=wave;break}
+    if(starter&&wave===1)run=rebuildStats({...run,weapons:[run.weapons[0],...fixture.slice(0,(moving?4:6)-1)]});
+    run=intermission(run);
   }}finally{Math.random=realRandom}
   return {seed,moving,deathWave,reached:rows.at(-1)?.wave||0,level:run.level,rows};
 }
