@@ -7,7 +7,7 @@ import { CHARACTER_SPRITES } from '@/game/art/characterSprites';
 import { createSpriteAnimation,updateSpriteAnimation,drawCharacterSprite } from '@/game/art/spriteAnimation';
 import { preloadCharacterSprite } from '@/game/art/spriteLoader';
 import { effectiveRange,updateVisibleViewport,withinReach,areaCanHit } from '@/game/combat/effectiveRange';
-import { RANGE_PROFILES,SIGNATURE_RANGE_WEAPONS } from '@/game/combat/rangeConfig';
+import { RANGE_PROFILES,SIGNATURE_RANGE_WEAPONS,RANGE_MULTIPLIER } from '@/game/combat/rangeConfig';
 import { advanceProjectile,projectileCanHit } from '@/game/combat/projectileTravel';
 import { decodePng } from './pngDecode.mjs';
 import { drawProjectile } from '@/game/performance/drawProjectile';
@@ -79,8 +79,8 @@ test('logical desktop/mobile/orientation/zoom ranges are bounded and DPR-indepen
     const viewport=view(width,height,zoom),short=Math.min(viewport.width,viewport.height);
     for(const dpr of [1,2,3]){
       const baseline=effectiveRange(weapon,run(),viewport),enhanced=effectiveRange(weapon,run('clone',1),viewport),oracleW={baseId:'otdr',range:520,pattern:'pierce'},oracleR=effectiveRange(oracleW,run('oracle'),viewport),oracleUp=effectiveRange(oracleW,run('oracle',1),viewport),melee=effectiveRange({baseId:'cleaver',range:92,pattern:'melee'},run(),viewport);
-      assert(baseline<=.30*short);assert(enhanced<=.42*short+1e-8);assert(oracleR<=.44*short);assert(oracleUp<=.44*short+1e-8);assert(oracleR>baseline);assert(melee<baseline*.6);
-      const meleeUpgraded=effectiveRange({baseId:'cleaver',range:92,pattern:'melee'},run('clone',1),viewport);assert(meleeUpgraded<=.18*short+1e-8);
+      assert(baseline<=.30*short*RANGE_MULTIPLIER);assert(enhanced<=.42*short*RANGE_MULTIPLIER+1e-8);assert(oracleR<=.44*short*RANGE_MULTIPLIER);assert(oracleUp<=.44*short*RANGE_MULTIPLIER+1e-8);assert(oracleR>baseline);assert(melee<baseline*.6);
+      const meleeUpgraded=effectiveRange({baseId:'cleaver',range:92,pattern:'melee'},run('clone',1),viewport);assert(meleeUpgraded<=.18*short*RANGE_MULTIPLIER+1e-8);
       assert.equal(effectiveRange(weapon,run(),view(width,height,zoom,dpr)),baseline);
       if(dpr===1 && zoom===Math.max(1,width/1100,height/800))examples.push({css:[width,height],zoom,shortWorld:short,old:{ordinary:330,ordinaryUpgraded:660,oracle:702,oracleUpgraded:1222,melee:92,meleeUpgraded:184},new:{ordinary:baseline,ordinaryUpgraded:enhanced,oracle:oracleR,oracleUpgraded:oracleUp,melee,meleeUpgraded}});
     }
@@ -93,9 +93,10 @@ test('inside/outside limits, flat/percent/weapon bonuses once, and resize never 
   const r=run('oracle'),before=JSON.stringify(r),vp=view(390,700),range=effectiveRange(weapon,r,vp);
   assert(withinReach(range-.01,0,0,0,range));assert(!withinReach(range+.01,0,0,0,range));
   assert(effectiveRange({...weapon,range:396},r,vp)>range);
-  assert.equal(effectiveRange(weapon,{...r,rangeFlat:5},vp),range+5);
-  assert.equal(effectiveRange({...weapon,rangeFlat:5},{...r,rangeFlat:5},vp),range+10);
-  assert(Math.abs(effectiveRange(weapon,run('oracle',.03),vp)-390*.26*1.38)<1e-8);
+  // flats still count exactly once; as part of the final reach they scale with the shared multiplier
+  assert.equal(effectiveRange(weapon,{...r,rangeFlat:5},vp),range+5*RANGE_MULTIPLIER);
+  assert.equal(effectiveRange({...weapon,rangeFlat:5},{...r,rangeFlat:5},vp),range+10*RANGE_MULTIPLIER);
+  assert(Math.abs(effectiveRange(weapon,run('oracle',.03),vp)-390*.26*1.38*RANGE_MULTIPLIER)<1e-8);
   for(let i=0;i<100;i++){updateVisibleViewport(vp,i%2?390:1280,i%2?700:720,i%2?1:1280/1100);effectiveRange(weapon,r,vp)}
   assert.equal(JSON.stringify(r),before);assert.equal(r.range,1.35);
 });
@@ -119,9 +120,9 @@ test('rendered beam/piercing front stops at remaining reach and tail never start
 });
 test('arcs/radial attacks and current chain fan share bounded visible reach; future turns cannot reset travel',()=>{
   const vp=view(390,700),r=run(),reach=effectiveRange({baseId:'jumper',range:210,pattern:'chain'},r,vp);
-  assert.equal(RANGE_PROFILES.chain.maxBounces,0);assert(reach<=.18*390);
+  assert.equal(RANGE_PROFILES.chain.maxBounces,0);assert(reach<=.18*390*RANGE_MULTIPLIER);
   assert(areaCanHit({x:reach-.01,y:0},0,0,reach,0,Math.PI/3));assert(!areaCanHit({x:reach+.01,y:0},0,0,reach));assert(!areaCanHit({x:-10,y:0},0,0,reach,0,Math.PI/3));
   for(const angle of [-.16,0,.16]){const s=shot(reach,1000);s.vx=Math.cos(angle)*1000;s.vy=Math.sin(angle)*1000;advanceProjectile(s,1);assert(Math.hypot(s.x,s.y)<=reach+1e-8);assert.equal(s.remaining,0)}
   const turn=shot(100,100);advanceProjectile(turn,.6);turn.vx=-100;advanceProjectile(turn,2);assert.equal(turn.traveled,100);assert.equal(turn.remaining,0);assert.equal(turn.x,20);
-  assert.equal(effectiveRange(SIGNATURE_RANGE_WEAPONS.trace,run('oracle'),vp),390*.4*1.35);assert.equal(effectiveRange(SIGNATURE_RANGE_WEAPONS.trace,run('oracle',10),vp),390*.6);
+  assert.equal(effectiveRange(SIGNATURE_RANGE_WEAPONS.trace,run('oracle'),vp),390*.4*1.35*RANGE_MULTIPLIER);assert.equal(effectiveRange(SIGNATURE_RANGE_WEAPONS.trace,run('oracle',10),vp),390*.6*RANGE_MULTIPLIER);
 });

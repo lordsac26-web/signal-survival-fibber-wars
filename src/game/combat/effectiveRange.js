@@ -1,4 +1,4 @@
-import { BASE_RANGE_RATINGS, RANGE_PROFILES, rangeProfile } from '@/game/combat/rangeConfig';
+import { BASE_RANGE_RATINGS, RANGE_PROFILES, RANGE_MULTIPLIER, rangeProfile } from '@/game/combat/rangeConfig';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export function updateVisibleViewport(out,cssWidth,cssHeight,zoom=1){
   out.width=Math.max(1,cssWidth)/Math.max(.01,zoom);out.height=Math.max(1,cssHeight)/Math.max(.01,zoom);
@@ -14,7 +14,10 @@ export function effectiveRange(weapon,run,viewport,override){
   // Legacy weapon.range is a reach rating, NOT a world-unit distance. Optional flats are world units.
   const raw=short*profile.base*familyScale*quality*Math.max(0,run.range ?? 1)+(run.rangeFlat || 0)+(weapon.rangeFlat || 0);
   const cap=(key==='ranged' || key==='turret') && run.character?.id==='oracle' ? .44 : profile.cap;
-  return clamp(raw,0,short*cap);
+  // One shared balance multiplier on the FINAL reach: every consumer of this
+  // function (target lookup, launch budget, turrets/structures, melee/cone/
+  // nova areas, drawn arcs, HUD readouts) inherits it from this single line.
+  return clamp(raw,0,short*cap)*RANGE_MULTIPLIER;
 }
 export function withinReach(x,y,ox,oy,range){return (x-ox)**2+(y-oy)**2<=range*range+1e-8}
 export function areaCanHit(e,x,y,reach,angle=0,half=Math.PI){
