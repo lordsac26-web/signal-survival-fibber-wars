@@ -4,7 +4,7 @@ import { saveCheckpoint, recordRun, updateProfile } from '@/game/storage';
 import { createRun, normalizeRun } from '@/game/progression/runRules';
 import { applyStartingKit } from '@/game/progression/startingKit';
 import { enterShop, shopTransaction } from '@/game/shop/shopRules';
-import { pickUpgrade, upgradeChoices } from '@/game/progression/upgradeRules';
+import { pickUpgrade, upgradeChoices, rerollUpgradeChoices, skipUpgrade } from '@/game/progression/upgradeRules';
 import { toast } from '@/components/ui/use-toast';
 export { upgradeChoices } from '@/game/progression/upgradeRules';
 export default function useSoloSession(profile){
@@ -35,6 +35,8 @@ export default function useSoloSession(profile){
     const where=next.pendingLevels>0?'upgrade':'shop';assign(where==='shop'?enterShop(next):next,where);
   };
   const shopAction=event=>{const next=shopTransaction(current.current,event);assign(next,'shop')};
+  const reroll=()=>{if(phase.current!=='upgrade')return;try{assign(rerollUpgradeChoices(current.current),'upgrade')}catch(e){toast({title:'Reroll unavailable',description:e.message})}};
+  const skip=()=>{if(phase.current!=='upgrade')return;const next=skipUpgrade(current.current);const where=next.pendingLevels>0?'upgrade':'shop';assign(where==='shop'?enterShop(next):next,where)};
   const nextWave=()=>{if(phase.current!=='shop')return;const r=current.current;assign({...r,wave:r.wave+1},'game',false)};
-  return {screen,run,newUnlocks,navigate,start,confirmKit,newRun,resume,finish,upgrade,shopAction,nextWave};
+  return {screen,run,newUnlocks,navigate,start,confirmKit,newRun,resume,finish,upgrade,reroll,skip,shopAction,nextWave};
 }

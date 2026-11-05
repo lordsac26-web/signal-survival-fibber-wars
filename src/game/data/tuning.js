@@ -4,6 +4,7 @@ export const TUNING = Object.freeze({
   levelCompound:1.30, targetEarlyLevelsPerWave:1, shopSlots:4, maxLocks:2,
   deployOfferChance:.02, premiumOfferChance:.01, premiumPriceMultiplier:3, premiumReferencePrice:36,
   deployBasePrice:80, deployRankCap:2, overclockRankCap:2, cloneOverclockCap:3,
+  deployInstanceCap:2, engineerDeployInstanceCap:3, structureCap:2, engineerStructureCap:12, placeProximity:90,
   itemStatWaveScale:.06, rerollBase:4, dodgeCap:.5, critCap:1,
   priceWaveScale:.06, signalWaveScale:0, legendaryWave:10, epicWaveGain:.3, epicWaveCap:12
 });

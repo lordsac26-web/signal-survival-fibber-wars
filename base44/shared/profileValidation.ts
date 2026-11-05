@@ -1,5 +1,5 @@
 // Server boundary, not a simulation or anti-cheat claim. Mirrors roster equip rules.
-const ids=['nomad','veteran','oracle','don','admin','clone','isr'];
+const ids=['nomad','veteran','oracle','don','admin','engineer','clone','isr'];
 const retired=['rookie','frenzy','cleaner','bucket','patty','deadline'];
 const patterns={cleaver:'melee',splicer:'nova',otdr:'pierce',vfl:'beam',power:'projectile',stripper:'projectile',cleaner:'cone',cutters:'melee',tray:'turret',closure:'turret',cable:'turret',fanout:'turret',jumper:'chain',midspan:'pierce',blaster:'cone',deadzone:'beamSweep',switch:'chain',bell:'orbiting',rocket:'thrown',dowel:'projectile'};
 const melee=w=>['melee','chain','nova','orbiting'].includes(w.pattern);
@@ -14,7 +14,8 @@ export function validateProfile(data,userId,previous=null) {
     if(previous?.checkpoint?.run?.runId===r.runId && rename(previous.checkpoint.run.character?.id || previous.checkpoint.run.characterId)!==c)throw new Error('Character cannot change midway through a run');
     if(retired.includes(r.character.id)){r.character={id:c,name:'Night-Shift Nomad'};r.specialCooldown=0;r.specialProgress=0;r.useAlt=false}
     r.character.id=c;if(c==='don')r.character.name='Dispatch Don';r.specialUnlocked=true;
-    if(!Array.isArray(r.weapons) || r.weapons.length>(c==='veteran'?8:c==='admin'?4:6) || new Set(r.weapons.map(w=>w.id)).size!==r.weapons.length) throw new Error('Tool slots or duplicate instance ids invalid');
+    if(!Array.isArray(r.weapons) || r.weapons.length>(c==='veteran'?8:(c==='admin'||c==='engineer')?4:6) || new Set(r.weapons.map(w=>w.id)).size!==r.weapons.length) throw new Error('Tool slots or duplicate instance ids invalid');
+    if(c==='engineer' && r.weapons.length+(r.items||[]).length+(r.deployables||[]).length>4) throw new Error('Field Engineer item budget exceeded');
     if(r.weapons.some(w=>!w || typeof w.id!=='string' || patterns[w.baseId]!==w.pattern || !Number.isFinite(w.damage) || w.damage<0 || !Number.isFinite(w.rate) || w.rate<=0 || (c==='oracle'&&melee(w)))) throw new Error('Forbidden or malformed weapon');
     if(c==='veteran' && [true,false].some(k=>r.weapons.filter(w=>melee(w)===k).length>4)) throw new Error('Veteran requires max 4 tools per family');
     if((r.lockedIds || []).length>2 || new Set(r.lockedIds || []).size!==(r.lockedIds || []).length) throw new Error('At most two shop locks');

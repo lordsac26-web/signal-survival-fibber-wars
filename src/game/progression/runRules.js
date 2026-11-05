@@ -11,6 +11,10 @@ export function legalLoadout(c, weapons) {
   if (weapons.some(w => !allowedWeapon(c, w))) return false;
   return !c.familyCap || ['melee','ranged'].every(k => weapons.filter(w => weaponSlot(w) === k).length <= c.familyCap);
 }
+// Field Engineer: exactly 4 item slots shared across tools, passives and
+// deployables (a module rides on its weapon).
+export const itemBudgetUsed = run => (run.weapons || []).length + (run.items || []).length + (run.deployables || []).length;
+export const itemBudgetCap = run => run.character?.id === 'engineer' ? 4 : Infinity;
 export function normalizeWeapon(w, index = 0, rankCap = TUNING.overclockRankCap) {
   const obj = typeof w === 'string' ? {...WEAPONS[w],baseId:w} : {...w};
   return normalizeItem({...obj,id:obj.id || `legacy-tool-${index}-${obj.baseId}`,slotType:weaponSlot(obj),rarity:obj.rarity || 'common',mods:obj.mods || [],overclockRank:Math.min(rankCap,obj.overclockRank || 0)});

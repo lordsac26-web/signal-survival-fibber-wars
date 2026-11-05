@@ -5,6 +5,8 @@ import { normalizeItem, scaleItem } from '@/game/items/itemScaling';
 import { acquireItem, hasCombineTarget, manualCombine } from '@/game/items/acquisition';
 import { priceOffer } from '@/game/shop/itemPricing';
 import { rerollCost, buyHealing } from '@/game/shop/economy';
+import { sellItem } from '@/game/shop/selling';
+import { itemBudgetUsed } from '@/game/progression/runRules';
 import { ownedMatch, withVisitDuplicate } from '@/game/shop/duplicateOffers';
 import { DEPLOYABLES } from '@/game/data/structures';
 import { TUNING } from '@/game/data/tuning';
@@ -26,7 +28,7 @@ function freshOffer(run,sequence){
   let item;
   if(chance<TUNING.deployOfferChance){
     const candidates=DEPLOYABLES.filter(d=>['turretMount','barricade'].includes(d.structure) && d.structure!==run.character.signatureStructure);
-    const turrets=ownedTurretCount(run)?[]:WEAPON_ARCHETYPES.filter(a=>a[2]==='turret' && allowedWeapon(run.character,{pattern:a[2]}) && run.character.signatureStructure!=='turretMount');
+    const turrets=ownedTurretCount(run)&&run.character.id!=='engineer'?[]:WEAPON_ARCHETYPES.filter(a=>a[2]==='turret' && allowedWeapon(run.character,{pattern:a[2]}) && run.character.signatureStructure!=='turretMount');
     if(candidates.length && (r()<.6 || !turrets.length)){
       const d=candidates[Math.floor(r()*candidates.length)],rar=run.character.id==='clone'?'rare':(r()<.8?'rare':'epic');
       item=scaleItem({...d,id:`deploy-${sequence}`,deployId:d.id,deploy:true,rarity:rar,baseStats:{mods:[]},baseCost:TUNING.deployBasePrice},rar);
@@ -63,7 +65,9 @@ export function offerReason(run,item){
   if(!item)return 'Offer already purchased.';
   if(item.baseId && !allowedWeapon(run.character,item))return `${run.character.restriction}-only technician.`;
   if(!item.premium && tierId(item.rarity)==='overclocked')return 'Overclocked items are combine-only, never sold.';
-  if(item.baseId && item.pattern==='turret' && ownedTurretCount(run) && !hasCombineTarget(run,item))return 'Only one deployable turret tool per technician — combine a matching tier or upgrade the one you own.';
+  if(item.baseId && item.pattern==='turret' && run.character.id!=='engineer' && ownedTurretCount(run) && !hasCombineTarget(run,item))return 'Only one deployable turret tool per technician — combine a matching tier or upgrade the one you own.';
+  if(run.character.id==='engineer' && item.baseId && item.pattern==='turret' && run.weapons.filter(w=>w.pattern==='turret').length>=4 && !hasCombineTarget(run,item))return 'Field Engineer fields at most 4 deployable tools.';
+  if(run.character.id==='engineer' && !item.premium && !item.baseId && itemBudgetUsed(run)>=4 && !hasCombineTarget(run,item))return 'Field Engineer carries exactly 4 items total — sell or combine first.';
   if(item.deploy && item.structure===run.character.signatureStructure)return 'Signature duplicate.';
   if(item.premium && !premiumTargets(run).length)return run.character.id==='clone'?'Requires an owned Rare tool below its overclock cap.':'Requires an eligible Epic or Legendary tool.';
   if(run.signal<item.cost)return `Need ${Math.ceil(item.cost-run.signal)} more spendable Signal.`;
@@ -80,6 +84,7 @@ export function shopTransaction(run,event){
   if(!run.shop)throw new Error('Shop is not open');
   if(event.type==='combine')return manualCombine(run,event.itemId);
   if(event.type==='heal')return buyHealing(run);
+  if(event.type==='sell')return sellItem(run,event.itemId);
   const shop={...run.shop,offers:[...run.shop.offers]},locks=[...(run.lockedIds || [])];
   if(event.type==='reroll'){
     const cost=rerollCost(run.wave,shop.rerolls);if(run.signal<cost)throw new Error('Not enough spendable Signal');

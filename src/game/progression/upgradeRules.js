@@ -1,11 +1,35 @@
 import { createGenerator } from '@/game/data/generation';
 import { acquireItem } from '@/game/items/acquisition';
-export function upgradeChoices(run){
-  const g=createGenerator(run.seed+run.level*3571+17,run.level,run.character.id==='clone'?'rare':null);
-  return [g.passive(run.luck),g.passive(run.luck),g.passive(run.luck)];
+import { levelRerollCost } from '@/game/shop/economy';
+
+// Level-up choices are seeded per level; levelRerolls shifts the seed so a
+// reroll replaces ALL THREE options. At levelRerolls=0 the seed is unchanged
+// from the original formula, so existing runs keep their offered set.
+export function upgradeChoices(run) {
+  const g = createGenerator(run.seed + run.level * 3571 + (run.levelRerolls || 0) * 104729 + 17, run.level, run.character.id === 'clone' ? 'rare' : null);
+  return [g.passive(run.luck), g.passive(run.luck), g.passive(run.luck)];
 }
-export function pickUpgrade(run,itemId){
-  const item=upgradeChoices(run).find(i=>i.id===itemId);
-  if(!item || !(run.pendingLevels>0))throw new Error('Level-up choice has changed');
-  return acquireItem({...run,level:run.level+1,pendingLevels:run.pendingLevels-1},{...item,levelUpgrade:true});
+export function pickUpgrade(run, itemId) {
+  const item = upgradeChoices(run).find(i => i.id === itemId);
+  if (!item || !(run.pendingLevels > 0)) throw new Error('Level-up choice has changed');
+  return acquireItem({...run, level: run.level + 1, pendingLevels: run.pendingLevels - 1, levelRerolls: 0}, {...item, levelUpgrade: true});
+}
+// A full Field Engineer kit (4 total items) cannot hold another passive:
+// declining keeps the level and moves on instead of dead-ending the screen.
+export function skipUpgrade(run) {
+  if (!(run.pendingLevels > 0)) throw new Error('No level-up pending');
+  return {...run, pendingLevels: run.pendingLevels - 1, levelRerolls: 0};
+}
+// Reroll costs roughly DOUBLE the item-reroll model (same growth curve,
+// doubled) at the current wave, paid from spendable Signal. The replacement
+// set must not immediately re-offer any of the current three.
+export function rerollUpgradeChoices(run) {
+  const prevIds = new Set(upgradeChoices(run).map(i => i.id));
+  const cost = levelRerollCost(run.wave, run.levelRerolls || 0);
+  if ((run.signal || 0) < cost) throw new Error('Not enough spendable Signal');
+  let rerolls = (run.levelRerolls || 0) + 1, choices = upgradeChoices({...run, levelRerolls: rerolls});
+  while (rerolls - (run.levelRerolls || 0) < 8 && choices.some(i => prevIds.has(i.id))) {
+    rerolls++; choices = upgradeChoices({...run, levelRerolls: rerolls});
+  }
+  return {...run, signal: run.signal - cost, levelRerolls: rerolls};
 }

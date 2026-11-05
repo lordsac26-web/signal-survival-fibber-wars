@@ -114,7 +114,9 @@ admin:Object.freeze((()=>{
   return Object.freeze({...d,specialActivationFrames:3,specialFps:2,specialDuration:4,deathColumns:7,deathCellW:118,deathCellH:88});
 })())
 });
-export const characterSprite=id=>CHARACTER_SPRITES[id]||null;
+// PLACEHOLDER body sheet: the Field Engineer reuses the 30 Year Veteran's
+// processed sheet until the owner supplies a real Field Engineer sheet.
+export const characterSprite=id=>id==='engineer'?CHARACTER_SPRITES.veteran:CHARACTER_SPRITES[id]||null;
 
 // Lag Sprite enemy — same definition/manifest/anchor convention as the character sprites,
 // plus an attack atlas. Pixel-inspected: front row is camera-facing (symmetric highlights);

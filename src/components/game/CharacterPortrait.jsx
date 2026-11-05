@@ -13,5 +13,8 @@ export default function CharacterPortrait({ character:c }) {
   if(c.id==='clone')return <ClonePortrait name={c.name}/>;
   if(c.id==='nomad')return <NomadPortrait name={c.name}/>;
   if(c.id==='admin')return <AdminPortrait name={c.name}/>;
+  // PLACEHOLDER portrait: the Field Engineer reuses the Veteran's portrait
+  // until the owner supplies a real Field Engineer sheet.
+  if(c.id==='engineer')return <VeteranPortrait name={c.name}/>;
   return null;
 }

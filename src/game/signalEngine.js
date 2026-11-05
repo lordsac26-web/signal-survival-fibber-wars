@@ -38,6 +38,7 @@ import drawCrosstalk from '@/game/art/crosstalkSpriteAnimation';
 import { APPARITION, ROUTER_ATTACK, createConeState, stepCone, consumeConeHit, casterVelocity, cancelHiddenCharge } from '@/game/combat/coneAttack';
 import drawConeEnemy from '@/game/art/drawConeEnemy';
 import { scaledEnemy, enemyDamageMultiplier } from '@/game/combat/difficulty';
+import { turretInstanceCap, structureItemCap, structureCap, turretStats, structureTurretStats, PLACE_PROXIMITY, ENGINEER_DEPLOY_CD_MULT } from '@/game/combat/deployableRules';
 import { createEncounterDirector, perimeterSpawn } from '@/game/combat/encounterDirector';
 import { CAMP_ATTACK, createCampState, updateCamp, campVelocity } from '@/game/combat/antiCamp';
 import drawCampCone from '@/game/art/drawCampCone';
@@ -65,7 +66,7 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  const ctx=canvas.getContext('2d',{alpha:false}),grid=new SpatialHash(96),charId=run.character.id;
  let dpr=Math.min(devicePixelRatio||1,2);
  if(run.character.id==='oracle'&&!characterArt)throw new Error('Oracle art must be preloaded before combat');
- const techChars=['veteran','clone','don','nomad','admin'];const spriteState=characterArt?(charId==='isr'?createISRAnimation():run.character.id==='oracle'?createSpriteAnimation():techChars.includes(run.character.id)?createTechAnimation():null):null;
+ const techChars=['veteran','clone','don','nomad','admin','engineer'];const spriteState=characterArt?(charId==='isr'?createISRAnimation():run.character.id==='oracle'?createSpriteAnimation():techChars.includes(run.character.id)?createTechAnimation():null):null;
  const sqArt=squirrelArt&&squirrelArt.definition?squirrelArt:null;
  const petArt=peteArt&&peteArt.definition?peteArt:null;
  const lagArt=enemyArt&&enemyArt.definition?enemyArt:null;
@@ -104,9 +105,9 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  let queryLimit=Infinity,queryOriginX=0,queryOriginY=0,queryArcAngle=0,queryArcHalf=Math.PI;
  // deployable state: per-structure-type cooldowns, the (tiny) active structure
  // list, and the pedestal attack-speed buff (recomputed every fixed step)
- const deployCds={...(run.deployCds||{})};let activeStructs=[],structCount=0,pedestalBuff=0;
- const structCap=()=>6+Math.floor((run.engineering||0)/10);
- const deployCdMax=(item,d)=>d.cd*(1-.12*Math.min((item.stacks||1)-1,3));
+ const deployCds={...(run.deployCds||{})};let activeStructs=[],structCount=0,pedestalBuff=0,placeBlocked=false;
+ const structCap=()=>structureCap(run);
+ const deployCdMax=(item,d)=>d.cd*(1-.12*Math.min((item.stacks||1)-1,3))*(charId==='engineer'?ENGINEER_DEPLOY_CD_MULT:1);
  function addShake(v){shakeMag=Math.min(20,shakeMag+v)}
  function updateCamera(){camX=Math.round(clamp(p.x-viewW/2,0,Math.max(0,W-viewW)));camY=Math.round(clamp(p.y-viewH/2,0,Math.max(0,H-viewH)))}
  function publishReach(){cb.reach?.({viewport:{...viewport},weaponRanges:run.weapons.map(w=>effectiveRange(weaponOf(w),run,viewport)),signatureReach:signatureWeapon?effectiveRange(signatureWeapon,run,viewport):0})}
@@ -222,13 +223,14 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
  // per-archetype tuning: life, cap, fire, mode).
  function deployTurret(w){const cfg=w.turret;
   let count=0;for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(t.active&&t.wid===w.id)count++}
-  if(count>=cfg.cap+Math.floor((run.engineering||0)/15))return; // silently at cap — HUD shows the live turrets
+  if(count>=turretInstanceCap(run))return; // silently at cap — HUD shows the live turrets
   const t=turrets.acquire();if(!t)return;const a=Math.random()*6.28;
   t.wid=w.id;t.mode=cfg.mode;t.color=w.color;t.born=0;t.inv=0;t.r=13;
   t.x=clamp(p.x+Math.cos(a)*26,20,W-20);t.y=clamp(p.y+Math.sin(a)*26,20,H-20);
   t.life=t.maxLife=cfg.life+(run.engineering||0)*.04;
-  t.fire=cfg.fire;t.fireCd=cfg.fire*.4;
-  t.damage=w.damage*(1+(run.engineering||0)*.01)*(1+(run.turretQuality||0)*.004);
+  const tStats=turretStats(run,w,cfg);
+  t.fire=tStats.fire;t.fireCd=tStats.fire*.4;
+  t.damage=tStats.damage;
   t.weapon=w;t.range=w.range;t.hp=20+(run.engineering||0)*2;t.lookA=a+Math.PI;
   t.weaponTurret=true; // drawn with the splice-pedestal pack (see draw loop)
   sfx('deploy');particle(t.x,t.y,'#d6d3d1',lowFx?2:8)}
@@ -263,7 +265,7 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
    activeStructs.push(s)}
   structCount=activeStructs.length;pedestalBuff=0;
   for(let i=0;i<activeStructs.length;i++){const s=activeStructs[i],def=s.stats||STRUCTURES[s.type];if(!def)continue;
-   if(def.kind==='turret'){s.fireCd-=dt;if(s.fireCd<=0){const reach=effectiveRange(def,run,viewport,'turret'),target=nearestAt(s.x,s.y,reach);if(target){let ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;const [mx,my]=truckArt&&truckDef&&s.type===truckDef.structureType?truckMuzzlePoint(truckDef,s.x,s.y,ang):pedArt?pedestalMuzzlePoint(pedArt.definition,s.x,s.y,ang):[s.x,s.y-14];ang=Math.atan2(target.y-my,target.x-mx);launch({damage:def.damage*(1+.2*(s.power-1))*(1+(run.engineering||0)*.01),range:def.range,pattern:'projectile',color:def.color},ang,mx,my,reach);sfx('snip');s.fireCd=def.fire}else s.fireCd=.15}}
+   if(def.kind==='turret'){s.fireCd-=dt;if(s.fireCd<=0){const reach=effectiveRange(def,run,viewport,'turret'),target=nearestAt(s.x,s.y,reach);if(target){let ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;const [mx,my]=truckArt&&truckDef&&s.type===truckDef.structureType?truckMuzzlePoint(truckDef,s.x,s.y,ang):pedArt?pedestalMuzzlePoint(pedArt.definition,s.x,s.y,ang):[s.x,s.y-14];ang=Math.atan2(target.y-my,target.x-mx);const stStats=structureTurretStats(run,def,s.power);launch({damage:stStats.damage,range:def.range,pattern:'projectile',color:def.color},ang,mx,my,reach);sfx('snip');s.fireCd=stStats.fire}else s.fireCd=.15}}
    else if(def.kind==='buff'&&Math.hypot(p.x-s.x,p.y-s.y)<s.r)pedestalBuff=Math.max(pedestalBuff,def.buff+.05*(s.power-1))}}
  // Q-key placement: structure appears AT the player, respecting per-type
  // cooldown and the total permit cap (6 + Engineering/10).
@@ -271,8 +273,13 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
   const idx=Math.min(Math.max(0,input.current.deploySel||0),list.length-1);
   const item=list[idx],def=deployStats(item);if(!def)return;
   if((deployCds[item.structure]||0)>0){cb.flash(`REBOOTING ${def.name.toUpperCase()} — ${Math.ceil(deployCds[item.structure])}s`);return}
-  let count=0;for(let i=0;i<structures.items.length;i++)if(structures.items[i].active)count++;
+  // PLACEMENT RULES (playtest): the per-item instance cap and the proximity
+  // exclusion are checked BEFORE the structure is acquired — a rejected
+  // placement consumes no cooldown and the press is simply refused.
+  let count=0,perItem=0,tooClose=false;for(let i=0;i<structures.items.length;i++){const s=structures.items[i];if(!s.active)continue;count++;if(s.type===item.structure)perItem++;if(Math.hypot(s.x-p.x,s.y-p.y)<PLACE_PROXIMITY)tooClose=true}
   if(count>=structCap()){cb.flash('PERMIT LIMIT: TOO MUCH STRUCTURE');return}
+  if(perItem>=structureItemCap(run)){cb.flash('THIS DEPLOYABLE HAS ALL ITS UNITS OUT');return}
+  if(tooClose){cb.flash('BLOCKED: TOO CLOSE TO A DEPLOYABLE');return}
   if(def.kind==='turret'&&!(truckArt&&truckDef&&truckDef.structureType===item.structure))cb.flash('TRUCK ART UNAVAILABLE — PEDESTAL STAND-IN');
   const s=structures.acquire();if(!s){cb.flash('PERMIT LIMIT');return}
   s.active=true;s.type=item.structure;s.x=clamp(p.x,30,W-30);s.y=clamp(p.y,30,H-30);
@@ -326,6 +333,12 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
   if(input.current.cycle){input.current.cycle=false;const list=run.deployables||[];if(list.length){const cur=Math.min(Math.max(0,input.current.deploySel||0),list.length-1);const nxt=(cur+1)%list.length;input.current.deploySel=nxt;cb.flash(`DEPLOY: ${list[nxt].name}`)}}
   if(input.current.deploy){input.current.deploy=false;placeStructure()}
   updateCamera();
+  // Live placement preview state: red exclusion ring at the feet whenever
+  // the selected deployable cannot legally go where the technician stands.
+  placeBlocked=false;
+  if((run.deployables||[]).length){const list=run.deployables,selIdx=Math.min(Math.max(0,input.current.deploySel||0),list.length-1),sel=list[selIdx],selDef=deployStats(sel);
+   if(selDef){let count=0,perItem=0,tooClose=false;for(let i=0;i<structures.items.length;i++){const s=structures.items[i];if(!s.active)continue;count++;if(s.type===sel.structure)perItem++;if(Math.hypot(s.x-p.x,s.y-p.y)<PLACE_PROXIMITY)tooClose=true}
+    placeBlocked=count>=structCap()||perItem>=structureItemCap(run)||tooClose}}
   if(!bossSpawned&&bossWave(run.wave)){bossSpawned=true;spawnBoss()}
   // Outage affects locomotion ONLY: ordinary spawn attempts, double chance and caps stay unchanged.
 if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
@@ -415,7 +428,7 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
   if(charId==='admin'&&characterArt&&characterArt.definition.deathColumns&&p.hp<=0){dying=DEATH_HOLD;sfx('death');cb.event?.({type:'deathSequence',time:duration-time})}
   else{sfx(p.hp<=0?'death':'clear');complete(p.hp>0)}}
   hudClock-=dt;if(hudClock<=0){let boss=null;for(let i=0;i<enemies.items.length;i++){const b=enemies.items[i];if(b.active&&(b.sq||b.kind==='rous')){boss={name:b.kind==='rous'?ROUS.name:SQUIRREL.name,hp:Math.max(0,b.hp),max:b.max,phase:b.sq?.phase||1};break}}const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,earnedSignal,xp,xpTarget:signalForLevel(run.level+levels),level:run.level+levels,kills,boss,specialUnlocked:true,specialCooldown,specialName:run.character.special.name,characterId:charId,specialRemaining:(charId==='isr'||charId==='admin')?specialTimer:0,fps:Math.round(fps),stress,...(cb.simulation?{position:{x:p.x,y:p.y}}:{}),viewport:{...viewport},weaponRanges:run.weapons.map(w=>effectiveRange(weaponOf(w),run,viewport)),signatureReach:signatureWeapon?effectiveRange(signatureWeapon,run,viewport):0,
-   deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,deployStats(d)),selected:i===depIdx})),structures:structCount,cap:structCap()}:null});hudClock=.1}
+   deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,deployStats(d)),selected:i===depIdx})),structures:structCount,cap:structCap(),blocked:placeBlocked}:null});hudClock=.1}
   // Opt-in automated-test observation only; GameArena supplies neither callback.
   if(cb.inspect)cb.inspect({time:duration-time,player:{...p},slow:puddleSlowMul,specialTimer,specialCooldown,healed,kills,clauseFired,damageDealt,camX,camY,meeting:meeting.active?{x:meeting.x,y:meeting.y,timer:specialTimer,radius:MEETING.blastRadius}:null,dying,...(charId==='isr'?{enemies:enemies.items.filter(e=>e.active).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,speed:e.speed,boss:e.boss,hp:e.hp,motion:e.outageMotion})),shots:shots.items.filter(s=>s.active).map(s=>({id:s.id,originX:s.originX,originY:s.originY,vx:s.vx,vy:s.vy})),sprite:{...spriteState}}:{}),puddles:puddles.items.filter(d=>d.active).map(d=>({...d})),puddings:enemies.items.filter(e=>e.active&&e.pud).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,cast:{...e.pud}})),
   petes:enemies.items.filter(e=>e.active&&(e.kind==='pete'||e.kind==='peteMini')).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cloneT:e.cloneT})),
@@ -468,6 +481,9 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
    else if(def.kind==='slow'){ctx.fillStyle='rgba(34,211,238,.12)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.strokeStyle='rgba(103,232,249,.55)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,st.r*.66*grow,0,4.6);ctx.stroke();drawEyes(x,y,st.lookA)}
    else if(def.kind==='buff'){ctx.fillStyle='rgba(250,204,21,.10)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.fillStyle='#a8a29e';ctx.fillRect(x-12,y,24,10);ctx.fillRect(x-8,y-8,16,8);drawHardHat(x,y-12);drawEyes(x,y-2,st.lookA)}
    ctx.globalAlpha=1}
+   // REJECTED-PLACEMENT PREVIEW: a red dashed exclusion ring at the
+   // technician's feet while the selected deployable cannot legally go there.
+   if(placeBlocked){const bx=Math.round(p.x),by=Math.round(p.y);ctx.save();ctx.globalAlpha=.1;ctx.fillStyle='#ef4444';ctx.beginPath();ctx.arc(bx,by,PLACE_PROXIMITY,0,7);ctx.fill();ctx.globalAlpha=.85;ctx.strokeStyle='#f87171';ctx.lineWidth=2;ctx.setLineDash([9,7]);ctx.beginPath();ctx.arc(bx,by,PLACE_PROXIMITY,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
   for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;const grow=Math.min(1,t.born*4);ctx.globalAlpha=t.life<1?Math.max(.2,t.life):1;
    if(t.mode==='helper'){ // Don's crew: the four extracted individual crew
     // sprites while his special runs; the placeholder helper is the mutually

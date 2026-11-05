@@ -5,22 +5,41 @@ import { applyStartingKit } from '@/game/progression/startingKit';
 import { characterById } from '@/game/data/characters';
 import { WEAPONS } from '@/game/data/combat';
 import { enterShop,shopTransaction,offerReason } from '@/game/shop/shopRules';
-import { pickUpgrade,upgradeChoices } from '@/game/progression/upgradeRules';
+import { pickUpgrade,skipUpgrade,upgradeChoices } from '@/game/progression/upgradeRules';
 import { waveDuration } from '@/game/data/tuning';
 import { rerollCost,healingCost } from '@/game/shop/economy';
 export const estimateDps=run=>run.weapons.reduce((sum,w)=>sum+w.damage/w.rate*(w.pattern==='chain'?3:1),0)*run.damage*run.attackSpeed*(1+run.crit)*(1+run.spliceQuality*.004);
-const names=['nomad','lag','bucket','squirrel','dirty','pedestal_turret','packet','jitter','pete','bend','crosstalk','attenuation','rous'];
-let cached;
-async function arts(){return cached??=await Promise.all(names.map((id,i)=>i===0?preloadCharacterSprite(id):[2,5].includes(i)?preloadStructureSprite(id):preloadEnemySprite(id)))}
+const names=['lag','bucket','squirrel','dirty','pedestal_turret','packet','jitter','pete','bend','crosstalk','attenuation','rous'];
+const artCache=new Map();
+// Each technician's campaign needs that technician's own art pack: the engine
+// draws from the character-specific sheets (ISR's seated sheets, the Oracle's
+// grid, the Engineer's placeholder Veteran sheet).
+async function arts(charId){
+  if(artCache.has(charId))return artCache.get(charId);
+  const rest=await Promise.all(names.map((id,i)=>[1,4].includes(i)?preloadStructureSprite(id):preloadEnemySprite(id)));
+  const art=[await preloadCharacterSprite(charId),...rest];
+  artCache.set(charId,art);return art;
+}
 function context(){const cache={};return new Proxy({imageSmoothingEnabled:false},{get(t,key){return t[key]??(cache[key]??=String(key).includes('Gradient')?()=>({addColorStop(){}}):()=>{})},set(t,key,value){t[key]=value;return true}})}
 function intermission(run){
-  while(run.pendingLevels>0){const choices=upgradeChoices(run);run=pickUpgrade(run,choices[0].id)}
+  while(run.pendingLevels>0){const choices=upgradeChoices(run);try{run=pickUpgrade(run,choices[0].id)}catch(error){if(run.character.id==='engineer')run=skipUpgrade(run);else throw error}}
   run=enterShop(run);
   if(run.hp<run.maxHp*.7&&run.signal>=healingCost(run.wave))run=shopTransaction(run,{type:'heal'});
+  // Field Engineer growth is combine-driven: with the 4-item budget full,
+  // only same-identity duplicates upgrade him, so his average play rerolls
+  // hunting combine targets and buys any that appear.
+  if(run.character.id==='engineer'){
+    for(let attempt=0;attempt<4;attempt++){
+      const buyable=run.shop.offers.filter(i=>i&&!offerReason(run,i));
+      if(buyable.length){try{run=shopTransaction(run,{type:'buy',offerId:buyable[0].id})}catch{break}continue}
+      if(run.signal>=rerollCost(run.wave,run.shop.rerolls)+20){try{run=shopTransaction(run,{type:'reroll'})}catch{break}}else break;
+    }
+    return {...run,wave:run.wave+1};
+  }
   for(let buys=0;buys<2;buys++){
     const legal=run.shop.offers.filter(i=>i&&!i.premium&&!i.deploy&&!i.turret&&!offerReason(run,i)&&(!i.baseId||run.weapons.length<run.character.slots));
     const item=legal.find(i=>i.baseId)||legal[0];if(!item)break;
-    run=shopTransaction(run,{type:'buy',offerId:item.id});
+    try{run=shopTransaction(run,{type:'buy',offerId:item.id})}catch{break}
   }
   if(run.weapons.length<3&&run.signal>=rerollCost(run.wave)*3)run=shopTransaction(run,{type:'reroll'});
   return {...run,wave:run.wave+1};
@@ -29,10 +48,29 @@ function intermission(run){
 // picked Basic tool is the whole wave-1 kit; from the first intermission on
 // it keeps a slot in the average build (displacing one fixture tool so total
 // tool count matches the verified baseline).
-export async function simulateCampaign(seed,moving,lastWave=30,starter=null){
-  const art=await arts(),realRandom=Math.random;Math.random=seeded(seed);const rows=[];
-  let run=createRun(characterById('nomad'),false,seed,`phase2-${seed}-${moving}${starter?`-${starter.baseId}`:''}`),deathWave=null;
-  const fixture=(moving?['vfl','otdr','power','stripper']:['vfl','otdr','power','stripper','cleaver','splicer']).map((id,i)=>({...WEAPONS[id],baseId:id,id:`fixture-${i}`,mods:[],rarity:'common'}));
+// Per-character average builds for the balance campaigns: legal under each
+// technician's restrictions and slot count, sized like the verified nomad
+// fixtures (4 tools moving, 6 stationary). The Field Engineer's 4-slot budget
+// caps him at four tools including one deployable sentry.
+export const AVERAGE_BUILDS={
+  nomad:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper','cleaver','splicer']},
+  veteran:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper','cleaver','splicer']},
+  oracle:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper','midspan','dowel']},
+  don:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper','cleaver','splicer']},
+  admin:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper']},
+  clone:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper','cleaver','splicer']},
+  isr:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper','cleaver','splicer']},
+  engineer:{mover:['tray','vfl','otdr'],camper:['tray','vfl','otdr']}
+};
+export async function simulateCampaign(seed,moving,lastWave=30,starter=null,charId='nomad'){
+  const art=await arts(charId),realRandom=Math.random;Math.random=seeded(seed);const rows=[];
+  let run=createRun(characterById(charId),false,seed,`phase2-${seed}-${moving}${starter?`-${starter.baseId}`:''}-${charId}`),deathWave=null;
+  const build=starter&&charId==='nomad'?(moving?['vfl','otdr','power','stripper']:['vfl','otdr','power','stripper','cleaver','splicer']):AVERAGE_BUILDS[charId][moving?'mover':'camper'];
+  const fixture=build.map((id,i)=>({...WEAPONS[id],baseId:id,id:`fixture-${i}`,mods:[],rarity:'common'}));
+  // The Field Engineer's average build spends half his 4-slot budget on
+  // deployable-type items; his simulated play places them on cooldown (Q),
+  // exactly like the owner-designed play pattern.
+  if(charId==='engineer')run.deployables=[{structure:'turretMount',name:'Turret Mount',icon:'🔩',stacks:1}];
   if(starter)run=applyStartingKit(run,[starter.id]);
   else run.weapons=fixture;
   run=rebuildStats({...run,items:[{id:'fixture-gear',name:'Average-build fixture',mods:[{stat:'maxHp',value:40},{stat:'armor',value:4},{stat:'speed',value:.1},{stat:'damage',value:.1}]}],hp:118});
@@ -44,6 +82,7 @@ export async function simulateCampaign(seed,moving,lastWave=30,starter=null){
       if(!hud)return;
       if(moving){const angle=f/60*1.4,tx=550+Math.cos(angle)*230,ty=400+Math.sin(angle)*180;input.current.x=tx-hud.position.x;input.current.y=ty-hud.position.y}
       if(hud.hp<hud.maxHp*.65&&hud.specialCooldown<=0)input.current.special=true;
+      if(run.character.id==='engineer'&&hud.deploy){if(f%30===0)input.current.deploy=true;if(f%420===300)input.current.cycle=true}
     })}finally{cleanup()}
     if(!finished)throw Error(`Wave ${wave} did not finish`);
     rows.at(-1).kills=finished.lastWaveMetrics.kills;rows.at(-1).peak=peak;rows.at(-1).campCones=cones;rows.at(-1).earned=finished.lastWaveMetrics.earnedSignal;

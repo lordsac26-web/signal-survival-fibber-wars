@@ -56,7 +56,7 @@ export default function GameHUD({ hud, wave, weapons, slots = 6, onOpenStats, on
         selects it (the HUD wrapper is pointer-events-none, so slots need
         pointer-events-auto like the stats button above). */}
     {hud.deploy?.items?.length > 0 && (
-      <div className="mt-1 flex items-center justify-center gap-1">
+      <div className={`mt-1 flex items-center justify-center gap-1 ${hud.deploy.structures >= hud.deploy.cap ? 'opacity-50 grayscale' : ''}`} title={hud.deploy.structures >= hud.deploy.cap ? 'Deployables at cap — placement greyed out' : 'Structures deployed / permit cap'}>
         <span className="rounded-md border-2 border-white/20 bg-slate-950/75 px-2 py-1 text-xs font-black text-amber-200" title="Structures deployed / permit cap">🧱 {hud.deploy.structures}/{hud.deploy.cap}</span>
         {hud.deploy.items.map((d, i) => (
           <button

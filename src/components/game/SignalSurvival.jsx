@@ -21,7 +21,7 @@ export default function SignalSurvival({ownerId}) {
   else if(s.screen==='select')content=<CharacterSelect save={state.profile} onBack={()=>s.navigate('menu')} onSelect={s.start}/>;
   else if(s.screen==='loadout')content=<LoadoutScreen run={s.run} onConfirm={s.confirmKit} onBack={()=>s.navigate('select')}/>;
   else if(s.screen==='game')content=<GameArena key={`${s.run.runId}-${s.run.wave}`} run={s.run} onFinish={s.finish}/>;
-  else if(s.screen==='upgrade')content=<UpgradeScreen key={`${s.run.wave}-${s.run.level}`} run={s.run} onPick={s.upgrade}/>;
+  else if(s.screen==='upgrade')content=<UpgradeScreen key={`${s.run.wave}-${s.run.level}`} run={s.run} onPick={s.upgrade} onReroll={s.reroll} onSkip={s.skip}/>;
   else if(s.screen==='shop')content=<ShopScreen run={s.run} onAction={s.shopAction} onContinue={s.nextWave} onProfile={()=>s.navigate('menu')}/>;
   else content=<SummaryScreen run={s.run} newUnlocks={s.newUnlocks} onMenu={()=>s.navigate('menu')} onRetry={()=>s.navigate('select')}/>;
   return <>{s.screen!=='game' && <div className="bg-game-bg px-5 pt-3 text-game-ink"><div className="mx-auto max-w-6xl"><SaveStatus state={state}/></div></div>}{content}</>;
