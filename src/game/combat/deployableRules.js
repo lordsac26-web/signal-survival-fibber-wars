@@ -6,13 +6,20 @@ import { TUNING } from '@/game/data/tuning';
 const isEngineer = run => run.character?.id === 'engineer';
 
 // (b) Concurrent deployable caps: 2 placed structures per player by default.
-// The Field Engineer is the deployables specialist: 12 placed structures
-// (4 deployable items x 3 instances) when his whole 4-slot kit is deployables.
+// The Field Engineer is the deployables specialist: up to 12 placed
+// structures when his whole 4-slot kit is deployables (unique gear caps at 1).
 export const structureCap = run => isEngineer(run) ? TUNING.engineerStructureCap : TUNING.structureCap;
 
+// UNIQUE deployables ("special" gear: Bucket Truck Keys, Traffic Barricade
+// Kit, any future item of the same class) are capped at exactly ONE
+// concurrent instance for every technician, Field Engineer included. The cap
+// keys off the structure type, so saves and fixtures can never lose it.
+export const UNIQUE_STRUCTURES = Object.freeze(new Set(['turretMount', 'barricade']));
+
 // (c) Per deployable ITEM instance cap: 3 for the Field Engineer, 2 for
-// everyone else — the "2-at-once default" adopted across the roster.
-export const structureItemCap = run => isEngineer(run) ? TUNING.engineerDeployInstanceCap : TUNING.structureCap;
+// everyone else — the "2-at-once default" adopted across the roster; unique
+// gear is always 1. Without an item the ladder holds.
+export const structureItemCap = (run, item) => item && UNIQUE_STRUCTURES.has(item.structure) ? 1 : isEngineer(run) ? TUNING.engineerDeployInstanceCap : TUNING.structureCap;
 
 // Per weapon-turret instance cap (auto-deployed sentries), same ladder.
 export const turretInstanceCap = run => isEngineer(run) ? TUNING.engineerDeployInstanceCap : TUNING.deployInstanceCap;

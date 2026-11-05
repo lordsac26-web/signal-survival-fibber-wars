@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createSignalEngine } from '@/game/signalEngine';
-import { preloadCharacterSprite, preloadEnemySprite, preloadStructureSprite } from '@/game/art/spriteLoader';
+import { preloadCharacterSprite, preloadEnemySprite, preloadStructureSprite, preloadStaticSprite } from '@/game/art/spriteLoader';
 import GameHUD from '@/components/game/GameHUD';
 import TouchControls from '@/components/game/TouchControls';
 import MatchFooter from '@/components/game/MatchFooter';
@@ -63,12 +63,12 @@ export default function GameArena({ run, onFinish }) {
     // Character art (Oracle or Dispatch Don), the Lag Sprite enemy art, the
     // Bucket-Truck turret art, and the Squirrel boss art load in parallel;
     // a failure blocks start with a retry.
-    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadEnemySprite('packet'),preloadEnemySprite('jitter'),preloadEnemySprite('pete'),preloadEnemySprite('bend'),preloadEnemySprite('crosstalk'),preloadEnemySprite('attenuation'),preloadEnemySprite('rous'),preloadArenaFloor(run.arenaTheme)]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor])=>{
+    Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadEnemySprite('packet'),preloadEnemySprite('jitter'),preloadEnemySprite('pete'),preloadEnemySprite('bend'),preloadEnemySprite('crosstalk'),preloadEnemySprite('attenuation'),preloadEnemySprite('rous'),preloadArenaFloor(run.arenaTheme),preloadStaticSprite('barricade'),preloadStaticSprite('spliceCabinetIdle'),preloadStaticSprite('spliceCabinetActive')]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor,barricadeSprite,cabinetIdle,cabinetActive])=>{
       if(disposed)return;
       clean=createSignalEngine(canvas.current,run,input,{
         hud:setHud,reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,
         flash:t=>{setFlash(t);setTimeout(()=>setFlash(''),1400)}
-      },paused,art,lagArt,truckArt,squirrelArt,blobArt,pedestalArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor);
+      },paused,art,lagArt,truckArt,squirrelArt,blobArt,pedestalArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor,barricadeSprite,{idle:cabinetIdle,active:cabinetActive});
       setArtStatus('');
     }).catch(error=>{if(!disposed)setArtStatus(error.message)});
 

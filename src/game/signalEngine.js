@@ -43,6 +43,7 @@ import { turretInstanceCap, structureItemCap, structureCap, turretStats, structu
 import { createEncounterDirector, perimeterSpawn } from '@/game/combat/encounterDirector';
 import { CAMP_ATTACK, createCampState, updateCamp, campVelocity } from '@/game/combat/antiCamp';
 import drawCampCone from '@/game/art/drawCampCone';
+import { PIN,createPinState,stepPin,sidestepVelocity } from '@/game/combat/bossAntiPin';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
 const clamp=(n,a,b)=>n<a?a:n>b?b:n;
@@ -63,7 +64,7 @@ const weaponOf=w=>typeof w==='string'?WEAPONS[w]:w;
 // structures (Q key) live in the `structures` pool. Both integrate with the
 // enemy spatial hash for targeting, and structure-vs-enemy steering is a small
 // per-enemy loop over the (tiny) active-structure list — no repathing, no O(n²).
-export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null,puddingArt=null,jitterArt=null,peteArt=null,bendArt=null,critterArt=null,apparitionArt=null,routerArt=null,arenaFloor=null){
+export function createSignalEngine(canvas,run,input,cb,paused={current:false},characterArt=null,enemyArt=null,structureArt=null,squirrelArt=null,blobArt=null,pedestalArt=null,puddingArt=null,jitterArt=null,peteArt=null,bendArt=null,critterArt=null,apparitionArt=null,routerArt=null,arenaFloor=null,barricadeArt=null,cabinetArt=null){
  const ctx=canvas.getContext('2d',{alpha:false}),grid=new SpatialHash(96),charId=run.character.id;
  let dpr=Math.min(devicePixelRatio||1,2);
  if(run.character.id==='oracle'&&!characterArt)throw new Error('Oracle art must be preloaded before combat');
@@ -126,7 +127,7 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
  // dirty impairments; instakill fails the inspection instantly; lifeSteal is
  // % of damage dealt returned as HP; knockback (item stat + crit special) shoves.
  // NOTE: hit() multiplies by run.damage — callers pass UN-multipled base damage.
- function hit(e,base,color,melee=false){if(!e.active)return;const crit=Math.random()<(run.crit||0);let amount=base*run.damage*(crit?2:1)*(1+(run.spliceQuality||0)*.004);if(e.dirty)amount*=1+(run.cleanliness||0)*.01;if(!e.boss&&Math.random()<(run.instakill||0)){amount=e.hp+1;cb.flash('FIBBER DUMP!')}e.hp-=amount;damageDealt+=amount;queryHits++;particle(e.x,e.y,color,crit?8:2);damageNumber(e.x,e.y,amount,crit);if(crit){const kb=(run.critKnockback||0)+(run.knockback||0);if(kb){const a=Math.atan2(e.y-p.y,e.x-p.x);e.x+=Math.cos(a)*kb*8;e.y+=Math.sin(a)*kb*8}slow=.04;addShake(3)}if(run.lifeSteal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+amount*run.lifeSteal);healed+=p.hp-before}if(e.hp<=0)kill(e)}
+ function hit(e,base,color,melee=false){if(!e.active)return;const crit=Math.random()<(run.crit||0);let amount=base*run.damage*(crit?2:1)*(1+(run.spliceQuality||0)*.004);if(e.dirty)amount*=1+(run.cleanliness||0)*.01;if(!e.boss&&Math.random()<(run.instakill||0)){amount=e.hp+1;cb.flash('FIBBER DUMP!')}e.hp-=amount;damageDealt+=amount;queryHits++;particle(e.x,e.y,color,crit?8:2);damageNumber(e.x,e.y,amount,crit);if(crit){const kb=((run.critKnockback||0)+(run.knockback||0))*(1-Math.min(1,e.knockbackResist||0));if(kb){const a=Math.atan2(e.y-p.y,e.x-p.x);e.x+=Math.cos(a)*kb*8;e.y+=Math.sin(a)*kb*8}slow=.04;addShake(3)}if(run.lifeSteal){const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+amount*run.lifeSteal);healed+=p.hp-before}if(e.hp<=0)kill(e)}
  // Shared player-damage path: contact and the boss's FEC pellets both funnel
  // through armor, dodge, signalStrength and the hurt flash.
  function clearOutage(){specialTimer=0;if(spriteState){spriteState.special=0;spriteState.heal=0}}
@@ -145,7 +146,7 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
  if(request.angle!==undefined)Object.assign(e,perimeterSpawn(p,{x:camX,y:camY,width:viewW,height:viewH},request.angle,pad));
  else{e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+(request.edge!==undefined?.5:Math.random())*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+(request.edge!==undefined?.5:Math.random())*viewH}
  Object.assign(e,scaledEnemy(base,run.wave));e.r=base.r;e.color=base.color;e.elite=!!base.elite;e.dirty=!!base.dirty;e.sound=base.sound;e.lastShot=-1;e.sprite=enemySprite(e.kind,base);
- e.art=null;e.anim=null;e.pud=null;e.sq=null;e.jit=null;e.mac=null;e.critter=null;e.caster=null;e.campCast=null;e.boss=false;
+ e.art=null;e.anim=null;e.pud=null;e.sq=null;e.jit=null;e.mac=null;e.critter=null;e.caster=null;e.campCast=null;e.boss=false;e.pin=null;e.shoutT=0;e.shoutCd=0;e.novaT=0;e.novaCd=0;
  if(e.kind==='attenuation'){let live=0;for(const o of enemies.items)if(o!==e&&o.active&&o.kind==='attenuation')live++;if(live>=APPARITION.maxActive){enemies.release(e);return}e.caster=createConeState(APPARITION);e.art=apparitionArt}
  if(e.kind==='crosstalk'){e.critter=createCritterState();e.art=critterArt}
  if(e.kind==='jitter'&&jitterArt){e.art=jitterArt;e.jit=createJitterState()}
@@ -154,7 +155,8 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
  // REPEAT PETE: the original carries a 30s clone-pulse clock; the mini is a
  // fully independent entity (no clock, never reproduces). Drawn from the same
  // processed strip set, minis scaled down at draw time.
- if((e.kind==='pete'||e.kind==='peteMini')&&petArt){e.art=petArt;e.anim=createTechAnimation();if(e.kind==='pete')e.cloneT=PETE.cloneInterval}
+ if(e.kind==='pete'){e.cloneT=PETE.cloneInterval;e.pin=createPinState();e.shoutCd=4}
+ if((e.kind==='pete'||e.kind==='peteMini')&&petArt){e.art=petArt;e.anim=createTechAnimation()}
   // MACROBEND BEAST: chase state machine + animation; the cast ring spawns
   // from the stepBend 'fire' action inside the enemy loop.
   if(e.kind==='bend'&&bendArt){e.art=bendArt;e.anim=createBendAnimation();e.mac=createBendState()}
@@ -164,19 +166,19 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
   m.kind='peteMini';m.x=clamp(src.x+(Math.random()<.5?-1:1)*26,20,W-20);m.y=clamp(src.y+(Math.random()<.5?-1:1)*26,20,H-20);
   Object.assign(m,scaledEnemy(base,run.wave,false));m.r=base.r;
   m.color=base.color;m.elite=false;m.dirty=false;m.sound=base.sound;m.lastShot=-1;m.sprite=enemySprite(m.kind,base);
-  m.art=null;m.anim=null;m.pud=null;m.sq=null;m.jit=null;m.mac=null;m.critter=null;m.caster=null;m.campCast=null;m.boss=false;m.cloneT=0;
+  m.art=null;m.anim=null;m.pud=null;m.sq=null;m.jit=null;m.mac=null;m.critter=null;m.caster=null;m.campCast=null;m.boss=false;m.cloneT=0;m.pin=null;m.shoutT=0;m.shoutCd=0;m.novaT=0;m.novaCd=0;
   if(petArt){m.art=petArt;m.anim=createTechAnimation()}return m;}
  // SQUIRREL BOSS: spawns at the wave-20 gate (then every 10 waves). Phase 1
  // chases the player; at <=50% HP it flees, keeps other impairments between
  // itself and the player, and casts the telegraphed FEC cone between retreats.
  let bossSpawned=false;
  function spawnRouter(){if(!routerArt)return;const e=enemies.acquire();if(!e)return;const b=ROUS,m=60;
-  Object.assign(e,{kind:b.id,x:clamp(p.x+viewW*.35,camX+m,camX+viewW-m),y:clamp(p.y-viewH*.3,camY+100,camY+viewH-16),...scaledEnemy(b,run.wave,true),r:b.r,color:b.color,elite:true,boss:true,dirty:false,sound:'boss',lastShot:-1,sprite:null,art:routerArt,anim:null,pud:null,sq:null,jit:null,mac:null,critter:null,campCast:null,caster:createConeState(ROUTER_ATTACK)});cb.flash(b.intro);cb.event?.({type:'bossSpawn',kind:b.id,time:duration-time});addShake(6)}
+  Object.assign(e,{kind:b.id,x:clamp(p.x+viewW*.35,camX+m,camX+viewW-m),y:clamp(p.y-viewH*.3,camY+100,camY+viewH-16),...scaledEnemy(b,run.wave,true),r:b.r,color:b.color,elite:true,boss:true,dirty:false,sound:'boss',lastShot:-1,sprite:null,art:routerArt,anim:null,pud:null,sq:null,jit:null,mac:null,critter:null,campCast:null,caster:createConeState(ROUTER_ATTACK),pin:createPinState(),novaT:0,novaCd:4,shoutT:0,shoutCd:0});cb.flash(b.intro);cb.event?.({type:'bossSpawn',kind:b.id,time:duration-time});addShake(6)}
  function spawnBoss(){if(bossKind(run.wave)==='rous'){spawnRouter();return}if(!sqArt||!SQUIRREL)return;const e=enemies.acquire();if(!e)return;
   const edge=(Math.random()*4)|0,pad=60;e.kind=SQUIRREL.id;
   e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+Math.random()*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+Math.random()*viewH;
   Object.assign(e,scaledEnemy(SQUIRREL,run.wave,true));e.r=SQUIRREL.r;e.campConfig={...CAMP_ATTACK,damage:e.damage};e.campCast=createConeState(e.campConfig);e.color=SQUIRREL.color;e.elite=true;e.boss=true;e.dirty=false;e.sound='boss';e.lastShot=-1;e.sprite=null;e.art=null;e.anim=null;e.pud=null;e.jit=null;e.mac=null;e.critter=null;e.caster=null;
-  e.sq={...createSquirrelAnimation(),art:sqArt,phase:1,castCd:2,wind:0,cast:0,aim:0};
+  e.sq={...createSquirrelAnimation(),art:sqArt,phase:1,castCd:2,wind:0,cast:0,aim:0,pounceCd:4,pounceT:0,leapT:0,leapA:0,leapSpd:0,recover:0};e.pin=createPinState();e.shoutT=0;e.shoutCd=0;e.novaT=0;e.novaCd=0;
   cb.flash(SQUIRREL.intro);addShake(6)}
  function fireCone(e){const c=SQUIRREL.cone,step=c.pellets>1?c.half*2/(c.pellets-1):0;
   for(let k=0;k<c.pellets;k++){const a=e.sq.aim+(k-(c.pellets-1)/2)*step,f=foeShots.acquire();if(!f)break;
@@ -195,6 +197,23 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
   s.cast=Math.max(0,s.cast-dt);s.wind=Math.max(0,s.wind-dt);s.castCd-=dt;
   if(wasWind&&!s.wind){fireCone(e);squirrelRelease(s)}
   if(s.phase===2&&s.wind<=0&&s.cast<=0&&s.castCd<=0&&distance(p,e)<d.cone.range*.95){s.wind=d.cone.windup;s.cast=d.cone.windup+.25;s.castCd=d.cone.cooldown;s.aim=Math.atan2(p.y-e.y,p.x-e.x);sfx('boss')}
+  // POUNCE (phase-1 close-range answer): cornering the squirrel is
+  // dangerous — 1.2s rooted telegraph, a leap whose aim locks at telegraph
+  // end, radial impact and a short recover. Cooldown-gated, never during a
+  // windup; the trigger sits inside the camp standoff distance.
+  s.pounceCd=Math.max(0,(s.pounceCd||0)-dt);
+  if(s.pounceT>0){s.pounceT=Math.max(0,s.pounceT-dt);
+   if(s.pounceT<=0){s.leapT=SQUIRREL.pounce.leapTime;s.leapA=Math.atan2(p.y-e.y,p.x-e.x);s.leapSpd=Math.max(160,Math.min(SQUIRREL.pounce.leapSpeed,distance(p,e)/SQUIRREL.pounce.leapTime));sfx('boss')}
+   return {a:Math.atan2(p.y-e.y,p.x-e.x),spd:0}}
+  if(s.leapT>0){s.leapT=Math.max(0,s.leapT-dt);
+   if(s.leapT<=0){const lands=p.inv<=0&&distance(p,e)<SQUIRREL.pounce.impactRadius+p.r;
+    if(lands){damagePlayer(e.damage*SQUIRREL.pounce.damage);p.inv=.55}
+    s.recover=SQUIRREL.pounce.recover;s.pounceCd=SQUIRREL.pounce.cooldown;addShake(7);particle(e.x,e.y,'#fca5a5',lowFx?4:14);
+    cb.event?.({type:'squirrelPounce',time:duration-time,hit:lands,x:e.x,y:e.y,radius:SQUIRREL.pounce.impactRadius,damage:e.damage*SQUIRREL.pounce.damage})}
+   return {a:s.leapA,spd:s.leapSpd}}
+  if(s.recover>0){s.recover=Math.max(0,s.recover-dt);return {a:Math.atan2(p.y-e.y,p.x-e.x),spd:0}}
+  if(s.phase===1&&s.wind<=0&&s.cast<=0&&s.castCd<=0&&s.pounceCd<=0&&distance(p,e)<SQUIRREL.pounce.range){
+   s.pounceT=SQUIRREL.pounce.telegraph;cb.event?.({type:'squirrelPounceTelegraph',time:duration-time,x:e.x,y:e.y});return {a:Math.atan2(p.y-e.y,p.x-e.x),spd:0}}
   let a;
   if(s.phase===2){ // flee the player, biased toward the nearest crowd to hide behind
    let fx=e.x-p.x,fy=e.y-p.y,fl=Math.hypot(fx,fy)||1;fx/=fl;fy/=fl;
@@ -284,7 +303,7 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
   // placement consumes no cooldown and the press is simply refused.
   let count=0,perItem=0,tooClose=false;for(let i=0;i<structures.items.length;i++){const s=structures.items[i];if(!s.active)continue;count++;if(s.type===item.structure)perItem++;if(Math.hypot(s.x-p.x,s.y-p.y)<PLACE_PROXIMITY)tooClose=true}
   if(count>=structCap()){cb.flash('PERMIT LIMIT: TOO MUCH STRUCTURE');return}
-  if(perItem>=structureItemCap(run)){cb.flash('THIS DEPLOYABLE HAS ALL ITS UNITS OUT');return}
+  if(perItem>=structureItemCap(run,item)){cb.flash(structureItemCap(run,item)===1?'UNIQUE GEAR: ONE INSTANCE PER SHIFT':'THIS DEPLOYABLE HAS ALL ITS UNITS OUT');return}
   if(tooClose){cb.flash('BLOCKED: TOO CLOSE TO A DEPLOYABLE');return}
   if(def.kind==='turret'&&!(truckArt&&truckDef&&truckDef.structureType===item.structure))cb.flash('TRUCK ART UNAVAILABLE — PEDESTAL STAND-IN');
   const s=structures.acquire();if(!s){cb.flash('PERMIT LIMIT');return}
@@ -378,7 +397,7 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
   placeBlocked=false;
   if((run.deployables||[]).length){const list=run.deployables,selIdx=Math.min(Math.max(0,input.current.deploySel||0),list.length-1),sel=list[selIdx],selDef=deployStats(sel);
    if(selDef){let count=0,perItem=0,tooClose=false;for(let i=0;i<structures.items.length;i++){const s=structures.items[i];if(!s.active)continue;count++;if(s.type===sel.structure)perItem++;if(Math.hypot(s.x-p.x,s.y-p.y)<PLACE_PROXIMITY)tooClose=true}
-    placeBlocked=count>=structCap()||perItem>=structureItemCap(run)||tooClose}}
+    placeBlocked=count>=structCap()||perItem>=structureItemCap(run,sel)||tooClose}}
   if(!bossSpawned&&bossWave(run.wave)){bossSpawned=true;spawnBoss()}
   // Outage affects locomotion ONLY: ordinary spawn attempts, double chance and caps stay unchanged.
 if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
@@ -400,7 +419,17 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
   // chomp + shove, snares slow — none of it touches the player.
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(!e.active)continue;const tgt=meeting.active?meeting:p;let a=Math.atan2(tgt.y-e.y,tgt.x-e.x),spd=e.speed;
    let slowMul=1;
-   if(e.caster){cancelHiddenCharge(e.caster,{x:camX,y:camY,width:viewW,height:viewH},e.boss?60:40,e.boss?100:40,e.boss?16:40);const c=e.boss?ROUTER_ATTACK:APPARITION,act=stepCone(e.caster,c,dt,{alive:e.hp>0,playerAlive:p.hp>0,x:e.x,y:e.y,tx:tgt.x,ty:tgt.y,shortSide:Math.min(viewW,viewH),visible:e.x>camX+55&&e.x<camX+viewW-55&&e.y>camY+(e.boss?100:55)&&e.y<camY+viewH-(e.boss?16:55)});
+   // FACTORY RESET (R.O.U.S.): 1.5s rooted radial telegraph, then a nova that
+   // also releases a couple of lag sprites. Never while a cone cast runs.
+   if(e.kind==='rous'){e.novaCd=Math.max(0,(e.novaCd||0)-dt);
+    if(e.novaT>0){e.novaT=Math.max(0,e.novaT-dt);
+     if(e.novaT<=0){const lands=p.inv<=0&&distance(p,e)<ROUS.nova.radius;
+      if(lands){damagePlayer(e.damage);p.inv=.55}
+      spawnEnemy('lag',true);spawnEnemy('lag',true);
+      e.novaCd=ROUS.nova.cooldown;addShake(7);particle(e.x,e.y,'#facc15',lowFx?6:18);
+      cb.event?.({type:'rousNova',time:duration-time,hit:lands,x:e.x,y:e.y,radius:ROUS.nova.radius,lags:2})}}
+    else if((e.novaCd||0)<=0&&e.caster&&e.caster.phase==='chase'&&distance(p,e)<ROUS.nova.range){e.novaT=ROUS.nova.telegraph;cb.event?.({type:'rousNovaTelegraph',time:duration-time,x:e.x,y:e.y})}}
+   if(e.caster&&!(e.novaT>0)){cancelHiddenCharge(e.caster,{x:camX,y:camY,width:viewW,height:viewH},e.boss?60:40,e.boss?100:40,e.boss?16:40);const c=e.boss?ROUTER_ATTACK:APPARITION,act=stepCone(e.caster,c,dt,{alive:e.hp>0,playerAlive:p.hp>0,x:e.x,y:e.y,tx:tgt.x,ty:tgt.y,shortSide:Math.min(viewW,viewH),visible:e.x>camX+55&&e.x<camX+viewW-55&&e.y>camY+(e.boss?100:55)&&e.y<camY+viewH-(e.boss?16:55)});
     if(act)cb.event?.({type:'conePhase',kind:e.kind,phase:act,time:duration-time,index:e.poolIndex,powered:e.caster.poweredShot});
     if(act==='release'){const lands=consumeConeHit(e.caster,p.x,p.y,p.inv);if(lands){damagePlayer(e.caster.damage*enemyDamageMultiplier(run.wave,e.elite));p.inv=.55}cb.event?.({type:'coneRelease',kind:e.kind,time:duration-time,hit:lands,cone:{...e.caster}})}}
    if(e.critter){const act=stepCritter(e.critter,dt,{alive:e.hp>0,playerAlive:p.hp>0,dx:tgt.x-e.x,dy:tgt.y-e.y,visible:e.x>camX+30&&e.x<camX+viewW-30&&e.y>camY+30&&e.y<camY+viewH-30});if(act)cb.event?.({type:'critterPhase',phase:act,time:duration-time,index:e.poolIndex})}
@@ -425,6 +454,15 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
    // telegraph plays; one independent mini per pulse, only under the cap.
    if(e.kind==='pete'&&e.cloneT>0){e.cloneT-=dt;if(e.cloneT<=0){e.cloneT=PETE.cloneInterval;let minis=0;for(let i=0;i<enemies.items.length;i++){const o=enemies.items[i];if(o.active&&o.kind==='peteMini')minis++}
     if(minis<PETE.miniCap&&p.hp>0){if(spawnPeteMini(e)){if(e.anim)e.anim.special=1.2}else e.cloneT=.25}}}
+   // CLIENT ESCALATION (Repeat Pete): 0.9s rooted shout telegraph, then a
+   // small-radius shockwave — and the 30s duplicate pulse fires early.
+   if(e.kind==='pete'){e.shoutCd=Math.max(0,e.shoutCd-dt);
+    if(e.shoutT>0){e.shoutT=Math.max(0,e.shoutT-dt);
+     if(e.shoutT<=0){const lands=p.inv<=0&&distance(p,e)<PETE.shockwave.radius;
+      if(lands){damagePlayer(e.damage);p.inv=.55}
+      e.cloneT=Math.min(e.cloneT,PETE.shockwave.earlyPulse);e.shoutCd=PETE.shockwave.cooldown;addShake(5);particle(e.x,e.y,'#f472b6',lowFx?4:12);
+      cb.event?.({type:'peteShout',time:duration-time,hit:lands,x:e.x,y:e.y,radius:PETE.shockwave.radius})}}
+    else if(e.shoutCd<=0&&distance(p,e)<PETE.shockwave.range){e.shoutT=PETE.shockwave.telegraph;cb.event?.({type:'peteShoutTelegraph',time:duration-time,x:e.x,y:e.y})}}
    for(let k=0;k<activeStructs.length;k++){const st=activeStructs[k];if(!st.active)continue;const def=st.stats||STRUCTURES[st.type];if(!def)continue;
     if(def.kind==='block'){const dx=e.x-st.x,dy=e.y-st.y,sd=Math.hypot(dx,dy),min=st.r+e.r;if(sd<min){const push=(min-sd)*.55;e.x+=dx/(sd||1)*push;e.y+=dy/(sd||1)*push}}
     else if(def.kind==='trap'&&st.rearm<=0&&st.uses>0){const sd=Math.hypot(e.x-st.x,e.y-st.y);if(sd<st.r+e.r){st.rearm=.7;st.uses--;hit(e,def.chomp*(1+.2*(st.power-1)),'#f87171',false);const ba=Math.atan2(e.y-st.y,e.x-st.x);e.x+=Math.cos(ba)*22;e.y+=Math.sin(ba)*22;sfx('snip');if(st.uses<=0){particle(st.x,st.y,'#f87171',lowFx?2:6);structures.release(st);structCount--}}}
@@ -433,16 +471,22 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
    if(e.jit&&e.jit.phase!=='chase'){e.x=e.jit.rootX;e.y=e.jit.rootY}
    if(e.mac&&e.mac.phase!=='chase'){e.x=e.mac.rootX;e.y=e.mac.rootY}
    if(e.sq&&(!e.campCast||e.campCast.phase==='chase'))({a,spd}=squirrelUpdate(e,dt));
-   const campBusy=(e.mac&&e.mac.phase!=='chase')||(e.sq&&(e.sq.wind>0||e.sq.cast>0));
+   const campBusy=(e.mac&&e.mac.phase!=='chase')||(e.sq&&(e.sq.wind>0||e.sq.cast>0||e.sq.pounceT>0||e.sq.leapT>0||e.sq.recover>0))||e.shoutT>0||e.novaT>0;
    if(e.campCast&&!campBusy){const cast=e.campCast;cancelHiddenCharge(cast,{x:camX,y:camY,width:viewW,height:viewH},45,65,45);const visible=e.x>camX+45&&e.x<camX+viewW-45&&e.y>camY+65&&e.y<camY+viewH-45;
     if((camp.active&&!meeting.active)||cast.phase!=='chase'){const act=stepCone(cast,e.campConfig,dt,{alive:e.hp>0,playerAlive:p.hp>0,x:e.x,y:e.y,tx:tgt.x,ty:tgt.y,shortSide:Math.min(viewW,viewH),visible});
      if(act==='release'){const lands=consumeConeHit(cast,p.x,p.y,p.inv);if(lands){damagePlayer(cast.damage);p.inv=.55}cb.event?.({type:'campCone',kind:e.kind,hit:lands,time:duration-time})}}
    }
    if(charId==='isr')slowMul=outageMovement(specialTimer,p.hp,slowMul);
-   const velocity=e.campCast&&e.campCast.phase!=='chase'?{x:0,y:0}:e.elite&&camp.active&&!meeting.active&&!campBusy&&!e.caster?campVelocity(e,tgt,spd*slowMul,Math.min(viewW,viewH)):e.caster?casterVelocity(e.caster,e.boss?ROUTER_ATTACK:APPARITION,a,spd*slowMul,distance(p,e),Math.min(viewW,viewH)):e.critter?critterVelocity(e.critter,a,spd*slowMul,slowMul):e.mac?bendVelocity(e.mac,a,spd*slowMul):e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
+   const velocity=e.novaT>0||e.shoutT>0?{x:0,y:0}:e.campCast&&e.campCast.phase!=='chase'?{x:0,y:0}:e.elite&&camp.active&&!meeting.active&&!campBusy&&!e.caster?campVelocity(e,tgt,spd*slowMul,Math.min(viewW,viewH)):e.caster?casterVelocity(e.caster,e.boss?ROUTER_ATTACK:APPARITION,a,spd*slowMul,distance(p,e),Math.min(viewW,viewH)):e.critter?critterVelocity(e.critter,a,spd*slowMul,slowMul):e.mac?bendVelocity(e.mac,a,spd*slowMul):e.jit?jitterVelocity(e.jit,a,spd*slowMul):{x:Math.cos(a)*spd*slowMul,y:Math.sin(a)*spd*slowMul};
    const mvx=velocity.x,mvy=velocity.y;
    if(cb.inspect&&charId==='isr')e.outageMotion={x:mvx,y:mvy,slow:slowMul};
+   const preX=e.x,preY=e.y;
    e.x+=mvx*dt;e.y+=mvy*dt;
+   // BOSS ANTI-PIN: a boss (Squirrel/Pete/R.O.U.S.) that tries to move but
+   // barely moves for 1.5s — wedged on a wall or barricade — spends a short
+   // sidestep burst perpendicular to its heading, flipped into the arena, and
+   // then reacquires the player. The three heavies cannot be pinned in place.
+   if(e.pin&&stepPin(e.pin,dt,mvx,mvy,e.x-preX,e.y-preY)){const sv=sidestepVelocity(e.pin,mvx,mvy,(Math.hypot(mvx,mvy)||e.speed)*PIN.sidestepBoost,W/2,H/2,e.x,e.y);e.x=preX+sv.x*dt;e.y=preY+sv.y*dt}
    if(e.caster){e.caster.vx=mvx;e.caster.vy=mvy;if(e.caster.phase==='chase'){const m=e.boss?60:40;e.x=clamp(e.x,camX+m,camX+viewW-m);e.y=clamp(e.y,camY+(e.boss?100:m),camY+viewH-(e.boss?16:m))}else{e.x=e.caster.x;e.y=e.caster.y}}
    if(e.critter&&e.critter.phase==='lunge')clampCritterLunge(e,{x:camX,y:camY,width:viewW,height:viewH});
    // SQUIRREL RETREAT BOUNDS: phase-2 flee must keep the boss's full body and
@@ -483,6 +527,7 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
  // and googly eyes (pupils track whatever it's currently aiming at).
  function drawHardHat(x,y){ctx.fillStyle='#facc15';ctx.beginPath();ctx.arc(x,y,7,Math.PI,0);ctx.fill();ctx.fillRect(x-8,y-1,16,2)}
  function drawEyes(x,y,a){const px=Math.cos(a)*1.5,py=Math.sin(a)*1.5;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x-4,y,3.2,0,7);ctx.fill();ctx.beginPath();ctx.arc(x+4,y,3.2,0,7);ctx.fill();ctx.fillStyle='#111';ctx.beginPath();ctx.arc(x-4+px,y+py,1.5,0,7);ctx.fill();ctx.beginPath();ctx.arc(x+4+px,y+py,1.5,0,7);ctx.fill()}
+ function drawTelegraphRing(x,y,r,frac){ctx.save();ctx.globalAlpha=.12+frac*.3;ctx.fillStyle='#fca5a5';ctx.beginPath();ctx.arc(Math.round(x),Math.round(y),r,0,7);ctx.fill();ctx.globalAlpha=.35+frac*.45;ctx.strokeStyle='#f87171';ctx.lineWidth=2;ctx.setLineDash([10,8]);ctx.beginPath();ctx.arc(Math.round(x),Math.round(y),r,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
  function drawTurretBody(x,y,color,a,r){ctx.strokeStyle='#475569';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-r,y+r);ctx.moveTo(x,y);ctx.lineTo(x+r,y+r);ctx.moveTo(x,y);ctx.lineTo(x,y+r);ctx.stroke();ctx.fillStyle='#334155';ctx.fillRect(x-r+2,y-r+2,r*2-4,r*2-6);ctx.strokeStyle=color;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*(r+6),y+Math.sin(a)*(r+6));ctx.stroke();drawHardHat(x,y-r+2);drawEyes(x,y,a)}
  function draw(){
   const sx=Math.round((Math.random()-.5)*shakeMag),sy=Math.round((Math.random()-.5)*shakeMag);
@@ -502,6 +547,12 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
   // (subtle fill + dashed ring, drawn for the whole 4s) and the round table
   // with its empty chairs, hard hat and googly eyes (structure convention).
   for(const enemy of enemies.items)if(enemy.active&&enemy.campCast)drawCampCone(ctx,enemy.campCast);
+  // Boss close-range answers: pulsing dashed rings sized to the exact effect
+  // radius, so the dodge read is honest at all zoom levels.
+  for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(!e.active)continue;
+   if(e.sq&&e.sq.pounceT>0)drawTelegraphRing(e.x,e.y,SQUIRREL.pounce.impactRadius,e.sq.pounceT/SQUIRREL.pounce.telegraph);
+   else if(e.shoutT>0)drawTelegraphRing(e.x,e.y,PETE.shockwave.radius,e.shoutT/PETE.shockwave.telegraph);
+   else if(e.novaT>0)drawTelegraphRing(e.x,e.y,ROUS.nova.radius,e.novaT/ROUS.nova.telegraph);}
   if(meeting.active){const tx=Math.round(meeting.x),ty=Math.round(meeting.y),tr=MEETING.tableRadius;
    ctx.save();ctx.globalAlpha=.07;ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.arc(tx,ty,MEETING.blastRadius,0,7);ctx.fill();
    ctx.globalAlpha=.34;ctx.strokeStyle='#fde68a';ctx.lineWidth=2;ctx.setLineDash([10,8]);ctx.beginPath();ctx.arc(tx,ty,MEETING.blastRadius,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore();
@@ -515,10 +566,20 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
    if(elapsed<SURGE.arming){const pr=elapsed/SURGE.arming;ctx.save();ctx.globalAlpha=.2+pr*.25;ctx.strokeStyle='#7fe6f9';ctx.lineWidth=2;ctx.setLineDash([12,9]);ctx.beginPath();ctx.arc(sx2,sy2,SURGE.ringRadius*pr,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
    for(const r of surge.rings){const pr=Math.min(1,r.t/(SURGE.pulseWindow/SURGE.pulses));ctx.save();ctx.globalAlpha=.55*(1-pr);ctx.strokeStyle='#7fe6f9';ctx.lineWidth=3;ctx.beginPath();ctx.arc(Math.round(r.x),Math.round(r.y),Math.max(2,SURGE.ringRadius*pr),0,7);ctx.stroke();ctx.restore()}
    ctx.save();ctx.globalAlpha=.12;ctx.fillStyle='#7fe6f9';ctx.beginPath();ctx.arc(sx2,sy2,20,0,7);ctx.fill();ctx.restore();
+   const cabArt=cabinetArt&&cabinetArt.idle&&cabinetArt.active?cabinetArt:null;
+   if(cabArt){ // user-supplied splice-cabinet sprites: idle through the
+    // arming beat, active while the four pulses fire, then idle fading out —
+    // bottom anchored on the planted point like every other deployable
+    const pulsesDone=surge.pulse>=SURGE.pulses,img=pulsesDone||elapsed<SURGE.arming?cabArt.idle:cabArt.active;
+    const ch2=Math.round(72),cw2=Math.round(72*img.width/img.height);
+    ctx.save();if(pulsesDone)ctx.globalAlpha=Math.max(0,Math.min(1,specialTimer/.4));
+    const prevSm=ctx.imageSmoothingEnabled;ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(img,sx2-cw2/2,sy2-ch2,cw2,ch2);ctx.imageSmoothingEnabled=prevSm;ctx.restore();
+   }else{
    ctx.fillStyle='#0f3d46';ctx.fillRect(sx2-16,sy2-26,32,26);
    ctx.fillStyle='#155e6b';ctx.fillRect(sx2-13,sy2-23,26,20);
    ctx.fillStyle='#7fe6f9';ctx.fillRect(sx2-3,sy2-14,6,10);
-   drawHardHat(sx2,sy2-30);drawEyes(sx2,sy2-18,Math.atan2(p.y-sy2,p.x-sx2));}
+   drawHardHat(sx2,sy2-30);drawEyes(sx2,sy2-18,Math.atan2(p.y-sy2,p.x-sx2));}}
   // structures (under enemies): pop-in scale, fade out during the last 1.5s of life
   for(let i=0;i<structures.items.length;i++){const st=structures.items[i];if(!st.active)continue;const def=st.stats||STRUCTURES[st.type];if(!def)continue;const x=Math.round(st.x),y=Math.round(st.y),grow=Math.min(1,st.born*4);
    ctx.globalAlpha=(st.life<1.5?Math.max(.2,st.life/1.5):1)*(.4+.6*grow);
@@ -527,7 +588,12 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
     if(truckArt&&truckDef&&st.type===truckDef.structureType)drawTruckTurret(ctx,truckArt,st.born,x,y,grow,st.lookA)
     else if(pedArt)drawPedestalTurret(ctx,pedArt,st,x,y,grow)
     else drawTurretBody(x,y,def.color,st.lookA,13*grow+3)}
-   else if(def.kind==='block'){ctx.fillStyle='#fb923c';ctx.fillRect(x-st.r,y-8,st.r*2,16);ctx.fillStyle='#fff';for(let k=0;k<4;k++)ctx.fillRect(x-st.r+6+k*12,y-8,5,16);drawHardHat(x,y-14);drawEyes(x,y-2,st.lookA)}
+   else if(def.kind==='block'){
+    // Traffic Barricade: the user-supplied striped A-frame sprite, bottom
+    // anchored on the structure point; the procedural stripes stay as the
+    // asset-free fallback for offline harnesses.
+    if(barricadeArt){const bw=Math.round(48),bh=Math.round(48*barricadeArt.height/barricadeArt.width);const prevSm=ctx.imageSmoothingEnabled;ctx.imageSmoothingEnabled=false;ctx.drawImage(barricadeArt,x-bw/2,y-bh,bw,bh);ctx.imageSmoothingEnabled=prevSm}
+    else{ctx.fillStyle='#fb923c';ctx.fillRect(x-st.r,y-8,st.r*2,16);ctx.fillStyle='#fff';for(let k=0;k<4;k++)ctx.fillRect(x-st.r+6+k*12,y-8,5,16);drawHardHat(x,y-14);drawEyes(x,y-2,st.lookA)}}
    else if(def.kind==='trap'){ctx.fillStyle='#525252';ctx.fillRect(x-14,y-8,28,14);ctx.fillStyle='#ef4444';for(let k=0;k<5;k++){ctx.fillRect(x-12+k*6,y-8,3,6);ctx.fillRect(x-9+k*6,y-2,3,6)}drawHardHat(x,y-16);drawEyes(x,y-4,st.lookA)}
    else if(def.kind==='slow'){ctx.fillStyle='rgba(34,211,238,.12)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.strokeStyle='rgba(103,232,249,.55)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,st.r*.66*grow,0,4.6);ctx.stroke();drawEyes(x,y,st.lookA)}
    else if(def.kind==='buff'){ctx.fillStyle='rgba(250,204,21,.10)';ctx.beginPath();ctx.arc(x,y,st.r*grow,0,7);ctx.fill();ctx.fillStyle='#a8a29e';ctx.fillRect(x-12,y,24,10);ctx.fillRect(x-8,y-8,16,8);drawHardHat(x,y-12);drawEyes(x,y-2,st.lookA)}

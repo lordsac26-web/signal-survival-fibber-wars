@@ -40,3 +40,18 @@ export const preloadStructureSprite=id=>preloadSprite(structureSpriteDef(id));
 // each icon simply keeps its existing glyph.
 let toolAtlasPromise=null;
 export const preloadToolAtlas=()=>toolAtlasPromise || (toolAtlasPromise=image(TOOL_ICON_ATLAS.url,TOOL_ICON_ATLAS.width,TOOL_ICON_ATLAS.height).catch(()=>null));
+// Static single-image art (deployable sprites): loaded once, size-validated.
+// The barricade A-frame and the two splice-cabinet states are local copies of
+// the public uploads (same bytes, so offline tests read the identical file).
+export const STATIC_SPRITES=Object.freeze({
+  barricade:{path:'/assets/barricade/barricade.png',width:88,height:96,source:'https://media.base44.com/images/public/6aab67049cd04a621f2adf4f/4aab76b35_barricade.png'},
+  spliceCabinetIdle:{path:'/assets/splicecabinet/idle.png',width:96,height:85,source:'https://media.base44.com/images/public/6aab67049cd04a621f2adf4f/00c91b85e_splice-cabinet.png'},
+  spliceCabinetActive:{path:'/assets/splicecabinet/active.png',width:82,height:96,source:'https://media.base44.com/images/public/6aab67049cd04a621f2adf4f/85bdf3d55_splice-cabinet-active.png'}
+});
+const staticCache=new Map();
+export function preloadStaticSprite(key){
+  const def=STATIC_SPRITES[key];if(!def)return Promise.reject(new Error('Unknown static sprite: '+key));
+  if(staticCache.has(key))return staticCache.get(key);
+  const promise=image(def.path,def.width,def.height).catch(error=>{staticCache.delete(key);throw error});
+  staticCache.set(key,promise);return promise;
+}

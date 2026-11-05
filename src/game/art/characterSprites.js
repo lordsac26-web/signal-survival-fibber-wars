@@ -234,9 +234,9 @@ bucket:Object.freeze({
   atlas:'/assets/buckettruck/turret.png',portrait:'/assets/buckettruck/icon.png',
   manifest:'/assets/buckettruck/animation.json',
   sources:{atlas:source+'53bcc4815_buckettruck-turret.png',icon:source+'8c553ef43_buckettruck-icon.png',manifest:source+'cb0ba0033_buckettruck-animation.json'},
-  atlasW:690,atlasH:190,tileW:230,tileH:190,columns:3,rows:1,fps:1.5,idleCycle:3,worldSize:86.4,anchorY:174,portraitW:234,portraitH:204,muzzle:{x:150,y:30},
+  atlasW:690,atlasH:190,tileW:230,tileH:190,columns:3,rows:1,fps:1.5,idleCycle:3,worldSize:172.8,anchorY:185,portraitW:234,portraitH:204,muzzle:{x:150,y:30},
   structureType:'turretMount',
-  manifestSpec:{structureId:'bucket_truck_turret',tileWidth:230,tileHeight:190,rightEdgeAnchorX:210,groundBaselineY:174,'animation.type':'idle_cycle','animation.fps':1.5}
+  manifestSpec:{structureId:'bucket_truck_turret',tileWidth:230,tileHeight:190,rightEdgeAnchorX:210,groundBaselineY:185,'animation.type':'idle_cycle','animation.fps':1.5}
 }),
 // Pedestal Turret — multi-strip animated turret from a 1024×683 magenta-bg sheet.
 // 4 strips: deploy(9f), rotate/aim(8f), fire(7f), retract(9f). Each strip is

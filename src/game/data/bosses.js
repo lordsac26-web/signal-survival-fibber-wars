@@ -10,7 +10,12 @@
 // between FEC casts, without outrunning any player build.
 export const SQUIRREL=Object.freeze({
   id:'squirrel',name:'Fiber-Nibbling Squirrel',color:'#b4763f',
-  hp:780,speed:95,damage:27.5,r:26,value:30,
+  hp:780,speed:95,damage:27.5,r:26,value:30,knockbackResist:.95,
+  // POUNCE (close-range answer): cornering the squirrel is dangerous — a
+  // 1.2s rooted telegraph, a leap locked at telegraph end, radial impact and
+  // a short recover. Impact rides the boss's scaled damage ×1.2; the aim
+  // locks at telegraph end, so an orbiting target walks out of the blast.
+  pounce:Object.freeze({telegraph:1.2,range:130,leapTime:.42,leapSpeed:620,impactRadius:80,damage:1.2,cooldown:9,recover:.6}),
   // FEC: 55°-total cone locked in aim at windup start; 7 pellets at 290 units/s
   // cross the 340-unit reach in ~1.2s, so strafing sideways during the 0.8s
   // tail-fluffing windup cleanly dodges it. 5s cooldown between casts.
@@ -27,12 +32,21 @@ export const SQUIRREL=Object.freeze({
 export const PETE=Object.freeze({
   id:'pete',name:'Repeat Pete',color:'#f472b6',
   minWave:11,spawnWeight:.25,
-  cloneInterval:30,miniCap:5,miniScale:.55,
+  cloneInterval:30,miniCap:5,miniScale:.55,knockbackResist:.95,
+  // CLIENT ESCALATION (close-range answer): 0.9s rooted shout telegraph, then
+  // a small-radius shockwave — and the 30s duplicate pulse fires early.
+  // Trigger sits inside the elite standoff distance, so a technician holding
+  // standoff range never feeds it; cornering Pete does.
+  shockwave:Object.freeze({telegraph:.9,radius:140,range:130,cooldown:12,damage:1,earlyPulse:.01}),
   intro:'REPEAT PETE HAS FILED THE SAME OUTAGE TWICE',
   flavor:"Pete is the ticket that keeps reopening. He reports the same outage every thirty seconds, and every report peels off the clipboard as its own smaller, independent Pete. The minis chase and hit on their own, never duplicate further, and the paperwork caps at five of them at once.",
   counter:"Focus the original: its 30-second pulse telegraphs with the ring pose. Minis cap at five, so the paperwork is finite — but the original never stops filing."
 });
-export const ROUS=Object.freeze({id:'rous',name:'R.O.U.S. - Router of Unusual Size',color:'#facc15',hp:1100,speed:48,damage:32,r:32,value:30,intro:'A ROUTER OF UNUSUAL SIZE HAS JOINED THE NETWORK'});
+export const ROUS=Object.freeze({id:'rous',name:'R.O.U.S. - Router of Unusual Size',color:'#facc15',hp:1100,speed:48,damage:32,r:32,value:30,knockbackResist:.95,intro:'A ROUTER OF UNUSUAL SIZE HAS JOINED THE NETWORK',
+  // FACTORY RESET (close-range answer): 1.5s rooted radial telegraph, then a
+  // nova that also releases a couple of lag sprites. Cooldown-gated and
+  // never while a cone cast is running.
+  nova:Object.freeze({telegraph:1.5,radius:210,range:150,cooldown:11,damage:1,lags:2})});
 export const bossWave=wave=>wave>=20&&wave%10===0;
 // One boss per existing gate: Squirrel 20/40/60; Router 30/50/70.
 export const bossKind=wave=>bossWave(wave)?(wave%20===10?'rous':'squirrel'):null;

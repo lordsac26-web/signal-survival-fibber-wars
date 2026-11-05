@@ -14,8 +14,8 @@ export const STRUCTURES = {
 // ability; each extra copy improves it: −12% cooldown and +20% potency per
 // extra copy, applied to at most DEPLOY_STACK_BONUS extra copies.
 export const DEPLOYABLES = [
-  { id: 'bucket_keys', name: 'Bucket Truck Keys',     icon: '🔑', structure: 'turretMount', cost: 22, desc: 'Press Q to plant a hard-hatted Turret Mount right where you\'re standing.' },
-  { id: 'cone_kit',    name: 'Traffic Barricade Kit', icon: '🚧', structure: 'barricade',   cost: 18, desc: 'Places a striped barricade. Impairments must politely go around.' },
+  { id: 'bucket_keys', name: 'Bucket Truck Keys',     icon: '🔑', structure: 'turretMount', cost: 22, unique: true, desc: 'Press Q to plant a hard-hatted Turret Mount right where you\'re standing. One truck per shift.' },
+  { id: 'cone_kit',    name: 'Traffic Barricade Kit', icon: '🚧', structure: 'barricade',   cost: 18, unique: true, desc: 'Places a striped barricade. Impairments must politely go around. One kit per shift.' },
   { id: 'rat_guard',   name: 'Rat Guard',             icon: '🪤', structure: 'ratTrap',     cost: 16, desc: 'A spring-loaded grievance. Chomps the first few impairments to step on it.' },
   { id: 'slack_coil',  name: 'Slack Coil Snare',     icon: '🌀', structure: 'snare',        cost: 18, desc: 'Deploys excess slack. Impairments inside move like they\'re on hold with Dispatch.' },
   { id: 'pedestal',    name: 'Portable Pedestal',    icon: '🗿', structure: 'pedestal',     cost: 20, desc: 'Stand near it for bonus Attack Speed. It believes in you.' }

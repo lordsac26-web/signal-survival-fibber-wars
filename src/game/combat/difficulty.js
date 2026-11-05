@@ -4,4 +4,4 @@ export const enemyHpMultiplier=(wave,elite=false)=>{const n=Math.max(0,wave-1);r
 export const enemyDamageMultiplier=(wave,elite=false)=>(1+DIFFICULTY.damageLinear*Math.max(0,wave-1))*(elite?DIFFICULTY.eliteDamage:1);
 export const enemySpeedMultiplier=wave=>Math.min(DIFFICULTY.speedCap,1+DIFFICULTY.speedLinear*Math.max(0,wave-1));
 export const signalMultiplier=wave=>1-DIFFICULTY.signalReduction*Math.min(1,Math.max(0,wave-1)/DIFFICULTY.signalHorizon);
-export function scaledEnemy(base,wave,elite=!!base.elite){const hp=base.hp*enemyHpMultiplier(wave,elite);return {hp,max:hp,speed:base.speed*enemySpeedMultiplier(wave),damage:base.damage*enemyDamageMultiplier(wave,elite),value:+(base.value*signalMultiplier(wave)).toFixed(4)}}
+export function scaledEnemy(base,wave,elite=!!base.elite){const hp=base.hp*enemyHpMultiplier(wave,elite);return {hp,max:hp,speed:base.speed*enemySpeedMultiplier(wave),damage:base.damage*enemyDamageMultiplier(wave,elite),value:+(base.value*signalMultiplier(wave)).toFixed(4),...(base.knockbackResist!==undefined?{knockbackResist:base.knockbackResist}:{})}}

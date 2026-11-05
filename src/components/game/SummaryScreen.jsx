@@ -1,5 +1,6 @@
 import { HeartPulse, RadioTower, ShoppingCart, Skull, Sparkles, Sword, Waves } from 'lucide-react';
 import GameButton from '@/components/game/GameButton';
+import { formatCompact } from '@/game/data/stats';
 
 export default function SummaryScreen({ run, newUnlocks = [], onMenu, onRetry }) {
   return (
@@ -36,11 +37,17 @@ export default function SummaryScreen({ run, newUnlocks = [], onMenu, onRetry })
 }
 
 function Stat({ icon, value, label }) {
+  // Clip-proof tile: the value is rounded + compacted (69.579… → "70", big
+  // values → "13.1K"/"1.4M"), the tile itself can never be forced wider than
+  // its grid cell (min-w-0), and the value shrinks and ellipsizes by length,
+  // so nothing escapes the box at any value, locale or viewport width.
+  const text = formatCompact(value);
+  const size = text.length <= 4 ? 'text-2xl' : text.length <= 6 ? 'text-xl' : text.length <= 8 ? 'text-lg' : 'text-base';
   return (
-    <div className="rounded-xl bg-slate-900 p-3">
+    <div className="min-w-0 rounded-xl bg-slate-900 p-3">
       <div className="mx-auto mb-1 flex justify-center text-cyan-300">{icon}</div>
-      <div className="text-2xl font-black tabular-nums">{value}</div>
-      <div className="text-xs font-black uppercase text-slate-400">{label}</div>
+      <div className={`overflow-hidden text-ellipsis whitespace-nowrap font-black tabular-nums ${size}`}>{text}</div>
+      <div className="truncate text-xs font-black uppercase text-slate-400">{label}</div>
     </div>
   );
 }

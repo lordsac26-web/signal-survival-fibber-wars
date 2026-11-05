@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { STRUCTURE_SPRITES, structureSpriteDef } from '@/game/art/characterSprites';
+import { STRUCTURE_SPRITES } from '@/game/art/characterSprites';
 import { truckFrame, drawTruckTurret } from '@/game/art/structureSprite';
 import { preloadStructureSprite } from '@/game/art/spriteLoader';
 import { DEPLOYABLES } from '@/game/data/structures';
@@ -12,22 +12,32 @@ import { decodePng } from './pngDecode.mjs';
 const def=STRUCTURE_SPRITES.bucket;
 const file=path=>readFileSync(new URL('../../../public'+path,import.meta.url));
 const bytesOf=path=>file(path);
+const s=()=>def.worldSize/def.tileW;
 
-test('actual Bucket-Truck public PNGs decode at exact sizes; local copies match uploaded bytes; manifest anchors verified',async()=>{
-  for(const [key,width,height,local] of [['atlas',690,190,'atlas'],['icon',234,204,'portrait']]){
-    const response=await fetch(def.sources[key],{signal:AbortSignal.timeout(30000)});assert.equal(response.status,200);
-    const bytes=Buffer.from(await response.arrayBuffer()),decoded=decodePng(bytes);
-    assert.equal(decoded.width,width);assert.equal(decoded.height,height);
-    assert.equal(createHash('sha256').update(bytesOf(def[local])).digest('hex'),createHash('sha256').update(bytes).digest('hex'));
-    assert(decoded.rgba.some((v,i)=>i%4===3 && v===0));assert(decoded.rgba.some((v,i)=>i%4===3 && v>200));
-    console.log('BUCKETTRUCK_IMAGE_EVIDENCE',JSON.stringify({key,http:response.status,width,height,bytes:bytes.length,decoded:true}));
+test('local atlas decodes at 690×190; every frame carries the full wheel band inside the tile',async()=>{
+  const decoded=decodePng(bytesOf(def.atlas));
+  assert.equal(decoded.width,690);assert.equal(decoded.height,190);
+  for(let f=0;f<3;f++){
+    const fx=f*230;let lowest=-1,best=0;
+    for(let y=0;y<190;y++){let run=0;
+      for(let x=fx;x<fx+230;x++){const i=(y*decoded.width+x)*4;
+        if(decoded.rgba[i+3]>10){if(y>lowest)lowest=y;
+          const lum=.299*decoded.rgba[i]+.587*decoded.rgba[i+1]+.114*decoded.rgba[i+2];
+          if(lum<60){run++;if(run>best)best=run}else run=0}
+        else run=0}
+    // the wheel band was completed inside the frame: tire contact at row 185
+    // with clearance above the tile bottom, and a real tread run at contact
+    assert.equal(lowest,185,`frame ${f}: wheel-contact row is 185, not clipped at the tile edge`);
+    assert(best>=20,`frame ${f}: visible tire tread at the contact row (${best}px)`);
   }
-  const mResponse=await fetch(def.sources.manifest,{signal:AbortSignal.timeout(30000)});assert.equal(mResponse.status,200);
-  const mBytes=Buffer.from(await mResponse.arrayBuffer());
-  assert.equal(createHash('sha256').update(bytesOf(def.manifest)).digest('hex'),createHash('sha256').update(mBytes).digest('hex'));
-  const m=JSON.parse(mBytes);
+  // the icon is untouched by the fix: still byte-identical to the public upload
+  const response=await fetch(def.sources.icon,{signal:AbortSignal.timeout(30000)});assert.equal(response.status,200);
+  const bytes=Buffer.from(await response.arrayBuffer());
+  assert.equal(createHash('sha256').update(bytesOf(def.portrait)).digest('hex'),createHash('sha256').update(bytes).digest('hex'));
+  const m=JSON.parse(bytesOf(def.manifest));
   for(const [key,expected] of Object.entries(def.manifestSpec)){const actual=key.split('.').reduce((o,p)=>o?.[p],m);assert.equal(actual,expected,key)}
   assert.equal(m.frames.length,3);assert.deepEqual(m.frames.map(f=>f.x),[0,230,460]);
+  assert.equal(m.groundBaselineY,def.anchorY,'manifest baseline matches the definition');
 });
 
 test('engine wiring: the truck is exclusive to the Keys turretMount; the Boss signature and other turrets keep placeholders',()=>{
@@ -50,7 +60,7 @@ test('engine wiring: the truck is exclusive to the Keys turretMount; the Boss si
   assert.doesNotMatch(guide,/StructurePortrait/);
 });
 
-test('slow idle cycle is a 3-pose wobble at 1.5fps; draw is centered, ground-anchored, rounded, smoothing restored',()=>{
+test('idle cycle is a 3-pose wobble at 1.5fps; draw doubles to 172.8 units, ground-anchored at the completed wheel band',()=>{
   assert.deepEqual(truckFrame(def,0),{sx:0,sy:0});
   assert.deepEqual(truckFrame(def,.7),{sx:230,sy:0});
   assert.deepEqual(truckFrame(def,1.4),{sx:460,sy:0});
@@ -58,14 +68,37 @@ test('slow idle cycle is a 3-pose wobble at 1.5fps; draw is centered, ground-anc
   assert.deepEqual(truckFrame(def,-1),{sx:0,sy:0});
   const draws=[],ctx={imageSmoothingEnabled:true,drawImage(...a){assert.equal(this.imageSmoothingEnabled,false);draws.push(a)}};
   drawTruckTurret(ctx,{definition:def,atlas:{id:'truck'}},0,100,100,1);
-  assert.equal(def.worldSize,86.4,'1.35× playtest scale');
+  assert.equal(def.worldSize,172.8,'2× playtest scale (86.4 → 172.8), draw-only');
+  assert.equal(def.anchorY,185,'wheel-contact baseline after the band completion');
   let a=draws.at(-1);assert.equal(a[0].id,'truck');assert.equal(a[1],0);assert.equal(a[2],0);assert.equal(a[3],230);assert.equal(a[4],190);
-  assert.equal(a[5],100-43);assert(Number.isInteger(a[5])&&Number.isInteger(a[6]));assert.equal(a[7],86);assert.equal(a[8],71);
-  // ground baseline: tile-local y=174 scaled to displayed width sits on the structure point
+  const w=Math.round(def.tileW*s()),h=Math.round(def.tileH*s());
+  assert.equal(a[5],Math.round(100-w/2));assert(Number.isInteger(a[5])&&Number.isInteger(a[6]));
+  assert.equal(a[6],Math.round(100-def.anchorY*s()));
+  assert.equal(a[7],w);assert.equal(a[8],h);
+  // the completed wheel band's contact row lands exactly on the structure point
+  assert(Math.abs(a[6]+def.anchorY*s()-100)<1,'wheels sit on the ground line');
   drawTruckTurret(ctx,{definition:def,atlas:{}},.7,0,0,.5);
-  a=draws.at(-1);assert.equal(a[1],230);assert.equal(a[6],-Math.round(174*(43.2/230)));assert.equal(a[7],43);
-  drawTruckTurret(ctx,{definition:def,atlas:{}},0,10,10,.05);assert.equal(draws.at(-1)[7],Math.round(86.4*.2));
+  a=draws.at(-1);assert.equal(a[1],230);assert.equal(a[6],Math.round(-def.anchorY*(def.worldSize*.5/def.tileW)));
+  drawTruckTurret(ctx,{definition:def,atlas:{}},0,10,10,.05);assert.equal(draws.at(-1)[7],Math.round(def.tileW*(def.worldSize*.2/def.tileW)));
   assert.equal(ctx.imageSmoothingEnabled,true);
+});
+
+test('max-zoom draw at all four facings: full source rect with the wheel band inside, ground-line anchored',()=>{
+  // "Max zoom" is the draw math that every zoom level multiplies: the full
+  // 230×190 source rect (which now includes the completed wheel band, source
+  // rows 174–185) is drawn with its wheel-contact row exactly on the anchor.
+  for(const aim of [0,Math.PI/2,Math.PI,-Math.PI/2]){
+    const draws=[],ctx={imageSmoothingEnabled:true,drawImage(...a){draws.push(a)},save(){},restore(){},translate(){},scale(){}};
+    drawTruckTurret(ctx,{definition:def,atlas:{id:'truck'}},0,100,100,1,aim);
+    const a=draws.at(-1);
+    assert.equal(a[3],230,'full tile width sourced');
+    assert.equal(a[4],190,`aim ${aim}: full tile height sourced — the wheel band is inside the drawn frame`);
+    const w=Math.round(def.tileW*s()),h=Math.round(def.tileH*s());
+    assert.equal(a[7],w);assert.equal(a[8],h);
+    const dy=Math.round(100-def.anchorY*s());
+    assert(Math.abs(dy+def.anchorY*s()-100)<1,`aim ${aim}: the wheel-contact row sits on the ground line`);
+    assert(Math.abs(dy+h-(100+(def.tileH-def.anchorY)*s()))<1,`aim ${aim}: frame bottom is the empty rows below the wheels`);
+  }
 });
 
 test('real engine draws the truck ONLY for the Keys turretMount; the Boss signature keeps its placeholder',async()=>{

@@ -146,19 +146,21 @@ async function encounter(configure) {
   return { run, input, state, cleanup };
 }
 
-test('engine placement: one deployable item fields 3 concurrent instances, the 4th is refused while all live', { timeout: 120000 }, async () => {
-  const h = await encounter(r => { r.wave = 6; r.hp = 3000; r.maxHp = 3000; r.armor = 60; r.deployables = [{ id: 'cone', structure: 'barricade', name: 'Traffic Barricade Kit', icon: '🚧', stacks: 1, deploy: true }] });
+test('engine placement: one ordinary deployable item fields 3 concurrent instances, the 4th is refused while all live', { timeout: 120000 }, async () => {
+  // The Barricade Kit is now UNIQUE deployable gear (one instance per shift),
+  // so the 3-instance ladder test runs on the ordinary Rat Guard instead.
+  const h = await encounter(r => { r.wave = 6; r.hp = 3000; r.maxHp = 3000; r.armor = 60; r.deployables = [{ id: 'rat', structure: 'ratTrap', name: 'Rat Guard', icon: '🪤', stacks: 1, deploy: true }] });
   try {
     pump(1 / 60);
     const posts = () => h.state.samples.at(-1)?.posts ?? [];
     const place = () => { h.input.current.deploy = true; pump(1 / 60); };
     const step = () => { h.input.current.x = 1; pump(.5); h.input.current.x = 0; };
-    place(); assert.equal(posts().length, 1, 'first barricade placed');
-    // each placement re-arms in 9s x .6 = 5.4s; the barricade lives 20s, so three overlap
-    step(); pump(5); place();
-    step(); pump(5); place();
+    place(); assert.equal(posts().length, 1, 'first trap placed');
+    // each placement re-arms in 11s x .6 = 6.6s; the trap lives 24s, so three overlap
+    step(); pump(7); place();
+    step(); pump(7); place();
     assert.equal(posts().length, 3, 'three concurrent instances of one item (engineer cap), not the roster 2');
-    step(); pump(5); // past the re-arm; all three still alive (life 20s)
+    step(); pump(7); // past the re-arm; all three still alive (life 24s)
     place();
     assert.equal(posts().length, 3);
     assert(h.state.flashes.some(f => f.includes('ALL ITS UNITS OUT')), '4th placement refused at the per-item cap');

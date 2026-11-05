@@ -27,6 +27,16 @@ export const STAT_INFO = {
   instakill: { label: 'Instakill Chance', kind: 'percent', desc: 'Chance to terminate a non-boss instantly (Veteran base 1%). Ignored for bosses; neither the trait nor Knowledge Dump bypasses boss HP.' }
 };
 
+// Game-over counter formatting: whole numbers on-screen, one decimal only
+// once the compact suffix kicks in — 69.579999… renders "70", never a
+// 17-digit float tail, and big values stay inside their tile (1.2K / 13.1K / 1.4M).
+export function formatCompact(v = 0) {
+  const n = +v || 0, a = Math.abs(n);
+  if (a >= 1e6) return `${+(n / 1e6).toFixed(1)}M`;
+  if (a >= 1e3) return `${+(n / 1e3).toFixed(1)}K`;
+  return `${Math.round(n)}`;
+}
+
 export function formatStat(kind, v = 0) {
   if (kind === 'multiplier' || kind === 'percent') return `${+(v * 100).toFixed(2)}%`;
   if (kind === 'velocity') return `${+v.toFixed(2)} units/s`;
