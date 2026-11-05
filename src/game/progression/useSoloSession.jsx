@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { resumeAudio } from '@/game/audio';
 import { saveCheckpoint, recordRun, updateProfile } from '@/game/storage';
-import { createRun, normalizeRun } from '@/game/progression/runRules';
+import { createRun, normalizeRun, advanceRunWave } from '@/game/progression/runRules';
 import { applyStartingKit } from '@/game/progression/startingKit';
 import { enterShop, shopTransaction } from '@/game/shop/shopRules';
 import { pickUpgrade, upgradeChoices, rerollUpgradeChoices, skipUpgrade } from '@/game/progression/upgradeRules';
@@ -12,9 +12,9 @@ export default function useSoloSession(profile){
   const current=useRef(null),phase=useRef('menu');
   const navigate=where=>{phase.current=where;setScreen(where)};
   const assign=(value,where,persist=true)=>{const {combineNotices=[],...clean}=value;const next=persist?saveCheckpoint(clean,where):clean;current.current=next;setRun(next);navigate(where);for(const notice of combineNotices)toast({...notice,duration:3500,className:'combine-flash'})};
-  const start=(c,useAlt,arenaTheme='classic')=>{
+  const start=(c,useAlt)=>{
     const alt=useAlt && profile.loadouts.includes(`${c.id}:alt`);resumeAudio();
-    const next={...createRun(c,alt,Math.floor(Math.random()*0x7fffffff)),useAlt:alt,arenaTheme};
+    const next={...createRun(c,alt,Math.floor(Math.random()*0x7fffffff)),useAlt:alt};
     current.current=next;setRun(next);navigate('loadout'); // tool choice first; nothing persists until it is confirmed
   };
   const confirmKit=pickedIds=>{
@@ -37,6 +37,6 @@ export default function useSoloSession(profile){
   const shopAction=event=>{const next=shopTransaction(current.current,event);assign(next,'shop')};
   const reroll=()=>{if(phase.current!=='upgrade')return;try{assign(rerollUpgradeChoices(current.current),'upgrade')}catch(e){toast({title:'Reroll unavailable',description:e.message})}};
   const skip=()=>{if(phase.current!=='upgrade')return;const next=skipUpgrade(current.current);const where=next.pendingLevels>0?'upgrade':'shop';assign(where==='shop'?enterShop(next):next,where)};
-  const nextWave=()=>{if(phase.current!=='shop')return;const r=current.current;assign({...r,wave:r.wave+1},'game',false)};
+  const nextWave=()=>{if(phase.current!=='shop')return;assign(advanceRunWave(current.current),'game',false)};
   return {screen,run,newUnlocks,navigate,start,confirmKit,newRun,resume,finish,upgrade,reroll,skip,shopAction,nextWave};
 }

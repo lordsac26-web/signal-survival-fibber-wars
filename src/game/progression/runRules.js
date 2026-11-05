@@ -4,6 +4,7 @@ import { WEAPONS } from '@/game/data/combat';
 import { applyMods, WEAPON_ARCHETYPES } from '@/game/data/generation';
 import { TUNING } from '@/game/data/tuning';
 import { normalizeItem } from '@/game/items/itemScaling';
+import { ARENA_THEMES, pickArenaTheme } from '@/game/art/arenaFloor';
 export const weaponSlot = w => ['melee','chain','nova','orbiting'].includes(w.pattern) ? 'melee' : 'ranged';
 export const allowedWeapon = (c, w) => c.restriction === 'any' || !c.restriction || weaponSlot(w) === c.restriction;
 export function legalLoadout(c, weapons) {
@@ -75,15 +76,21 @@ export function normalizeRun(raw) {
   for (const value of raw.weapons || []) {const w=normalizeWeapon(value,weapons.length,rankCap);if(WEAPON_ARCHETYPES.some(a=>a[0]===w.baseId && a[2]===w.pattern) && allowedWeapon(c,w) && legalLoadout(c,[...weapons,w])) weapons.push(w)}
   if (!weapons.length) weapons.push(...c.start.map((id,i)=>normalizeWeapon({...WEAPONS[id],baseId:id,id:`${raw.runId}-starter-${i}`},i,rankCap)));
   const items = (raw.items || []).filter(i=>!i.baseId && !i.deploy && !i.premium).map((i,index)=>normalizeItem({...i,id:i.id || `${raw.runId}:legacy-passive:${index}`}));
-  const next = {...raw,signal:raw.signal || 0,xp:raw.xp || 0,level:raw.level || 0,kills:raw.kills || 0,earnedSignal:raw.earnedSignal ?? raw.signal ?? 0,character:c,weapons,items,specialUnlocked:true,deployables:(raw.deployables || []).filter(d=>d.structure!==c.signatureStructure).map((d,index)=>normalizeItem({...d,deploy:true,id:d.id || `${raw.runId}:legacy-deploy:${index}`,stacks:Math.min(TUNING.deployRankCap,d.stacks || 1)})),lockedIds:(raw.lockedIds || []).slice(0,TUNING.maxLocks)};
+  const rawTheme = raw.arenaTheme === 'night-worksite' ? 'nightWorksite' : raw.arenaTheme;
+  const arenaTheme = ARENA_THEMES.some(t => t.id === rawTheme) ? rawTheme : pickArenaTheme(raw.seed, raw.wave || 1);
+  const next = {...raw,arenaTheme,signal:raw.signal || 0,xp:raw.xp || 0,level:raw.level || 0,kills:raw.kills || 0,earnedSignal:raw.earnedSignal ?? raw.signal ?? 0,character:c,weapons,items,specialUnlocked:true,deployables:(raw.deployables || []).filter(d=>d.structure!==c.signatureStructure).map((d,index)=>normalizeItem({...d,deploy:true,id:d.id || `${raw.runId}:legacy-deploy:${index}`,stacks:Math.min(TUNING.deployRankCap,d.stacks || 1)})),lockedIds:(raw.lockedIds || []).slice(0,TUNING.maxLocks)};
   if(migratedId!==previousId && c.id!=='don')Object.assign(next,{specialCooldown:0,specialProgress:0,useAlt:false});
   if(c.id==='isr')next.specialCooldown=Math.min(c.special.cooldown,Math.max(0,raw.specialCooldown||0));
   if(next.shop) next.shop={...next.shop,offers:(next.shop.offers || []).map(i=>!i?null:i.baseId&&!allowedWeapon(c,i)?null:normalizeItem(i))};
   next.lockedIds=next.lockedIds.filter(id=>next.shop?.offers?.some(i=>i?.id===id));
   return rebuildStats(next);
 }
+export function advanceRunWave(run) {
+  const wave = (run.wave || 1) + 1;
+  return {...run,wave,arenaTheme:pickArenaTheme(run.seed,wave,run.arenaTheme)};
+}
 export function createRun(c, useAlt, seed, id) {
   const runId = id || crypto.randomUUID();
   const ids = useAlt && c.altStart ? c.altStart : c.start;
-  return normalizeRun({runId,checkpointId:`${runId}:start`,character:c,wave:1,level:0,hp:c.stats.maxHp,signal:0,earnedSignal:0,kills:0,xp:0,pendingLevels:0,buys:0,seed,weapons:ids.map((baseId,i)=>({...WEAPONS[baseId],baseId,id:`${runId}-start-${i}`})),items:[],deployables:[],lockedIds:[],specialCooldown:0});
+  return normalizeRun({runId,checkpointId:`${runId}:start`,character:c,wave:1,level:0,hp:c.stats.maxHp,signal:0,earnedSignal:0,kills:0,xp:0,pendingLevels:0,buys:0,seed,arenaTheme:pickArenaTheme(seed,1),weapons:ids.map((baseId,i)=>({...WEAPONS[baseId],baseId,id:`${runId}-start-${i}`})),items:[],deployables:[],lockedIds:[],specialCooldown:0});
 }
