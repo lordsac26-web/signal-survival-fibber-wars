@@ -1,0 +1,312 @@
+{
+  "id": "ditchWitch",
+  "source": "/assets/ditchwitch/ditch-witch-source.jpg",
+  "remoteSource": "https://base44.app/api/apps/6aab67049cd04a621f2adf4f/files/mp/public/6aab67049cd04a621f2adf4f/4d2db1b88_ditch-witch-source.jpg",
+  "frameWidth": 192,
+  "frameHeight": 120,
+  "anchorX": 72,
+  "baselineY": 114,
+  "baseFacing": "right",
+  "counts": {
+    "idle": 4,
+    "drive": 6,
+    "windup": 3,
+    "charge": 5,
+    "dig": 4,
+    "death": 5
+  },
+  "rocksVfx": {
+    "width": 108,
+    "height": 96,
+    "sourceRect": {
+      "x": 774,
+      "y": 454,
+      "w": 105,
+      "h": 95
+    }
+  },
+  "frames": {
+    "idle": [
+      {
+        "sourceRect": {
+          "x": 28,
+          "y": 17,
+          "w": 156,
+          "h": 87
+        },
+        "chassisCenterX": 85,
+        "trackBaselineY": 102
+      },
+      {
+        "sourceRect": {
+          "x": 230,
+          "y": 18,
+          "w": 155,
+          "h": 86
+        },
+        "chassisCenterX": 286,
+        "trackBaselineY": 103
+      },
+      {
+        "sourceRect": {
+          "x": 434,
+          "y": 19,
+          "w": 152,
+          "h": 86
+        },
+        "chassisCenterX": 488,
+        "trackBaselineY": 104
+      },
+      {
+        "sourceRect": {
+          "x": 629,
+          "y": 20,
+          "w": 153,
+          "h": 87
+        },
+        "chassisCenterX": 685,
+        "trackBaselineY": 105
+      }
+    ],
+    "drive": [
+      {
+        "sourceRect": {
+          "x": 24,
+          "y": 130,
+          "w": 147,
+          "h": 85
+        },
+        "chassisCenterX": 77,
+        "trackBaselineY": 214
+      },
+      {
+        "sourceRect": {
+          "x": 198,
+          "y": 132,
+          "w": 145,
+          "h": 85
+        },
+        "chassisCenterX": 251,
+        "trackBaselineY": 215
+      },
+      {
+        "sourceRect": {
+          "x": 364,
+          "y": 133,
+          "w": 145,
+          "h": 85
+        },
+        "chassisCenterX": 416,
+        "trackBaselineY": 216
+      },
+      {
+        "sourceRect": {
+          "x": 525,
+          "y": 135,
+          "w": 143,
+          "h": 85
+        },
+        "chassisCenterX": 576,
+        "trackBaselineY": 217
+      },
+      {
+        "sourceRect": {
+          "x": 687,
+          "y": 137,
+          "w": 143,
+          "h": 83
+        },
+        "chassisCenterX": 738,
+        "trackBaselineY": 218
+      },
+      {
+        "sourceRect": {
+          "x": 849,
+          "y": 137,
+          "w": 147,
+          "h": 85
+        },
+        "chassisCenterX": 901,
+        "trackBaselineY": 219
+      }
+    ],
+    "windup": [
+      {
+        "sourceRect": {
+          "x": 26,
+          "y": 238,
+          "w": 153,
+          "h": 85
+        },
+        "chassisCenterX": 79,
+        "trackBaselineY": 321
+      },
+      {
+        "sourceRect": {
+          "x": 219,
+          "y": 240,
+          "w": 155,
+          "h": 86
+        },
+        "chassisCenterX": 272,
+        "trackBaselineY": 323
+      },
+      {
+        "sourceRect": {
+          "x": 411,
+          "y": 242,
+          "w": 159,
+          "h": 86
+        },
+        "chassisCenterX": 465,
+        "trackBaselineY": 324
+      }
+    ],
+    "charge": [
+      {
+        "sourceRect": {
+          "x": 24,
+          "y": 346,
+          "w": 164,
+          "h": 86
+        },
+        "chassisCenterX": 78,
+        "trackBaselineY": 430
+      },
+      {
+        "sourceRect": {
+          "x": 227,
+          "y": 347,
+          "w": 164,
+          "h": 88
+        },
+        "chassisCenterX": 285,
+        "trackBaselineY": 430
+      },
+      {
+        "sourceRect": {
+          "x": 420,
+          "y": 348,
+          "w": 168,
+          "h": 88
+        },
+        "chassisCenterX": 482,
+        "trackBaselineY": 431
+      },
+      {
+        "sourceRect": {
+          "x": 623,
+          "y": 349,
+          "w": 164,
+          "h": 88
+        },
+        "chassisCenterX": 682,
+        "trackBaselineY": 433
+      },
+      {
+        "sourceRect": {
+          "x": 822,
+          "y": 350,
+          "w": 181,
+          "h": 87
+        },
+        "chassisCenterX": 887,
+        "trackBaselineY": 433
+      }
+    ],
+    "dig": [
+      {
+        "sourceRect": {
+          "x": 22,
+          "y": 455,
+          "w": 167,
+          "h": 88
+        },
+        "chassisCenterX": 75,
+        "trackBaselineY": 539
+      },
+      {
+        "sourceRect": {
+          "x": 223,
+          "y": 458,
+          "w": 166,
+          "h": 86
+        },
+        "chassisCenterX": 274,
+        "trackBaselineY": 542
+      },
+      {
+        "sourceRect": {
+          "x": 424,
+          "y": 461,
+          "w": 169,
+          "h": 86
+        },
+        "chassisCenterX": 476,
+        "trackBaselineY": 544
+      },
+      {
+        "sourceRect": {
+          "x": 633,
+          "y": 455,
+          "w": 169,
+          "h": 95
+        },
+        "chassisCenterX": 686,
+        "trackBaselineY": 545
+      }
+    ],
+    "death": [
+      {
+        "sourceRect": {
+          "x": 20,
+          "y": 550,
+          "w": 149,
+          "h": 113
+        },
+        "chassisCenterX": 88,
+        "trackBaselineY": 661
+      },
+      {
+        "sourceRect": {
+          "x": 213,
+          "y": 554,
+          "w": 154,
+          "h": 111
+        },
+        "chassisCenterX": 281,
+        "trackBaselineY": 664
+      },
+      {
+        "sourceRect": {
+          "x": 412,
+          "y": 558,
+          "w": 153,
+          "h": 108
+        },
+        "chassisCenterX": 480,
+        "trackBaselineY": 665
+      },
+      {
+        "sourceRect": {
+          "x": 602,
+          "y": 563,
+          "w": 173,
+          "h": 108
+        },
+        "chassisCenterX": 670,
+        "trackBaselineY": 665
+      },
+      {
+        "sourceRect": {
+          "x": 811,
+          "y": 571,
+          "w": 169,
+          "h": 96
+        },
+        "chassisCenterX": 879,
+        "trackBaselineY": 665
+      }
+    ]
+  }
+}
