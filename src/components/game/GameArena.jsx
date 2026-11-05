@@ -48,6 +48,7 @@ export default function GameArena({ run, onFinish }) {
       // C cycles which owned deployable is selected (HUD highlight follows).
       if (k === 'q') input.current.deploy = true;
       if (k === 'c') input.current.cycle = true;
+      if (k === 'g' && !e.repeat && run.onCoopPing) run.onCoopPing();
     };
     const up = e => {
       const k = e.key.toLowerCase();
@@ -66,7 +67,7 @@ export default function GameArena({ run, onFinish }) {
     Promise.all([preloadCharacterSprite(run.character.id),preloadEnemySprite('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),preloadEnemySprite('squirrel'),preloadEnemySprite('dirty'),preloadEnemySprite('packet'),preloadEnemySprite('jitter'),preloadEnemySprite('pete'),preloadEnemySprite('bend'),preloadEnemySprite('crosstalk'),preloadEnemySprite('attenuation'),preloadEnemySprite('rous'),preloadArenaFloor(run.arenaTheme),preloadStaticSprite('barricade'),preloadStaticSprite('spliceCabinetIdle'),preloadStaticSprite('spliceCabinetActive'),preloadEnemySprite('ditch')]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor,barricadeSprite,cabinetIdle,cabinetActive,ditchArt])=>{
       if(disposed)return;
       clean=createSignalEngine(canvas.current,run,input,{
-        hud:setHud,reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,
+        hud:nextHud=>{setHud(nextHud);run.onCoopTelemetry?.(nextHud)},reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,
         flash:t=>{setFlash(t);setTimeout(()=>setFlash(''),1400)}
       },paused,art,lagArt,truckArt,squirrelArt,blobArt,pedestalArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor,barricadeSprite,{idle:cabinetIdle,active:cabinetActive},ditchArt);
       setArtStatus('');
