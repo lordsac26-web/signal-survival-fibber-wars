@@ -2,9 +2,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
 import { validateProfile } from '../../shared/profileValidation.ts';
 export default async function(req) {
   try {
-    const client=createClientFromRequest(req),user=await client.auth.me();
+    const client=createClientFromRequest(req),user=await client.auth.me().catch(e=>e?.status===401?null:Promise.reject(e));
     if(!user) return Response.json({error:'Sign in required'},{status:401});
-    const body=await req.json();if(!['load','save'].includes(body.action)) return Response.json({error:'Unknown operation'},{status:400});
+    const body=await req.json().catch(()=>({}));if(!['load','save'].includes(body?.action)) return Response.json({error:'Unknown operation'},{status:400});
     const owned=await client.entities.SaveSync.filter({created_by_id:user.id},'-updated_date',100);
     const managed=owned.filter(r=>Number.isInteger(r.revision));
     let record=managed.sort((a,b)=>String(a.created_date).localeCompare(String(b.created_date)) || a.id.localeCompare(b.id))[0];

@@ -87,7 +87,7 @@ export function normalizeRun(raw) {
 }
 export function advanceRunWave(run) {
   const wave = (run.wave || 1) + 1;
-  return {...run,wave,arenaTheme:pickArenaTheme(run.seed,wave,run.arenaTheme)};
+  return {...run,wave,deployCds:{},arenaTheme:pickArenaTheme(run.seed,wave,run.arenaTheme)};
 }
 export function createRun(c, useAlt, seed, id) {
   const runId = id || crypto.randomUUID();

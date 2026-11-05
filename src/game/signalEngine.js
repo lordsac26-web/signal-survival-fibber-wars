@@ -146,7 +146,7 @@ function kill(e){if(!e.active)return;if(e.ditch){stepDitch(e.ditch,0,{alive:fals
  function nearestVisitor(e){if(!e.active)return;const d=Math.hypot(e.x-queryX,e.y-queryY);if(d<nearestDist){nearestBest=e;nearestDist=d}}
  function nearest(range){queryX=p.x;queryY=p.y;nearestBest=null;nearestDist=range;grid.visit(p.x,p.y,range,nearestVisitor);return nearestBest}
  function nearestAt(x,y,range){queryX=x;queryY=y;nearestBest=null;nearestDist=range;grid.visit(x,y,range,nearestVisitor);return nearestBest}
- function activeFoeCount(){let n=0;for(let i=0;i<enemies.items.length;i++)if(enemies.items[i].active)n++;return n}
+ function activeFoeCount(){return enemies.items.length-enemies.freeCount}
  function spawnEnemy(kind,force,request={}){if(!force&&activeFoeCount()>=maxActiveEnemies(run.wave))return;const e=enemies.acquire();if(!e)return;const base=ENEMIES[kind||pickEnemyKind(TYPES,run.wave)],edge=request.edge??((Math.random()*4)|0),pad=35;e.kind=kind||Object.keys(ENEMIES).find(id=>ENEMIES[id]===base);
  if(request.angle!==undefined)Object.assign(e,perimeterSpawn(p,{x:camX,y:camY,width:viewW,height:viewH},request.angle,pad));
  else{e.x=edge===1?camX+viewW+pad:edge===3?camX-pad:camX+(request.edge!==undefined?.5:Math.random())*viewW;e.y=edge===0?camY-pad:edge===2?camY+viewH+pad:camY+(request.edge!==undefined?.5:Math.random())*viewH}

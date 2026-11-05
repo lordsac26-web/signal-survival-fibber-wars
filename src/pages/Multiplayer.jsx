@@ -36,6 +36,7 @@ export default function Multiplayer() {
 
   const runRef = useRef(null);
   const lastPosRef = useRef({ x: 550, y: 400 });
+  const lastTelemetryRef = useRef({ sig: '', ts: 0 });
   const syncedWaveRef = useRef(0);
 
   const playerName = user?.full_name || user?.email?.split('@')[0] || 'Technician';
@@ -377,9 +378,16 @@ export default function Multiplayer() {
       },
       onCoopTelemetry: (hudSnap) => {
         if (hudSnap.position) lastPosRef.current = hudSnap.position;
+        const tx = Math.round(hudSnap.position?.x ?? lastPosRef.current.x);
+        const ty = Math.round(hudSnap.position?.y ?? lastPosRef.current.y);
+        const thp = Math.round(hudSnap.hp || 0);
+        const sig = `${tx}:${ty}:${thp}:${hudSnap.maxHp}:${hudSnap.kills}:${Math.round(hudSnap.signal || 0)}:${hudSnap.level}:${Math.ceil(hudSnap.specialRemaining || 0)}`;
+        const now = performance.now();
+        if (sig === lastTelemetryRef.current.sig && now - lastTelemetryRef.current.ts < 500) return;
+        lastTelemetryRef.current = { sig, ts: now };
         coop.sendTelemetry({
-          x: hudSnap.position?.x ?? lastPosRef.current.x,
-          y: hudSnap.position?.y ?? lastPosRef.current.y,
+          x: tx,
+          y: ty,
           hp: hudSnap.hp,
           maxHp: hudSnap.maxHp,
           kills: hudSnap.kills,

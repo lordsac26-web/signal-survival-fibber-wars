@@ -6,11 +6,12 @@ const melee=w=>['melee','chain','nova','orbiting'].includes(w.pattern);
 const rename=id=>['dispatch','dave','dispatch_dave'].includes(id)?'don':retired.includes(id)?'nomad':id;
 export function validateProfile(data,userId,previous=null) {
   if(!data || typeof data!=='object' || Array.isArray(data) || JSON.stringify(data).length>700000) throw new Error('Invalid or oversized profile');
-  const p=structuredClone(data);if(p.ownerId && p.ownerId!==userId) throw new Error('Profile owner mismatch');p.ownerId=userId;p.version=4;p.unlocked=ids;
+  const p=structuredClone(data);if(p.ownerId && p.ownerId!==userId) throw new Error('Profile owner mismatch');p.ownerId=userId;p.version=4;
+  p.unlocked=ids.filter(id=>id==='clone'?(p.deaths||0)>=5:id==='isr'?!!p.squirrelDefeated:true);
   p.selectedCharacter=ids.includes(rename(p.selectedCharacter))?rename(p.selectedCharacter):'nomad';
   if(p.checkpoint){
     if(!['ready','shop','upgrade'].includes(p.checkpoint.phase))throw new Error('Unknown checkpoint boundary');
-    const r=p.checkpoint.run,c=rename(r?.character?.id);if(!r || !ids.includes(c) || typeof r.runId!=='string' || r.runId.length>80 || !Number.isInteger(r.wave) || r.wave<1 || r.wave>10000 || !Number.isFinite(r.hp) || r.hp<=0) throw new Error('Invalid solo checkpoint');
+    const r=p.checkpoint.run,c=rename(r?.character?.id);if(!r || !ids.includes(c) || typeof r.runId!=='string' || r.runId.length>80 || !Number.isInteger(r.wave) || r.wave<1 || r.wave>10000 || !Number.isFinite(r.hp) || r.hp<=0 || r.hp>50000) throw new Error('Invalid solo checkpoint');
     if(previous?.checkpoint?.run?.runId===r.runId && rename(previous.checkpoint.run.character?.id || previous.checkpoint.run.characterId)!==c)throw new Error('Character cannot change midway through a run');
     if(retired.includes(r.character.id)){r.character={id:c,name:'Night-Shift Nomad'};r.specialCooldown=0;r.specialProgress=0;r.useAlt=false}
     r.character.id=c;if(c==='don')r.character.name='Dispatch Don';r.specialUnlocked=true;
@@ -22,14 +23,15 @@ export function validateProfile(data,userId,previous=null) {
       const n=k=>all.filter(i=>cat(i)===k).length;
       if(n('ranged')>1||n('melee')>2||n('deployable')>4) throw new Error('Field Engineer category cap exceeded');
     }
-    if(r.weapons.some(w=>!w || typeof w.id!=='string' || patterns[w.baseId]!==w.pattern || !Number.isFinite(w.damage) || w.damage<0 || !Number.isFinite(w.rate) || w.rate<=0 || (c==='oracle'&&melee(w)))) throw new Error('Forbidden or malformed weapon');
+    if(r.weapons.some(w=>!w || typeof w.id!=='string' || patterns[w.baseId]!==w.pattern || !Number.isFinite(w.damage) || w.damage<0 || w.damage>50000 || !Number.isFinite(w.rate) || w.rate<.02 || (c==='oracle'&&melee(w)))) throw new Error('Forbidden or malformed weapon');
+    if([...(r.items || []),...(r.statMods || [])].some(i=>!i || typeof i!=='object' || (i.mods && (!Array.isArray(i.mods) || i.mods.some(m=>!m || !Number.isFinite(m.value) || Math.abs(m.value)>5000))))) throw new Error('Malformed passive modifiers');
     if(c==='veteran' && [true,false].some(k=>r.weapons.filter(w=>melee(w)===k).length>4)) throw new Error('Veteran requires max 4 tools per family');
     if((r.lockedIds || []).length>2 || new Set(r.lockedIds || []).size!==(r.lockedIds || []).length) throw new Error('At most two shop locks');
     if((r.lockedIds || []).some(id=>!r.shop?.offers?.some(i=>i?.id===id))) throw new Error('Locked offer missing');
     if(r.shop && (!Array.isArray(r.shop.offers) || r.shop.offers.length!==4))throw new Error('Shop requires exactly four slots');
     if(r.shop?.offers?.some(w=>w?.baseId && (patterns[w.baseId]!==w.pattern || (c==='oracle'&&melee(w))))) throw new Error('Forbidden shop offer');
     if((r.deployables || []).some(d=>!Number.isInteger(d.stacks) || d.stacks<1 || d.stacks>2)) throw new Error('Deployable loot rank cap exceeded');
-    for(const field of ['signal','xp','level','kills','earnedSignal']) if(!Number.isFinite(r[field]) || r[field]<0) throw new Error(`Invalid ${field}`);
+    for(const field of ['signal','xp','level','kills','earnedSignal']) if(!Number.isFinite(r[field]) || r[field]<0 || r[field]>1e9) throw new Error(`Invalid ${field}`);
   }
   return p;
 }

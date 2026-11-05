@@ -9,9 +9,9 @@ import { tierInfo } from '@/game/items/tiers';
 // Year Veteran picks two; everyone else picks one. The screen never shares
 // space with the gameplay canvas — it replaces the view entirely.
 export default function LoadoutScreen({ run, onConfirm, onBack }) {
-  const { offers, limitedBy } = useMemo(() => startingOffers(run.character, run.seed), [run.character.id, run.seed]);
-  const [picked, setPicked] = useState([]);
+  const { offers, limitedBy } = useMemo(() => startingOffers(run.character, run.seed, undefined, Boolean(run.useAlt)), [run.character.id, run.seed, run.useAlt]);
   const need = startingPickCount(run.character);
+  const [picked, setPicked] = useState(() => run.useAlt ? offers.slice(0, need).map(o => o.id) : []);
   const toggle = id => setPicked(picked.includes(id) ? picked.filter(p => p !== id) : canPick(run.character, offers, picked, id) ? [...picked, id] : picked);
   const ready = kitComplete(run.character, offers, picked);
   const pickedItems = offers.filter(o => picked.includes(o.id));

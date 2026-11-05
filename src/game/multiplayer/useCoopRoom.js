@@ -25,6 +25,7 @@ export default function useCoopRoom(roomId, initialConfig = null) {
   const [chat, setChat] = useState([]);
 
   const handleRef = useRef(null);
+  const seatRef = useRef(null);
   const peersRef = useRef([]);
   const combatEventsRef = useRef([]);
   const initSentRef = useRef(false);
@@ -53,6 +54,7 @@ export default function useCoopRoom(roomId, initialConfig = null) {
 
       if (msg.type === 'welcome') {
         setStatus('connected');
+        seatRef.current = msg.seat;
         setSeat(msg.seat);
         setRoom(msg.room);
         setUsers(msg.users || []);
@@ -63,6 +65,7 @@ export default function useCoopRoom(roomId, initialConfig = null) {
           initSentRef.current = true;
           actorHandle.send({
             type: 'init_room',
+            roomId,
             registryId: initialConfig.registryId || null,
             title: initialConfig.title || 'Field Crew Shift',
             arenaChoice: initialConfig.arenaChoice || 'random',
@@ -88,6 +91,7 @@ export default function useCoopRoom(roomId, initialConfig = null) {
       }
 
       if (msg.type === 'telemetry' && msg.state) {
+        if (msg.seat === seatRef.current) return;
         const list = peersRef.current;
         const idx = list.findIndex((p) => p.seat === msg.seat);
         if (idx >= 0) {

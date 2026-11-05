@@ -22,7 +22,7 @@ export function startingPickCount(c) {
 // the shop's one-per-technician inventory cap), and always include at least
 // one direct-damage tool. A legal pool smaller than four offers everything
 // legal and reports which character hit the limit.
-export function startingOffers(c, seed, pool = WEAPON_ARCHETYPES) {
+export function startingOffers(c, seed, pool = WEAPON_ARCHETYPES, useAlt = false) {
   const legal = legalStartPool(c, pool);
   const want = Math.min(STARTER_OFFER_COUNT, legal.length);
   const limitedBy = legal.length < STARTER_OFFER_COUNT ? c.id : null;
@@ -34,8 +34,18 @@ export function startingOffers(c, seed, pool = WEAPON_ARCHETYPES) {
   }
   const chosen = [];
   let turretOffered = false;
+  if (useAlt && Array.isArray(c.altStart)) {
+    for (const id of c.altStart) {
+      if (chosen.length >= want) break;
+      const a = legal.find(x => x[0] === id);
+      if (!a || chosen.includes(a)) continue;
+      if (isTurret(a)) { if (turretOffered) continue; turretOffered = true; }
+      chosen.push(a);
+    }
+  }
   for (const a of order) {
     if (chosen.length >= want) break;
+    if (chosen.includes(a)) continue;
     if (isTurret(a)) { if (turretOffered) continue; turretOffered = true; }
     chosen.push(a);
   }
@@ -67,7 +77,7 @@ export function kitComplete(c, offers, pickedIds) {
 // occupying slots normally, and the rest of the run (signature grant, stats,
 // shop rules) is untouched.
 export function applyStartingKit(run, pickedIds) {
-  const { offers } = startingOffers(run.character, run.seed);
+  const { offers } = startingOffers(run.character, run.seed, WEAPON_ARCHETYPES, Boolean(run.useAlt));
   const picked = pickedIds.map(id => offers.find(o => o.id === id));
   if (picked.some(w => !w)) throw new Error('Unknown starting tool');
   if (new Set(pickedIds).size !== pickedIds.length) throw new Error('Each starting tool may be picked once');

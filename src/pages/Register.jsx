@@ -10,6 +10,7 @@ import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
+import { continueMfa, loginWithGoogle } from "@/lib/authMfa";
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -42,11 +43,16 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
+      const returnTo = safeReturnTo();
       const result = await base44.auth.verifyOtp({ email, otpCode });
+      if (result?.mfa_required) {
+        await continueMfa(result, returnTo);
+        return;
+      }
       if (result?.access_token) {
         base44.auth.setToken(result.access_token);
       }
-      window.location.href = safeReturnTo();
+      window.location.href = returnTo;
     } catch (err) {
       setError(err.message || "Invalid verification code");
     } finally {
@@ -68,7 +74,7 @@ export default function Register() {
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", safeReturnTo());
+    loginWithGoogle(safeReturnTo());
   };
 
   if (showOtp) {

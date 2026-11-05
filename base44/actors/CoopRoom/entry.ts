@@ -136,7 +136,12 @@ export default class CoopRoom extends Actor {
 
     if (msg.type === 'init_room') {
       if (u.seat === this.room.hostSeat) {
-        if (typeof msg.registryId === 'string' && msg.registryId.length <= 64) {
+        if (
+          !this.room.registryId &&
+          typeof msg.registryId === 'string' &&
+          /^[a-f0-9]{24}$/i.test(msg.registryId) &&
+          (!msg.roomId || msg.registryId === msg.roomId)
+        ) {
           this.room.registryId = msg.registryId;
         }
         if (typeof msg.title === 'string' && msg.title.trim()) {
@@ -277,6 +282,11 @@ export default class CoopRoom extends Actor {
     if (msg.type === 'combat_event') {
       const kind = String(msg.kind || '').slice(0, 32);
       if (!['special', 'deploy', 'ping', 'boss_damage', 'heal_pulse'].includes(kind)) return;
+      const now = Date.now();
+      if (u.lastEventAt && now - u.lastEventAt < 250) return;
+      if (kind === 'heal_pulse' && u.characterId !== 'nomad') return;
+      u.lastEventAt = now;
+      const maxAmt = kind === 'heal_pulse' ? 18 : kind === 'boss_damage' ? 2500 : 0;
       this.broadcast({
         type: 'combat_event',
         seat: u.seat,
@@ -285,7 +295,7 @@ export default class CoopRoom extends Actor {
         kind,
         x: clamp(msg.x ?? u.x, 0, 1100),
         y: clamp(msg.y ?? u.y, 0, 800),
-        amount: clamp(msg.amount ?? 0, 0, 50000),
+        amount: clamp(msg.amount ?? 0, 0, maxAmt),
         label: String(msg.label || '').slice(0, 48)
       });
       return;

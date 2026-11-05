@@ -1,7 +1,7 @@
 import { ArrowLeft, CheckCircle2, LockKeyhole, RadioTower } from 'lucide-react';
 import { CHARACTERS } from '@/game/data/characters';
 import { WEAPON_ARCHETYPES } from '@/game/data/generation';
-import { CHALLENGES, ACHIEVEMENTS, LOADOUTS } from '@/game/data/unlocks';
+import { ACHIEVEMENTS, LOADOUTS, unlockMet } from '@/game/data/unlocks';
 import CareerChallenges from '@/components/game/CareerChallenges';
 import CharacterPortrait from '@/components/game/CharacterPortrait';
 import OraclePortrait from '@/components/game/OraclePortrait';
@@ -31,15 +31,16 @@ export default function GalleryScreen({ save, onBack }) {
         <h2 className="mt-9 text-xl font-black uppercase text-cyan-200">Technicians</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {CHARACTERS.map(c => {
-            const done = true;
-            const ch = CHALLENGES.find(x => x.id === c.id);
+            const done = unlockMet(save, c);
+            const goal = c.unlock?.goal || 1;
+            const progress = c.unlock ? (c.unlock.metric === 'squirrel' ? (save.squirrelDefeated ? 1 : 0) : Math.min(save[c.unlock.metric] || 0, goal)) : 1;
             return (
               <div key={c.id} className="rounded-xl border border-white/10 bg-slate-900/80 p-4">
                 <div className="flex items-center gap-3">
                   {c.id==='oracle'?<OraclePortrait name={c.name}/>:done ? (<CharacterPortrait character={c}/> || <RadioTower className="shrink-0 text-cyan-300" />) : <LockKeyhole className="shrink-0 text-slate-500" />}
-                  <div><b>{c.name}</b><p className="text-sm text-slate-400">{done ? `${c.passive} • ${c.special.name}` : ch.desc}</p></div>
+                  <div><b>{c.name}</b><p className="text-sm text-slate-400">{done ? `${c.passive} • ${c.special.name}` : (c.unlock?.desc || 'Career milestone required')}</p></div>
                 </div>
-                {!done && <div className="mt-3"><Bar value={ch.progress(save)} goal={ch.goal} /></div>}
+                {!done && <div className="mt-3"><Bar value={progress} goal={goal} /></div>}
               </div>
             );
           })}
