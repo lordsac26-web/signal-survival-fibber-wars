@@ -1,0 +1,106 @@
+{
+  "name": "CoopLobby",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Public shift room title"
+    },
+    "host_name": {
+      "type": "string",
+      "description": "Display name of the room host"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "lobby",
+        "loadout",
+        "combat",
+        "intermission",
+        "closed"
+      ],
+      "enumColors": [
+        "green",
+        "blue",
+        "yellow",
+        "purple",
+        "gray"
+      ],
+      "default": "lobby"
+    },
+    "player_count": {
+      "type": "integer",
+      "default": 1
+    },
+    "max_players": {
+      "type": "integer",
+      "default": 4
+    },
+    "wave": {
+      "type": "integer",
+      "default": 1
+    },
+    "arena_choice": {
+      "type": "string",
+      "default": "random"
+    }
+  },
+  "required": [
+    "title",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
