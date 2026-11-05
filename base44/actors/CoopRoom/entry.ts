@@ -1,6 +1,6 @@
 import { Actor } from 'base44:runtime/actors';
 
-const MAX_USERS = 4;
+const MAX_USERS = 4; // authoritative room actor
 const W = 1100;
 const H = 800;
 const SIM_STEP = 1 / 30;
@@ -766,20 +766,27 @@ export default class CoopRoom extends Actor {
       return;
     }
 
-    if (msg.type === 'combat_input') {
+    if (msg.type === 'combat_input' || msg.type === 'telemetry') {
       if (this.room.phase !== 'combat') return;
-      u.ix = clamp(msg.x ?? 0, -1, 1);
-      u.iy = clamp(msg.y ?? 0, -1, 1);
-      if (msg.viewportW && msg.viewportH) u.viewport = { width: clamp(msg.viewportW, 320, 2400), height: clamp(msg.viewportH, 240, 1800) };
+      if (msg.type === 'combat_input') {
+        u.ix = clamp(msg.x ?? 0, -1, 1);
+        u.iy = clamp(msg.y ?? 0, -1, 1);
+      } else if (msg.ix !== undefined || msg.iy !== undefined) {
+        u.ix = clamp(msg.ix ?? 0, -1, 1);
+        u.iy = clamp(msg.iy ?? 0, -1, 1);
+      }
+      if (msg.viewportW && msg.viewportH) {
+        u.viewport = { width: clamp(msg.viewportW, 320, 2400), height: clamp(msg.viewportH, 240, 1800) };
+      }
       this.stepWorldToNow();
       return;
     }
 
-    if (msg.type === 'combat_action') {
+    if (msg.type === 'combat_action' || msg.type === 'combat_event') {
       if (this.room.phase !== 'combat' || !this.world) return;
       if (this.hasProcessedAction(u, msg.actionId)) return;
-      const action = String(msg.action || '');
-      if (action === 'special') {
+      const action = String(msg.action || msg.kind || '');
+      if (action === 'special' || action === 'heal_pulse') {
         const spec = charSpec(u.characterId);
         if (u.alive && u.hp > 0 && u.specialCooldown <= 0) {
           u.specialCooldown = spec.special.cooldown;
@@ -794,8 +801,23 @@ export default class CoopRoom extends Actor {
           }
           pushFx(this.world, { type: 'special', seat: u.seat, specialId: spec.special.id, label: `${u.name}: ${spec.special.name.toUpperCase()}`, x: Math.round(u.x), y: Math.round(u.y) });
         }
+      } else if (action === 'deploy') {
+        const list = u.deployables || [];
+        const idx = clamp(Number(msg.deployIndex) || 0, 0, Math.max(0, list.length - 1));
+        const item = list[idx];
+        const row = STRUCT_TABLE[item?.structure];
+        if (row && (u.deployCds?.[item.structure] || 0) <= 0 && !this.world.structures.some((s) => Math.hypot(s.x - u.x, s.y - u.y) < 90)) {
+          u.deployCds = u.deployCds || {};
+          u.deployCds[item.structure] = row[4] * (u.characterId === 'engineer' ? 0.45 : 1);
+          this.world.structures.push({ id: this.world.nextEntityId++, ownerSeat: u.seat, type: item.structure, x: clamp(Math.round(u.x), 30, W - 30), y: clamp(Math.round(u.y), 30, H - 30), r: row[2], life: row[3], maxLife: row[3], power: clamp(item.stacks || 1, 1, 2), uses: row[5] || 0, rearm: 0, fireCd: 0.25, haste: 0, lookA: 0 });
+          pushFx(this.world, { type: 'deploy', seat: u.seat, structure: item.structure, x: Math.round(u.x), y: Math.round(u.y) });
+        }
       } else if (action === 'ping') {
-        pushFx(this.world, { type: 'ping', seat: u.seat, name: u.name, x: Math.round(u.x), y: Math.round(u.y), label: 'SECTOR PING' });
+        const now = Date.now();
+        if (!u.lastPingAt || now - u.lastPingAt >= 400) {
+          u.lastPingAt = now;
+          pushFx(this.world, { type: 'ping', seat: u.seat, name: u.name, x: Math.round(u.x), y: Math.round(u.y), label: 'SECTOR PING' });
+        }
       }
       this.stepWorldToNow();
       return;
@@ -883,13 +905,11 @@ export default class CoopRoom extends Actor {
   }
 
   ensureSimLoop() {
-    if (this.simTimer) return;
     this.lastSimAt = Date.now();
-    this.simTimer = setInterval(() => this.stepWorldToNow(), TICK_MS);
   }
 
   stopSimLoop() {
-    if (this.simTimer) { clearInterval(this.simTimer); this.simTimer = null; }
+    this.simTimer = null;
   }
 
   stepWorldToNow() {
