@@ -1,6 +1,7 @@
 import { PETE } from '@/game/data/bosses';
 import { MACRO } from '@/game/combat/macrobend';
 import { APPARITION } from '@/game/combat/coneAttack';
+import { DITCH } from '@/game/combat/ditchWitch';
 export const JITTER=Object.freeze({telegraph:1,recovery:.45,cooldown:12,initialMin:10,initialMax:15,radius:76*1.20,damage:12,activationRange:130,spawnWeight:.5});
 export const createJitterState=(random=Math.random)=>({phase:'chase',remaining:0,cooldown:JITTER.initialMin+random()*(JITTER.initialMax-JITTER.initialMin),clock:0,melee:0,facing:'right'});
 export function stepJitter(s,dt,{alive=true,playerAlive=true,dist=Infinity,visible=false,targetDx=0}={}){
@@ -24,7 +25,7 @@ export function jitterVelocity(s,angle,speed){
 }
 export const jitterPulseHits=(s,dist,inv)=>s.phase==='recover'&&inv<=0&&dist<=JITTER.radius;
 export function pickEnemyKind(types,wave,random=Math.random){
-  const eligible=types.slice(0,Math.min(types.length,2+(wave/2|0))).filter(id=>id!=='peteMini');
+  const eligible=types.slice(0,Math.min(types.length,2+(wave/2|0))).filter(id=>id!=='peteMini'&&id!=='ditch');
   // Reuse its single existing pool entry; wave-4 inclusion replaces an attempt.
   if(wave>=4&&!eligible.includes('crosstalk'))eligible.push('crosstalk');
   if(wave>=APPARITION.wave&&!eligible.includes('attenuation'))eligible.push('attenuation');
@@ -32,7 +33,9 @@ export function pickEnemyKind(types,wave,random=Math.random){
   // MACROBEND BEAST: explicit wave-4 gate (the slice alone would surface it at
   // wave 6) and the same half-weight gate the Jitter Bug uses.
   if(wave>=MACRO.wave&&!eligible.includes('bend'))eligible.push('bend');
-  const kind=eligible[Math.floor(random()*eligible.length)];
+  const u=random(),scaled=u*eligible.length,idx=Math.floor(scaled),frac=scaled-idx;
+  const kind=eligible[idx];
+  if(kind==='dirty'&&wave>=DITCH.wave&&types.includes('ditch')&&frac<DITCH.spawnWeight)return 'ditch';
   if(kind==='attenuation'&&(wave<APPARITION.wave||random()>=APPARITION.weight))return 'lag';
   if(kind!=='jitter'&&kind!=='bend'&&kind!=='pete')return kind;
   if(kind==='jitter'&&random()<JITTER.spawnWeight)return kind;

@@ -3,6 +3,7 @@
 import jitterSpriteDefinition from '@/game/art/jitterSpriteDefinition';
 import isrSpriteDefinition from '@/game/art/isrSpriteDefinition';
 import crosstalkSpriteDefinition from '@/game/art/crosstalkSpriteDefinition';
+import ditchWitchSpriteDefinition from '@/game/art/ditchWitchSpriteDefinition';
 import { apparitionSprite, routerSprite } from '@/game/art/coneEnemySprites';
 const source='https://base44.app/api/apps/6aab67049cd04a621f2adf4f/files/mp/public/6aab67049cd04a621f2adf4f/';
 
@@ -140,7 +141,7 @@ export const characterSprite=id=>CHARACTER_SPRITES[id]||null;
 // Lag Sprite enemy — same definition/manifest/anchor convention as the character sprites,
 // plus an attack atlas. Pixel-inspected: front row is camera-facing (symmetric highlights);
 // side-row highlights sit right → the side row faces RIGHT, so left movement mirrors it.
-export const ENEMY_SPRITES=Object.freeze({attenuation:apparitionSprite,rous:routerSprite,crosstalk:crosstalkSpriteDefinition,jitter:jitterSpriteDefinition,lag:Object.freeze({
+export const ENEMY_SPRITES=Object.freeze({ditch:ditchWitchSpriteDefinition,attenuation:apparitionSprite,rous:routerSprite,crosstalk:crosstalkSpriteDefinition,jitter:jitterSpriteDefinition,lag:Object.freeze({
   atlas:'/assets/lagsprite/movement.png',attack:'/assets/lagsprite/attack.png',portrait:'/assets/lagsprite/portrait.png',
   manifest:'/assets/lagsprite/animation.json',
   sources:{atlas:source+'2492cec76_lagsprite-movement.png',attack:source+'1dfb1e925_lagsprite-attack.png',portrait:source+'645d0e291_lagsprite-portrait.png',manifest:source+'c1df7b69d_lagsprite-animation.json'},

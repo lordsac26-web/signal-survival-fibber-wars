@@ -1,6 +1,6 @@
 import { characterSprite, enemySpriteDef, structureSpriteDef } from '@/game/art/characterSprites';
 import { TOOL_ICON_ATLAS } from '@/game/art/toolAtlas';
-const cache=new Map();
+const cache=new Map(),resolvedCache=new Map();
 function image(url,width,height){return new Promise((resolve,reject)=>{
   const img=new globalThis.Image();
   img.onload=async()=>{try{await img.decode();if(img.naturalWidth!==width || img.naturalHeight!==height)throw new Error(`Unexpected image size: ${img.naturalWidth}×${img.naturalHeight}`);resolve(img)}catch(error){reject(error)}};
@@ -27,12 +27,14 @@ function preloadSprite(definition){
     for(const [key,url,width,height] of definition.extras || [])art[key]=await image(url,width,height);
     if(definition.attackW)art.attack=await image(definition.attack,definition.attackW,definition.attackH);
     if(definition.hurtTint)art.hurt=hurtAtlas(atlas,atlasW,atlasH,definition.hurtTint);
+    resolvedCache.set(definition,art);
     return art;
-  }).catch(error=>{cache.delete(definition);throw error});
+  }).catch(error=>{cache.delete(definition);resolvedCache.delete(definition);throw error});
   cache.set(definition,promise);return promise;
 }
 export const preloadCharacterSprite=id=>preloadSprite(characterSprite(id));
 export const preloadEnemySprite=kind=>preloadSprite(enemySpriteDef(kind));
+export const loadedEnemySprite=kind=>resolvedCache.get(enemySpriteDef(kind))||null;
 export const preloadStructureSprite=id=>preloadSprite(structureSpriteDef(id));
 // Shared tool/item icon atlas (store, inventory, HUD bar, Field Guide). One
 // image for every menu icon: this loads and size-validates it once so the
