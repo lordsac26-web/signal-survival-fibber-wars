@@ -12,6 +12,11 @@ import { loadedCharacterSprite, preloadCharacterSprite } from '@/game/art/sprite
 import { createPuddingAnimation, updatePuddingAnimation } from '@/game/art/puddingSpriteAnimation';
 import { createBendAnimation, updateBendAnimation } from '@/game/art/bendSpriteAnimation';
 import { createSquirrelAnimation, updateSquirrelAnimation } from '@/game/art/squirrelSpriteAnimation';
+import { createDitchState } from '@/game/combat/ditchWitch';
+import { createConeState, APPARITION, ROUTER_ATTACK } from '@/game/combat/coneAttack';
+import { createCritterState } from '@/game/combat/crosstalk';
+import { createJitterState } from '@/game/combat/jitter';
+import { createBendState } from '@/game/combat/macrobend';
 
 function ensurePeerSpriteState(peer, charId) {
   if (!peer.spriteState || peer.spriteCharId !== charId) {
@@ -48,14 +53,14 @@ function reconcilePoolById(pool, list, dt, configureItem) {
   const byId = new Map();
   for (let i = 0; i < incoming.length; i++) {
     const item = incoming[i];
-    if (item && item.id !== undefined) byId.set(item.id, item);
+    if (item && item.id !== undefined && Number.isFinite(item.x) && Number.isFinite(item.y) && !(item.hp !== undefined && item.hp <= 0)) byId.set(item.id, item);
   }
 
   const existingById = new Map();
   for (let i = 0; i < pool.items.length; i++) {
     const obj = pool.items[i];
     if (!obj.active) continue;
-    if (obj.netId !== undefined && byId.has(obj.netId)) {
+    if (obj.netId !== undefined && byId.has(obj.netId) && !existingById.has(obj.netId)) {
       existingById.set(obj.netId, obj);
     } else {
       pool.release(obj);
@@ -175,19 +180,19 @@ export function syncAuthoritativeCoopWorld(state) {
 
       if (src.kind === 'ditch' && arts.ditchArt) {
         e.art = arts.ditchArt;
-        e.ditch = { phase: 'chase', mode: 'charge', facing: 'left', timer: 0, animT: 0, vfxT: 0 };
+        e.ditch = createDitchState(() => .5);
       } else if (src.kind === 'attenuation' && arts.apparitionArt) {
         e.art = arts.apparitionArt;
-        e.caster = { phase: 'chase', facing: 'left', vx: 0, vy: 0, aim: 0, radius: 180, half: 0.45, timer: 0 };
+        e.caster = createConeState(APPARITION);
       } else if (src.kind === 'rous' && arts.routerArt) {
         e.art = arts.routerArt;
-        e.caster = { phase: 'chase', facing: 'left', vx: 0, vy: 0, aim: 0, radius: 220, half: 0.52, timer: 0 };
+        e.caster = createConeState(ROUTER_ATTACK);
       } else if (src.kind === 'crosstalk' && arts.critterArt) {
         e.art = arts.critterArt;
-        e.critter = { phase: 'chase', facing: 'left', timer: 0 };
+        e.critter = createCritterState();
       } else if (src.kind === 'jitter' && arts.jitterArt) {
         e.art = arts.jitterArt;
-        e.jit = { phase: 'chase', facing: 'left', timer: 0, melee: 0 };
+        e.jit = createJitterState(() => .5);
       } else if (src.kind === 'lag' && arts.lagArt) {
         e.art = arts.lagArt;
         e.anim = createLagAnimation();
@@ -204,39 +209,48 @@ export function syncAuthoritativeCoopWorld(state) {
       } else if (src.kind === 'bend' && arts.bendArt) {
         e.art = arts.bendArt;
         e.anim = createBendAnimation();
-        e.mac = { phase: 'chase', facing: 'left', timer: 0 };
+        e.mac = createBendState(() => .5);
       } else if (src.kind === 'squirrel' && arts.sqArt) {
         e.sq = { ...createSquirrelAnimation(), art: arts.sqArt, phase: src.phase || 1, pounceT: src.pounceT || 0 };
       }
     }
 
+    // Renderer clocks must advance independently of snapshot frequency. These
+    // are visual DTOs only: never run local combat state machines in co-op.
+    for (const visual of [e.ditch, e.caster, e.critter, e.jit, e.mac]) {
+      if (!visual) continue;
+      const snapshot = src.renderState || {};
+      visual.clock = Number.isFinite(snapshot.clock) ? snapshot.clock : (Number.isFinite(visual.clock) ? visual.clock : 0) + dt;
+      visual.remaining = Number.isFinite(snapshot.remaining) ? snapshot.remaining : Math.max(0, visual.remaining || 0);
+      visual.facing = snapshot.facing || src.facing || ((src.vx || 0) < 0 ? 'left' : 'right');
+    }
     if (e.ditch) {
-      e.ditch.phase = src.state || 'chase';
-      e.ditch.facing = src.facing || 'left';
+      e.ditch.phase = src.state || src.phase || 'chase';
+      e.ditch.facing = src.renderState?.facing || src.facing || ((src.vx || 0) < 0 ? 'left' : 'right');
       e.ditch.animT = (e.ditch.animT || 0) + dt;
     }
     if (e.caster) {
-      e.caster.phase = src.state || 'chase';
-      e.caster.facing = src.facing || 'left';
+      e.caster.phase = src.renderState?.phase || src.state || (typeof src.phase === 'string' ? src.phase : 'chase');
+      e.caster.facing = src.renderState?.facing || src.facing || ((src.vx || 0) < 0 ? 'left' : 'right');
       e.caster.vx = mvx;
       e.caster.vy = mvy;
       e.caster.x = e.x;
       e.caster.y = e.y;
     }
     if (e.critter) {
-      e.critter.phase = src.state || 'chase';
-      e.critter.facing = src.facing || 'left';
+      e.critter.phase = src.renderState?.phase || src.state || (typeof src.phase === 'string' ? src.phase : 'chase');
+      e.critter.facing = src.renderState?.facing || src.facing || ((src.vx || 0) < 0 ? 'left' : 'right');
     }
     if (e.jit) {
-      e.jit.phase = src.state || 'chase';
-      e.jit.facing = src.facing || 'left';
+      e.jit.phase = src.renderState?.phase || src.state || (typeof src.phase === 'string' ? src.phase : 'chase');
+      e.jit.facing = src.renderState?.facing || src.facing || ((src.vx || 0) < 0 ? 'left' : 'right');
     }
     if (e.mac) {
-      e.mac.phase = src.state || 'chase';
-      e.mac.facing = src.facing || 'left';
+      e.mac.phase = src.renderState?.phase || src.state || (typeof src.phase === 'string' ? src.phase : 'chase');
+      e.mac.facing = src.renderState?.facing || src.facing || ((src.vx || 0) < 0 ? 'left' : 'right');
     }
     if (e.pud) {
-      e.pud.phase = src.state || 'chase';
+      e.pud.phase = src.renderState?.phase || src.state || (typeof src.phase === 'string' ? src.phase : 'chase');
       if (e.anim) e.anim.telegraph = e.pud.phase === 'telegraph';
     }
     if (e.sq && arts.sqArt) {
