@@ -116,10 +116,10 @@ test('deployable instance caps: engineer 3 per item / 12 global, everyone else 2
   assert.equal(mount.fire, .225);
 });
 
-test('campaign fixture: the engineer average build fits his exact 4-slot budget with the shared gear passive', () => {
+test('campaign fixture: the engineer average build (tray + vfl + turret-mount item + gear) fits his exact 4-slot budget', () => {
   const build = AVERAGE_BUILDS.engineer.mover;
-  assert.deepEqual(build, ['tray', 'vfl', 'cleaver']);
-  assert.equal(engineerCapReason([...build.map(id => weapon(id)), { id: 'fixture-gear', mods: [] }]), '', 'the fixture must be acquirable or every intermission purchase refuses');
+  assert.deepEqual(build, ['tray', 'vfl']);
+  assert.equal(engineerCapReason([...build.map(id => weapon(id)), { deploy: true, structure: 'turretMount' }, { id: 'fixture-gear', mods: [] }]), '', 'the fixture must be acquirable or every intermission purchase refuses');
   for (const id of ['nomad', 'veteran', 'oracle', 'don', 'admin', 'clone', 'isr']) assert(AVERAGE_BUILDS[id].mover.length >= 4, `${id} fixture untouched`);
 });
 

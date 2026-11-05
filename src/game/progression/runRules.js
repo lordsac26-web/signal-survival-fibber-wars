@@ -56,6 +56,9 @@ export function normalizeWeapon(w, index = 0, rankCap = TUNING.overclockRankCap)
 export function rebuildStats(run) {
   let next = {...run,...run.character.stats,cleaningKillsHeal:0,bonusSignal:0,hitSpeedBoost:0,critKnockback:0,turretQuality:0,firstHitBlocked:0,spliceExplosion:0};
   for (const item of [...run.weapons,...run.items]) next = applyMods(next,item);
+  // statMods: upgrades applied outside the inventory (the Field Engineer's
+  // full-budget level-ups) — folded in on every rebuild like held items.
+  for (const item of run.statMods || []) next = applyMods(next,item);
   next.hp = Math.min(next.maxHp,Math.max(0,run.hp));
   next.dodge = Math.min(TUNING.dodgeCap,Math.max(0,next.dodge));
   next.crit = Math.min(TUNING.critCap,Math.max(0,next.crit));

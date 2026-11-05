@@ -1,6 +1,7 @@
 import { createGenerator } from '@/game/data/generation';
 import { acquireItem } from '@/game/items/acquisition';
 import { levelRerollCost } from '@/game/shop/economy';
+import { rebuildStats } from '@/game/progression/runRules';
 
 // Level-up choices are seeded per level; levelRerolls shifts the seed so a
 // reroll replaces ALL THREE options. At levelRerolls=0 the seed is unchanged
@@ -12,10 +13,20 @@ export function upgradeChoices(run) {
 export function pickUpgrade(run, itemId) {
   const item = upgradeChoices(run).find(i => i.id === itemId);
   if (!item || !(run.pendingLevels > 0)) throw new Error('Level-up choice has changed');
-  return acquireItem({...run, level: run.level + 1, pendingLevels: run.pendingLevels - 1, levelRerolls: 0}, {...item, levelUpgrade: true});
+  const next = {...run, level: run.level + 1, pendingLevels: run.pendingLevels - 1, levelRerolls: 0};
+  try {
+    return acquireItem(next, {...item, levelUpgrade: true});
+  } catch (error) {
+    // A full Field Engineer kit (4 total items) cannot hold another passive,
+    // so the upgrade applies as a bare stat mod instead of an inventory
+    // item: his levels never dead-end, they just take no item slot.
+    if (run.character?.id === 'engineer' && /exactly 4 items total/.test(error.message)) {
+      return rebuildStats({...next, statMods: [...(next.statMods || []), {id: item.id, mods: item.mods, special: item.special, specialPower: item.specialPower}]});
+    }
+    throw error;
+  }
 }
-// A full Field Engineer kit (4 total items) cannot hold another passive:
-// declining keeps the level and moves on instead of dead-ending the screen.
+// Declining keeps the level and moves on instead of dead-ending the screen.
 export function skipUpgrade(run) {
   if (!(run.pendingLevels > 0)) throw new Error('No level-up pending');
   return {...run, pendingLevels: run.pendingLevels - 1, levelRerolls: 0};
