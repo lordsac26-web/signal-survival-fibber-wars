@@ -112,11 +112,30 @@ admin:Object.freeze((()=>{
   d.extras.push(['death','/assets/admin/death.png',826,88]);
   d.manifestSpec['death.columns']=7;
   return Object.freeze({...d,specialActivationFrames:3,specialFps:2,specialDuration:4,deathColumns:7,deathCellW:118,deathCellH:88});
+})()),
+// Field Engineer — cut from the 1024x683 opaque-magenta source (near-magenta
+// keying, per-row component detection with thin inter-frame divider removal,
+// figure spines straddling grid dividers resolved by component grouping).
+// Strips: idle 8, walk-right 8, walk-left 8 (genuine art, not a mirror),
+// attack 7 right-facing red-beam poses (the source holds seven attack
+// figures though the label says six — all kept; the beam muzzle is measured
+// at the origin of the widest beam), special 8 (the cabinet opens, cables
+// splice outward), death 8 collapse poses (label says six). All frames are
+// bottom-aligned to one shared ground line per strip, 2px transparent bleed
+// between cells, 64px logical body size. Portrait = padded idle frame 0.
+engineer:Object.freeze((()=>{
+  const d=tech('engineer',67,93,
+    {atlasW:536,atlasH:83,cellW:67,cellH:83,frames:8},
+    {atlasW:544,atlasH:80,cellW:68,cellH:80,frames:8},
+    {atlasW:488,atlasH:78,cellW:61,cellH:78,frames:8},
+    {atlasW:896,atlasH:81,cellW:128,cellH:81,frames:7,muzzle:{x:89,y:36,cellW:128,cellH:81}},
+    {atlasW:968,atlasH:103,cellW:121,cellH:103,frames:8});
+  d.extras.push(['death','/assets/engineer/death.png',1032,82]);
+  d.manifestSpec['death.columns']=8;
+  return Object.freeze({...d,worldSize:64,specialFps:5/3,deathColumns:8,deathCellW:129,deathCellH:82});
 })())
 });
-// PLACEHOLDER body sheet: the Field Engineer reuses the 30 Year Veteran's
-// processed sheet until the owner supplies a real Field Engineer sheet.
-export const characterSprite=id=>id==='engineer'?CHARACTER_SPRITES.veteran:CHARACTER_SPRITES[id]||null;
+export const characterSprite=id=>CHARACTER_SPRITES[id]||null;
 
 // Lag Sprite enemy — same definition/manifest/anchor convention as the character sprites,
 // plus an attack atlas. Pixel-inspected: front row is camera-facing (symmetric highlights);

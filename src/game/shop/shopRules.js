@@ -10,7 +10,7 @@ import { itemBudgetUsed } from '@/game/progression/runRules';
 import { ownedMatch, withVisitDuplicate } from '@/game/shop/duplicateOffers';
 import { DEPLOYABLES } from '@/game/data/structures';
 import { TUNING } from '@/game/data/tuning';
-import { allowedWeapon, legalLoadout, rebuildStats } from '@/game/progression/runRules';
+import { allowedWeapon, legalLoadout, rebuildStats, engineerCategory, engineerCounts, engineerWeaponCapBlocked, ENGINEER_CAPS } from '@/game/progression/runRules';
 // Clone keeps Rare-only fresh rolls and Rare premium tune-ups (cap 3).
 // The shared combine ladder can still promote owned items above Rare.
 export const cloneOverclockCap=run=>run.character.id==='clone'?TUNING.cloneOverclockCap:TUNING.overclockRankCap;
@@ -49,25 +49,50 @@ function freshOffer(run,sequence){
 }
 // Only the per-visit slot below can sell an exact owned-tier duplicate.
 // Rerolls do not manufacture another duplicate opportunity in that visit.
+// The Field Engineer is never OFFERED an option he cannot legally acquire.
 function freshNonDuplicate(run,shop){
-  for(let attempt=0;attempt<200;attempt++){const item=freshOffer(run,++shop.sequence);if(!ownedMatch(run,item))return item}
+  for(let attempt=0;attempt<200;attempt++){const item=freshOffer(run,++shop.sequence);if(!ownedMatch(run,item)&&!engineerOfferIllegal(run,item))return item}
   return null;
+}
+// Never-offer-illegal rule (Field Engineer): a combine target always upgrades
+// in place; a weapon is offerable when a fresh add fits the caps OR an owned
+// same-category tool can legally be replaced; passives and deployable items
+// have no swap mechanism, so they need real headroom.
+function engineerOfferIllegal(run,item){
+  if(run.character.id!=='engineer'||!item||item.premium)return false;
+  if(hasCombineTarget(run,item))return false;
+  const cat=engineerCategory(item),counts=engineerCounts([...run.weapons,...run.items,...(run.deployables||[])]);
+  const cap=cat==='deployable'?4:cat==='melee'?2:cat==='ranged'?1:4;
+  if(item.baseId){
+    const fresh=counts.total<ENGINEER_CAPS.total&&counts[cat]<cap;
+    const swap=run.weapons.some(w=>engineerCategory(w)===cat);
+    return !(fresh||swap);
+  }
+  return !(counts.total<ENGINEER_CAPS.total&&counts[cat]<cap);
 }
 export function enterShop(run){
   if(run.shop?.wave===run.wave)return run;
   const old=run.shop?.offers || [],locked=run.lockedIds || [],state={sequence:run.shop?.sequence || 0};
-  const fresh=Array.from({length:TUNING.shopSlots},(_,index)=>{const item=old[index];return item && locked.includes(item.id) && !(item.pattern==='turret'&&ownedTurretCount(run)&&!hasCombineTarget(run,item))?item:freshNonDuplicate(run,state)});
+  const fresh=Array.from({length:TUNING.shopSlots},(_,index)=>{const item=old[index];return item && locked.includes(item.id) && !(item.pattern==='turret'&&ownedTurretCount(run)&&!hasCombineTarget(run,item)) && !engineerOfferIllegal(run,item)?item:freshNonDuplicate(run,state)});
   const {offers,sequence,duplicateOffered}=withVisitDuplicate(run,fresh,state.sequence,seeded((run.seed+run.wave*3571+851)>>>0));
   return {...run,shop:{wave:run.wave,offers,sequence,rerolls:0,duplicateOffered},lockedIds:locked.filter(id=>offers.some(o=>o?.id===id))};
 }
-export function swapTargets(run,item){return run.weapons.filter(old=>legalLoadout(run.character,run.weapons.map(w=>w.id===old.id?item:w)))}
+export function swapTargets(run,item){const cat=run.character.id==='engineer'?engineerCategory(item):null;return run.weapons.filter(old=>(cat?engineerCategory(old)===cat:true)&&legalLoadout(run.character,run.weapons.map(w=>w.id===old.id?item:w)))}
 export function offerReason(run,item){
   if(!item)return 'Offer already purchased.';
   if(item.baseId && !allowedWeapon(run.character,item))return `${run.character.restriction}-only technician.`;
   if(!item.premium && tierId(item.rarity)==='overclocked')return 'Overclocked items are combine-only, never sold.';
   if(item.baseId && item.pattern==='turret' && run.character.id!=='engineer' && ownedTurretCount(run) && !hasCombineTarget(run,item))return 'Only one deployable turret tool per technician — combine a matching tier or upgrade the one you own.';
-  if(run.character.id==='engineer' && item.baseId && item.pattern==='turret' && run.weapons.filter(w=>w.pattern==='turret').length>=4 && !hasCombineTarget(run,item))return 'Field Engineer fields at most 4 deployable tools.';
-  if(run.character.id==='engineer' && !item.premium && !item.baseId && itemBudgetUsed(run)>=4 && !hasCombineTarget(run,item))return 'Field Engineer carries exactly 4 items total — sell or combine first.';
+  // FIELD ENGINEER CAPS: a capped category shows its exact reason unless a
+  // legal same-category replacement exists (the purchase then routes through
+  // the replacement picker); passives at a full budget never have a swap.
+  if(run.character.id==='engineer' && !item.premium && !hasCombineTarget(run,item)){
+    if(item.baseId){
+      const cat=engineerCategory(item),cap=cat==='deployable'?4:cat==='melee'?2:1;
+      const counts=engineerCounts([...run.weapons,...run.items,...(run.deployables||[])]);
+      if(counts[cat]>=cap && !run.weapons.some(w=>engineerCategory(w)===cat))return `${cat[0].toUpperCase()+cat.slice(1)} cap: ${cap} of ${cap} — sell or combine first`;
+    } else if(itemBudgetUsed(run)>=4)return 'Field Engineer carries exactly 4 items total — sell or combine first.';
+  }
   if(item.deploy && item.structure===run.character.signatureStructure)return 'Signature duplicate.';
   if(item.premium && !premiumTargets(run).length)return run.character.id==='clone'?'Requires an owned Rare tool below its overclock cap.':'Requires an eligible Epic or Legendary tool.';
   if(run.signal<item.cost)return `Need ${Math.ceil(item.cost-run.signal)} more spendable Signal.`;

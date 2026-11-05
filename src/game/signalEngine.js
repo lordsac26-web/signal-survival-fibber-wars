@@ -33,6 +33,7 @@ import { drawISR, isrMuzzlePoint } from '@/game/art/drawISR';
 import { MACRO, createBendState, stepBend, bendVelocity } from '@/game/combat/macrobend';
 import { createBendAnimation, updateBendAnimation, drawBendSprite, drawBendRing } from '@/game/art/bendSpriteAnimation';
 import { MEETING, meetingTableSpot } from '@/game/combat/meetingInvite';
+import { SURGE, surgeTotal, surgePulseTimes, surgePulseDamage } from '@/game/combat/fiberSplice';
 import { createCritterState, stepCritter, critterVelocity, critterContactReady, clampCritterLunge } from '@/game/combat/crosstalk';
 import drawCrosstalk from '@/game/art/crosstalkSpriteAnimation';
 import { APPARITION, ROUTER_ATTACK, createConeState, stepCone, consumeConeHit, casterVelocity, cancelHiddenCharge } from '@/game/combat/coneAttack';
@@ -81,6 +82,9 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  // active, exploding exactly once at expiry. dying > 0 holds the Admin's
  // death strip for DEATH_HOLD seconds before the unchanged game-over flow.
  const meeting={active:false,x:0,y:0};const DEATH_HOLD=1.1;
+ // FIBER SPLICE SURGE (Field Engineer): the cabinet plants at his feet and
+ // 4 pulses fire off the special timer; ring visuals expand per pulse.
+ const surge={active:false,x:0,y:0,pulse:0,id:0,rings:[]};
  const areaFx={life:0,x:0,y:0,reach:0,angle:0,half:Math.PI,color:'#fff',limit:Infinity,originX:0,originY:0};
  const enemies=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,r:10,lastShot:-1}));
  const shots=new ObjectPool(320,i=>({poolIndex:i,active:false,x:0,y:0,prevX:0,prevY:0,originX:0,originY:0,maxReach:0,remaining:0,traveled:0,vx:0,vy:0,r:5,life:0,id:0,pen:0,mortar:false,pattern:'projectile',boom:false}));
@@ -88,8 +92,8 @@ export function createSignalEngine(canvas,run,input,cb,paused={current:false},ch
  const pickups=new ObjectPool(650,i=>({poolIndex:i,active:false,x:0,y:0,value:1}));
  const numbers=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,life:0,value:0,crit:false}));
  const foeShots=new ObjectPool(64,i=>({poolIndex:i,active:false,x:0,y:0,prevX:0,prevY:0,vx:0,vy:0,r:6,remaining:0,traveled:0,life:0,damage:0,color:'#a16207',pattern:'foe',ring:false}));
- const turrets=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,inv:0,r:13,wid:null,mode:'pellet',color:'#f59e0b',life:0,maxLife:1,fireCd:0,fire:.5,damage:10,range:300,born:0,lookA:0,weapon:null}));
- const structures=new ObjectPool(24,i=>({poolIndex:i,active:false,type:null,x:0,y:0,life:0,maxLife:1,r:20,born:0,uses:0,rearm:0,power:1,fireCd:0,lookA:0}));
+ const turrets=new ObjectPool(48,i=>({poolIndex:i,active:false,x:0,y:0,hp:0,maxHp:0,haste:0,inv:0,r:13,wid:null,mode:'pellet',color:'#f59e0b',life:0,maxLife:1,fireCd:0,fire:.5,damage:10,range:300,born:0,lookA:0,weapon:null}));
+ const structures=new ObjectPool(24,i=>({poolIndex:i,active:false,type:null,x:0,y:0,life:0,maxLife:1,r:20,born:0,uses:0,rearm:0,power:1,fireCd:0,haste:0,lookA:0}));
  // Puddle hazards are their own bounded pool — never counted against the
  // enemy cap, cleaned up with the engine instance on reset/wave end.
  const puddles=new ObjectPool(16,i=>({poolIndex:i,active:false,x:0,y:0,born:0,life:PUDDING.puddleLife,maxLife:PUDDING.puddleLife,mirror:false}));
@@ -231,7 +235,7 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
   const tStats=turretStats(run,w,cfg);
   t.fire=tStats.fire;t.fireCd=tStats.fire*.4;
   t.damage=tStats.damage;
-  t.weapon=w;t.range=w.range;t.hp=20+(run.engineering||0)*2;t.lookA=a+Math.PI;
+  t.weapon=w;t.range=w.range;t.hp=t.maxHp=20+(run.engineering||0)*2;t.haste=0;t.lookA=a+Math.PI;
   t.weaponTurret=true; // drawn with the splice-pedestal pack (see draw loop)
   sfx('deploy');particle(t.x,t.y,'#d6d3d1',lowFx?2:8)}
  function turretContact(e){const t=queryStruct;if(!e.active||t.inv>0)return;if(Math.hypot(e.x-t.x,e.y-t.y)<t.r+e.r+4){t.hp-=e.damage*.5;t.inv=.5}}
@@ -244,8 +248,9 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
  // barrel tip; signature sentries and the placeholder helper from a sensible
  // body-forward point instead of the feet.
  function turretMuzzle(t){if(t.mode==='helper')return characterArt&&characterArt.definition&&characterArt.definition.crewInd?crewMuzzle(characterArt.definition.crewInd,t):[t.x+Math.cos(t.lookA||0)*8,t.y-12];if(!(pedArt&&t.weaponTurret))return [t.x+Math.cos(t.lookA||0)*10,t.y-12];return pedestalMuzzlePoint(pedArt.definition,t.x,t.y,t.lookA)}
+ const hasteMul=t=>(t.haste||0)>0?1+SURGE.haste:1; // Fiber Splice Surge: +30% fire clock while the repair haste runs
  function turretsUpdate(dt){for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;
-  t.born+=dt;t.inv=Math.max(0,t.inv-dt);t.fireCd-=dt;t.life-=dt;
+  t.born+=dt;t.inv=Math.max(0,t.inv-dt);t.haste=Math.max(0,(t.haste||0)-dt);t.fireCd-=dt*hasteMul(t);t.life-=dt;
   if(t.mode==='helper'){const a=t.helperIndex*Math.PI/2;t.x+=(p.x+Math.cos(a)*38-t.x)*Math.min(1,dt*4);t.y+=(p.y+Math.sin(a)*38-t.y)*Math.min(1,dt*4)}
   if(t.life<=0||t.hp<=0){particle(t.x,t.y,'#94a3b8',lowFx?2:5);turrets.release(t);continue} // quiet despawn — no shake spam
   if(t.inv<=0){queryStruct=t;grid.visit(t.x,t.y,t.r+40,turretContact)} // impairments dent the sentry on contact
@@ -265,7 +270,8 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
    activeStructs.push(s)}
   structCount=activeStructs.length;pedestalBuff=0;
   for(let i=0;i<activeStructs.length;i++){const s=activeStructs[i],def=s.stats||STRUCTURES[s.type];if(!def)continue;
-   if(def.kind==='turret'){s.fireCd-=dt;if(s.fireCd<=0){const reach=effectiveRange(def,run,viewport,'turret'),target=nearestAt(s.x,s.y,reach);if(target){let ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;const [mx,my]=truckArt&&truckDef&&s.type===truckDef.structureType?truckMuzzlePoint(truckDef,s.x,s.y,ang):pedArt?pedestalMuzzlePoint(pedArt.definition,s.x,s.y,ang):[s.x,s.y-14];ang=Math.atan2(target.y-my,target.x-mx);const stStats=structureTurretStats(run,def,s.power);launch({damage:stStats.damage,range:def.range,pattern:'projectile',color:def.color},ang,mx,my,reach);sfx('snip');s.fireCd=stStats.fire}else s.fireCd=.15}}
+    s.haste=Math.max(0,(s.haste||0)-dt);
+    if(def.kind==='turret'){s.fireCd-=dt*hasteMul(s);if(s.fireCd<=0){const reach=effectiveRange(def,run,viewport,'turret'),target=nearestAt(s.x,s.y,reach);if(target){let ang=Math.atan2(target.y-s.y,target.x-s.x);s.lookA=ang;const [mx,my]=truckArt&&truckDef&&s.type===truckDef.structureType?truckMuzzlePoint(truckDef,s.x,s.y,ang):pedArt?pedestalMuzzlePoint(pedArt.definition,s.x,s.y,ang):[s.x,s.y-14];ang=Math.atan2(target.y-my,target.x-mx);const stStats=structureTurretStats(run,def,s.power);launch({damage:stStats.damage,range:def.range,pattern:'projectile',color:def.color},ang,mx,my,reach);sfx('snip');s.fireCd=stStats.fire}else s.fireCd=.15}}
    else if(def.kind==='buff'&&Math.hypot(p.x-s.x,p.y-s.y)<s.r)pedestalBuff=Math.max(pedestalBuff,def.buff+.05*(s.power-1))}}
  // Q-key placement: structure appears AT the player, respecting per-type
  // cooldown and the total permit cap (6 + Engineering/10).
@@ -290,7 +296,7 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
  function novaSparks(x,y){const count=lowFx?4:8;for(let i=0;i<count;i++){const q=particles.acquire();if(!q)break;const a=i*Math.PI*2/count;Object.assign(q,{x:x+Math.cos(a)*JITTER.radius*.9,y:y+Math.sin(a)*JITTER.radius*.9,vx:0,vy:0,life:.2,color:'#67e8f9'})}}
  function spawnPuddle(x,y){const d=puddles.acquire();if(!d)return;d.x=x;d.y=y;d.born=0;d.life=d.maxLife=PUDDING.puddleLife;d.mirror=((Math.round(x*.13)+Math.round(y*.07))&1)===1;cb.event?.({type:'puddleDrop',time:duration-time,index:d.poolIndex,x,y,life:d.life});sfx('packet')}
  function signatureTurret(cfg){const t=turrets.acquire();if(!t)return false;const a=cfg.index*Math.PI/2,helper=cfg.mode==='helper';
-  Object.assign(t,{x:p.x+(helper?Math.cos(a)*22:0),y:p.y+(helper?Math.sin(a)*22:0),wid:`signature-${run.character.id}`,mode:cfg.mode,helperIndex:cfg.index,color:cfg.color,born:0,inv:0,r:13,life:cfg.life,maxLife:cfg.life,fire:cfg.fire,fireCd:.15,damage:cfg.damage*(1+(run.engineering||0)*.01)*(1+(run.turretQuality||0)*.004),range:cfg.range,weapon:{range:cfg.range,pattern:'turret'},hp:cfg.mode==='helper'?crewHelperHp(run.wave,run.engineering):35+(run.engineering||0),lookA:0});return true}
+  Object.assign(t,{x:p.x+(helper?Math.cos(a)*22:0),y:p.y+(helper?Math.sin(a)*22:0),wid:`signature-${run.character.id}`,mode:cfg.mode,helperIndex:cfg.index,color:cfg.color,born:0,inv:0,r:13,life:cfg.life,maxLife:cfg.life,fire:cfg.fire,fireCd:.15,damage:cfg.damage*(1+(run.engineering||0)*.01)*(1+(run.turretQuality||0)*.004),range:cfg.range,weapon:{range:cfg.range,pattern:'turret'},hp:cfg.mode==='helper'?crewHelperHp(run.wave,run.engineering):35+(run.engineering||0),maxHp:cfg.mode==='helper'?crewHelperHp(run.wave,run.engineering):35+(run.engineering||0),haste:0,lookA:0});return true}
  function spawnMeetingTable(){if(meeting.active)return false;
   const spot=meetingTableSpot(p.x,p.y,camX,camY,viewW,viewH,W,H);
   meeting.active=true;meeting.x=Math.round(spot.x);meeting.y=Math.round(spot.y);
@@ -306,7 +312,24 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
   if(burstCount){queryDamage=total/burstCount;grid.visit(meeting.x,meeting.y,MEETING.blastRadius,meetingDamageVisitor)}
   queryColor='#fbbf24';showArea();particle(meeting.x,meeting.y,'#fbbf24',lowFx?8:24);addShake(8);sfx('burst');
   cb.event?.({type:'meetingExplode',time:duration-time,x:meeting.x,y:meeting.y,radius:MEETING.blastRadius,total,share:burstCount?total/burstCount:0,targets:burstCount})}
- function activateSpecial(){if(specialCooldown>0||p.hp<=0||over||meeting.active||(charId==='isr'&&specialTimer>0))return;  const timer=activateSignature(run,p,{table:spawnMeetingTable,launch,area:(r,d,color)=>explode(p.x,p.y,d,color,effectiveRange(signatureWeapon,run,viewport)),heal:amount=>{const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+amount);healed+=p.hp-before},turret:signatureTurret});if(timer===null){cb.flash('NO PERMIT SPACE — TRY AGAIN');return}specialTimer=timer;if(charId==='isr'&&spriteState){spriteState.special=timer;spriteState.heal=0;cb.event?.({type:'outageStart',time:duration-time,duration:timer,cooldown:run.character.special.cooldown})}if(spriteState&&run.character.special.id==='clause'){spriteState.special=timer;clauseFired=false}specialCooldown=run.character.special.cooldown;sfx(run.character.special.id==='cash'?'cash':run.character.special.id==='outage'?'whistle':run.character.special.id==='clause'?'charge':run.character.special.id==='sprint'?'chug':'special');cb.flash(run.character.special.name.toUpperCase());addShake(5);particle(p.x,p.y,'#ffffff',lowFx?6:16);if(run.character.special.id==='cash'){for(let i=0;i<8;i++){let q=particles.acquire();if(q){q.x=p.x+(Math.random()-.5)*20;q.y=p.y+(Math.random()-.5)*20;q.vx=(Math.random()-.5)*200;q.vy=-100-Math.random()*100;q.life=.5;q.color='#22c55e'}}}}
+  // FIBER SPLICE SURGE pulse: one grid pass over the ring radius; each enemy
+  // is tagged with the activation+pulse id so a single pulse can never hit the
+  // same impairment twice (and a new pulse always re-tags). The same pulse
+  // repairs every deployed unit (20% max HP) and grants +30% attack speed.
+  function fireSurgePulse(k){
+  const damage=surgePulseDamage(run,run.wave),tag=surge.id*10+k;let hits=0;
+  queryX=surge.x;queryY=surge.y;queryR=SURGE.ringRadius;queryArcAngle=0;queryArcHalf=Math.PI;
+  grid.visit(surge.x,surge.y,SURGE.ringRadius,e=>{
+   if(!e.active||e.surgeHit===tag||!areaCanHit(e,surge.x,surge.y,SURGE.ringRadius,0,Math.PI))return;
+   e.surgeHit=tag;hits++;hit(e,damage,'#7fe6f9',true);particle(e.x,e.y,'#ffffff',lowFx?2:4)});
+  surge.rings.push({x:surge.x,y:surge.y,t:0});
+  for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;
+   t.hp=Math.min(t.maxHp||t.hp,t.hp+(t.maxHp||t.hp)*SURGE.repairPct);t.haste=SURGE.hasteDuration}
+  for(let i=0;i<structures.items.length;i++){const s=structures.items[i];if(!s.active)continue;
+   const def=s.stats||STRUCTURES[s.type];if(def?.kind==='turret')s.haste=SURGE.hasteDuration}
+  addShake(3);sfx('burst');
+  cb.event?.({type:'surgePulse',time:duration-time,pulse:k,x:surge.x,y:surge.y,radius:SURGE.ringRadius,damage,hits})}
+  function activateSpecial(){if(specialCooldown>0||p.hp<=0||over||meeting.active||(charId==='isr'&&specialTimer>0))return;  const timer=activateSignature(run,p,{table:spawnMeetingTable,launch,area:(r,d,color)=>explode(p.x,p.y,d,color,effectiveRange(signatureWeapon,run,viewport)),heal:amount=>{const before=p.hp;p.hp=Math.min(p.maxHp,p.hp+amount);healed+=p.hp-before},turret:signatureTurret});if(timer===null){cb.flash('NO PERMIT SPACE — TRY AGAIN');return}specialTimer=timer;if(charId==='isr'&&spriteState){spriteState.special=timer;spriteState.heal=0;cb.event?.({type:'outageStart',time:duration-time,duration:timer,cooldown:run.character.special.cooldown})}if(spriteState&&run.character.special.id==='clause'){spriteState.special=timer;clauseFired=false}specialCooldown=run.character.special.cooldown;sfx(run.character.special.id==='cash'?'cash':run.character.special.id==='outage'?'whistle':run.character.special.id==='clause'?'charge':run.character.special.id==='surge'?'deploy':run.character.special.id==='sprint'?'chug':'special');cb.flash(run.character.special.name.toUpperCase());addShake(5);particle(p.x,p.y,'#ffffff',lowFx?6:16);if(run.character.special.id==='cash'){for(let i=0;i<8;i++){let q=particles.acquire();if(q){q.x=p.x+(Math.random()-.5)*20;q.y=p.y+(Math.random()-.5)*20;q.vx=(Math.random()-.5)*200;q.vy=-100-Math.random()*100;q.life=.5;q.color='#22c55e'}}}}
  function separateVisitor(other){const e=queryShot;if(!other.active||other===e)return;let dx=e.x-other.x,dy=e.y-other.y,d2=dx*dx+dy*dy,min=e.r+other.r;if(d2>0&&d2<min*min){const push=(min-Math.sqrt(d2))*.025;e.x+=dx*push;e.y+=dy*push}}
  // Single completion funnel (wave clear or player defeat): harvest, the
  // solo checkpoint payload, and the meeting/lure cleanup all run exactly
@@ -322,7 +345,21 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
  const total=run.weapons.reduce((s,w)=>s+(weaponOf(w).damage||0),0)*30;burstCount=0;queryX=p.x;queryY=p.y;queryR=CLAUSE_RADIUS;queryArcAngle=0;queryArcHalf=Math.PI;grid.visit(p.x,p.y,CLAUSE_RADIUS,clauseCountVisitor);if(burstCount){queryDamage=total/burstCount;grid.visit(p.x,p.y,CLAUSE_RADIUS,clauseDamageVisitor)}queryColor='#fbbf24';showArea();addShake(15);sfx('burst');particle(p.x,p.y,'#fbbf24',lowFx?10:30)}}if(specialTimer<=0)clauseFired=false;
   // MEETING INVITE: exactly 4s after activation the table explodes once,
   // then aggro returns to the player immediately (no permanent retargeting).
-  if(meeting.active&&specialTimer<=1e-6){meeting.active=false;explodeMeeting()}for(const k in deployCds)if(deployCds[k]>0)deployCds[k]=Math.max(0,deployCds[k]-dt);p.regen+=dt*run.regen;if(p.regen>=1){const h=p.regen|0,before=p.hp;p.hp=Math.min(p.maxHp,p.hp+h);healed+=p.hp-before;p.regen-=h} // PACKET-LOSS PUDDING hazards: expire on a game-time clock (frozen while
+  if(meeting.active&&specialTimer<=1e-6){meeting.active=false;explodeMeeting()}
+  // FIBER SPLICE SURGE: arm the planted cabinet (fixed at activation), fire
+  // pulses on the schedule, then clear state when the timer ends. Pause
+  // freezes everything because this whole block runs off specialTimer.
+  if(specialTimer>0&&run.character.special.id==='surge'){
+   const elapsed=surgeTotal()-specialTimer;
+   if(!surge.active){surge.active=true;surge.id++;surge.pulse=0;surge.x=clamp(p.x,30,W-30);surge.y=clamp(p.y,30,H-30);surge.rings.length=0;
+    cb.event?.({type:'surgeStart',time:duration-time,x:surge.x,y:surge.y,radius:SURGE.ringRadius,arming:SURGE.arming,duration:surgeTotal()});
+    sfx('deploy');particle(surge.x,surge.y,'#7fe6f9',lowFx?4:10)}
+   const times=surgePulseTimes();
+   while(surge.pulse<SURGE.pulses&&elapsed>=times[surge.pulse]-1e-9){fireSurgePulse(surge.pulse);surge.pulse++}
+  }
+  if(specialTimer<=0&&surge.active){surge.active=false;surge.rings.length=0}
+  for(let i=surge.rings.length-1;i>=0;i--){const r=surge.rings[i];r.t+=dt;if(r.t>=SURGE.pulseWindow/SURGE.pulses)surge.rings.splice(i,1)}
+  for(const k in deployCds)if(deployCds[k]>0)deployCds[k]=Math.max(0,deployCds[k]-dt);p.regen+=dt*run.regen;if(p.regen>=1){const h=p.regen|0,before=p.hp;p.hp=Math.min(p.maxHp,p.hp+h);healed+=p.hp-before;p.regen-=h} // PACKET-LOSS PUDDING hazards: expire on a game-time clock (frozen while
  // paused), the strongest slow applies once while inside, and damage runs on
  // ONE shared 0.5s tick clock that overlapping puddles never reset or stack.
  puddleSlowMul=1;
@@ -425,12 +462,13 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
   if((p.hp<=0||time<=0)&&!over){over=true;if(charId==='isr')clearOutage();
   // DEATH SEQUENCE: on a player defeat the Admin plays his 6th-row collapse
   // strip briefly (any key skips it) before the unchanged game-over flow.
-  if(charId==='admin'&&characterArt&&characterArt.definition.deathColumns&&p.hp<=0){dying=DEATH_HOLD;sfx('death');cb.event?.({type:'deathSequence',time:duration-time})}
+  if(characterArt&&characterArt.definition.deathColumns&&p.hp<=0){dying=DEATH_HOLD;sfx('death');cb.event?.({type:'deathSequence',time:duration-time})}
   else{sfx(p.hp<=0?'death':'clear');complete(p.hp>0)}}
   hudClock-=dt;if(hudClock<=0){let boss=null;for(let i=0;i<enemies.items.length;i++){const b=enemies.items[i];if(b.active&&(b.sq||b.kind==='rous')){boss={name:b.kind==='rous'?ROUS.name:SQUIRREL.name,hp:Math.max(0,b.hp),max:b.max,phase:b.sq?.phase||1};break}}const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,earnedSignal,xp,xpTarget:signalForLevel(run.level+levels),level:run.level+levels,kills,boss,specialUnlocked:true,specialCooldown,specialName:run.character.special.name,characterId:charId,specialRemaining:(charId==='isr'||charId==='admin')?specialTimer:0,fps:Math.round(fps),stress,...(cb.simulation?{position:{x:p.x,y:p.y}}:{}),viewport:{...viewport},weaponRanges:run.weapons.map(w=>effectiveRange(weaponOf(w),run,viewport)),signatureReach:signatureWeapon?effectiveRange(signatureWeapon,run,viewport):0,
    deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,deployStats(d)),selected:i===depIdx})),structures:structCount,cap:structCap(),blocked:placeBlocked}:null});hudClock=.1}
   // Opt-in automated-test observation only; GameArena supplies neither callback.
-  if(cb.inspect)cb.inspect({time:duration-time,player:{...p},slow:puddleSlowMul,specialTimer,specialCooldown,healed,kills,clauseFired,damageDealt,camX,camY,meeting:meeting.active?{x:meeting.x,y:meeting.y,timer:specialTimer,radius:MEETING.blastRadius}:null,dying,...(charId==='isr'?{enemies:enemies.items.filter(e=>e.active).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,speed:e.speed,boss:e.boss,hp:e.hp,motion:e.outageMotion})),shots:shots.items.filter(s=>s.active).map(s=>({id:s.id,originX:s.originX,originY:s.originY,vx:s.vx,vy:s.vy})),sprite:{...spriteState}}:{}),puddles:puddles.items.filter(d=>d.active).map(d=>({...d})),puddings:enemies.items.filter(e=>e.active&&e.pud).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,cast:{...e.pud}})),
+  if(cb.inspect)cb.inspect({time:duration-time,player:{...p},slow:puddleSlowMul,specialTimer,specialCooldown,healed,kills,clauseFired,damageDealt,camX,camY,meeting:meeting.active?{x:meeting.x,y:meeting.y,timer:specialTimer,radius:MEETING.blastRadius}:null,dying,
+   ...(run.character.special.id==='surge'?{surge:{active:surge.active,x:surge.x,y:surge.y,pulse:surge.pulse,elapsed:surgeTotal()-specialTimer,rings:surge.rings.length},sentries:turrets.items.filter(t=>t.active).map(t=>({index:t.poolIndex,wid:t.wid,hp:t.hp,maxHp:t.maxHp,haste:t.haste})),posts:structures.items.filter(s=>s.active).map(s=>({type:s.type,haste:s.haste,life:s.life}))}:{}),...(charId==='isr'?{enemies:enemies.items.filter(e=>e.active).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,speed:e.speed,boss:e.boss,hp:e.hp,motion:e.outageMotion})),shots:shots.items.filter(s=>s.active).map(s=>({id:s.id,originX:s.originX,originY:s.originY,vx:s.vx,vy:s.vy})),sprite:{...spriteState}}:{}),puddles:puddles.items.filter(d=>d.active).map(d=>({...d})),puddings:enemies.items.filter(e=>e.active&&e.pud).map(e=>({index:e.poolIndex,x:e.x,y:e.y,hp:e.hp,cast:{...e.pud}})),
   petes:enemies.items.filter(e=>e.active&&(e.kind==='pete'||e.kind==='peteMini')).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,hp:e.hp,max:e.max,speed:e.speed,damage:e.damage,cloneT:e.cloneT})),
   casters:enemies.items.filter(e=>e.active&&e.caster).map(e=>({index:e.poolIndex,kind:e.kind,x:e.x,y:e.y,cast:{...e.caster}})),
   critters:enemies.items.filter(e=>e.active&&e.critter).map(e=>({index:e.poolIndex,x:e.x,y:e.y,cast:{...e.critter}})),
@@ -468,6 +506,16 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
    ctx.fillStyle='#8b5a2b';ctx.beginPath();ctx.arc(tx,ty,tr-5,0,7);ctx.fill();
    for(let k=0;k<6;k++){const a=k*Math.PI/3+Math.PI/6,cx2=tx+Math.cos(a)*(tr+13),cy2=ty+Math.sin(a)*(tr+13);ctx.fillStyle='#92400e';ctx.fillRect(Math.round(cx2-6),Math.round(cy2-10),12,14);ctx.fillStyle='#3f2410';ctx.fillRect(Math.round(cx2-4),Math.round(cy2-16),8,6)}
    drawHardHat(tx,ty-tr-4);drawEyes(tx,ty-tr*.25,Math.atan2(p.y-ty,p.x-tx))}
+   // FIBER SPLICE SURGE world object: arming telegraph, expanding pulse rings,
+   // then the splice cabinet itself (hard hat + googly eyes, structure convention).
+   if(surge.active){const sx2=Math.round(surge.x),sy2=Math.round(surge.y),elapsed=surgeTotal()-specialTimer;
+   if(elapsed<SURGE.arming){const pr=elapsed/SURGE.arming;ctx.save();ctx.globalAlpha=.2+pr*.25;ctx.strokeStyle='#7fe6f9';ctx.lineWidth=2;ctx.setLineDash([12,9]);ctx.beginPath();ctx.arc(sx2,sy2,SURGE.ringRadius*pr,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
+   for(const r of surge.rings){const pr=Math.min(1,r.t/(SURGE.pulseWindow/SURGE.pulses));ctx.save();ctx.globalAlpha=.55*(1-pr);ctx.strokeStyle='#7fe6f9';ctx.lineWidth=3;ctx.beginPath();ctx.arc(Math.round(r.x),Math.round(r.y),Math.max(2,SURGE.ringRadius*pr),0,7);ctx.stroke();ctx.restore()}
+   ctx.save();ctx.globalAlpha=.12;ctx.fillStyle='#7fe6f9';ctx.beginPath();ctx.arc(sx2,sy2,20,0,7);ctx.fill();ctx.restore();
+   ctx.fillStyle='#0f3d46';ctx.fillRect(sx2-16,sy2-26,32,26);
+   ctx.fillStyle='#155e6b';ctx.fillRect(sx2-13,sy2-23,26,20);
+   ctx.fillStyle='#7fe6f9';ctx.fillRect(sx2-3,sy2-14,6,10);
+   drawHardHat(sx2,sy2-30);drawEyes(sx2,sy2-18,Math.atan2(p.y-sy2,p.x-sx2));}
   // structures (under enemies): pop-in scale, fade out during the last 1.5s of life
   for(let i=0;i<structures.items.length;i++){const st=structures.items[i];if(!st.active)continue;const def=st.stats||STRUCTURES[st.type];if(!def)continue;const x=Math.round(st.x),y=Math.round(st.y),grow=Math.min(1,st.born*4);
    ctx.globalAlpha=(st.life<1.5?Math.max(.2,st.life/1.5):1)*(.4+.6*grow);

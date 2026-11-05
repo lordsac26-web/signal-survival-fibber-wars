@@ -1,6 +1,6 @@
 import { addToInventory, combineOwned } from '@/game/items/combining';
 import { canCombine } from '@/game/items/tiers';
-import { allowedWeapon, legalLoadout, normalizeWeapon, rebuildStats, itemBudgetUsed, itemBudgetCap } from '@/game/progression/runRules';
+import { allowedWeapon, legalLoadout, normalizeWeapon, rebuildStats, itemBudgetUsed, itemBudgetCap, engineerCapReason, engineerCategory } from '@/game/progression/runRules';
 export const hasCombineTarget = (run,item) => (run[item.baseId?'weapons':item.deploy?'deployables':'items'] || []).some(other=>canCombine(other,item));
 export function acquireItem(run,item,{replaceId}={}){
   if(item.premium)throw new Error('Premium cards must target an owned weapon');
@@ -18,6 +18,14 @@ export function acquireItem(run,item,{replaceId}={}){
   // One deployable turret tool per technician; the Field Engineer is the
   // deployables specialist and may field up to 4 (budget-capped) instead.
   if(item.baseId && item.pattern==='turret' && run.character.id!=='engineer' && !merging && run.weapons.some(w=>w.pattern==='turret'))throw new Error('Only one deployable turret tool per technician — combine a matching tier or upgrade the one you own.');
+  // FIELD ENGINEER CATEGORY CAPS: validate the whole kit after the add — the
+  // retired tool was already removed above, so a same-category replacement
+  // stays legal while anything else refuses with the exact cap. A merge never
+  // changes counts, so it is exempt.
+  if(run.character.id==='engineer' && !merging){
+    const reason=engineerCapReason([...(next.weapons||[]),...(next.items||[]),...(next.deployables||[]),item]);
+    if(reason)throw new Error(reason);
+  }
   next=addToInventory(next,item.baseId?normalizeWeapon(item):item);
   if(item.baseId && !legalLoadout(run.character,next.weapons))throw new Error('Choose a compatible tool to replace; slot or family cap reached');
   return rebuildStats(next);

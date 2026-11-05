@@ -15,6 +15,40 @@ export function legalLoadout(c, weapons) {
 // deployables (a module rides on its weapon).
 export const itemBudgetUsed = run => (run.weapons || []).length + (run.items || []).length + (run.deployables || []).length;
 export const itemBudgetCap = run => run.character?.id === 'engineer' ? 4 : Infinity;
+// FIELD ENGINEER LOADOUT CAPS (owner rule): 4 total item slots with
+// per-category caps inside them — at most 1 RANGED weapon, 2 MELEE weapons,
+// and 4 DEPLOYABLE items (turret tools + structure deployables count as one
+// category); passives count against the total only. Legal builds include
+// 4 deployables, 1 ranged + 3 deployables, 2 melee + 2 deployables, or
+// 1 ranged + 2 melee + 1 deployable.
+export const ENGINEER_CAPS = Object.freeze({ total: 4, ranged: 1, melee: 2, deployable: 4 });
+export const engineerCategory = item => !item ? null
+  : item.deploy || item.pattern === 'turret' ? 'deployable'
+  : item.baseId ? (['melee', 'chain', 'nova', 'orbiting'].includes(item.pattern) ? 'melee' : 'ranged')
+  : 'passive';
+export function engineerCounts(inventory) {
+  const c = { ranged: 0, melee: 0, deployable: 0, passive: 0, total: 0 };
+  for (const i of inventory || []) { const k = engineerCategory(i); if (k) { c[k]++; c.total++; } }
+  return c;
+}
+// First violated cap as a clear reason, exactly like the shop displays it.
+export function engineerCapReason(inventory) {
+  const c = engineerCounts(inventory);
+  if (c.ranged > ENGINEER_CAPS.ranged) return `Ranged cap: ${ENGINEER_CAPS.ranged} of ${ENGINEER_CAPS.ranged} — replace or combine first`;
+  if (c.melee > ENGINEER_CAPS.melee) return `Melee cap: ${ENGINEER_CAPS.melee} of ${ENGINEER_CAPS.melee} — replace or combine first`;
+  if (c.deployable > ENGINEER_CAPS.deployable) return `Deployable cap: ${ENGINEER_CAPS.deployable} of ${ENGINEER_CAPS.deployable} — replace or combine first`;
+  if (c.total > ENGINEER_CAPS.total) return `Slot cap: ${ENGINEER_CAPS.total} of ${ENGINEER_CAPS.total} — sell or combine first`;
+  return '';
+}
+// Does a plain (no-replacement) weapon add hit an engineer cap? The shop uses
+// this to route the purchase through the replacement picker instead of a
+// guaranteed refusal.
+export function engineerWeaponCapBlocked(run, item) {
+  if (run?.character?.id !== 'engineer' || !item?.baseId) return false;
+  const counts = engineerCounts([...(run.weapons || []), ...(run.items || []), ...(run.deployables || [])]);
+  const cat = engineerCategory(item), cap = cat === 'deployable' ? 4 : cat === 'melee' ? 2 : 1;
+  return counts[cat] >= cap || counts.total >= ENGINEER_CAPS.total;
+}
 export function normalizeWeapon(w, index = 0, rankCap = TUNING.overclockRankCap) {
   const obj = typeof w === 'string' ? {...WEAPONS[w],baseId:w} : {...w};
   return normalizeItem({...obj,id:obj.id || `legacy-tool-${index}-${obj.baseId}`,slotType:weaponSlot(obj),rarity:obj.rarity || 'common',mods:obj.mods || [],overclockRank:Math.min(rankCap,obj.overclockRank || 0)});

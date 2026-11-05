@@ -2,6 +2,7 @@
 import { KNOWLEDGE_DUMP } from '@/game/combat/knowledgeDump';
 import { OUTAGE } from '@/game/combat/outage';
 import { MEETING } from '@/game/combat/meetingInvite';
+import { surgeTotal } from '@/game/combat/fiberSplice';
 export function activateSignature(run,p,api){
   switch(run.character.special.id){
     case 'clause':return KNOWLEDGE_DUMP.total; // explicit 2.5s charge, middle-cell impact, separate 0.5s recovery
@@ -11,6 +12,7 @@ export function activateSignature(run,p,api){
     case 'sprint':api.heal(40);return 5; // chug + heal + 1.8× speed for 5s
     case 'cash':return 8;   // double Signal on every drop while the timer runs
     case 'outage':return OUTAGE.duration; // immediate global movement impairment + guarded owned-kill healing
+    case 'surge':return surgeTotal(); // engine plants the splice cabinet and fires the 4 pulses off this timer
     default:return null;
   }
 }
