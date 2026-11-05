@@ -11,6 +11,7 @@ export default function CoopStagingRoom({
   coop,
   profile,
   selectedCharId,
+  selectedAlt = false,
   onSelectCharacter,
   onLeave
 }) {
@@ -79,6 +80,15 @@ export default function CoopStagingRoom({
             </button>
           </div>
         </header>
+
+        {coop.error && (
+          <div
+            role="alert"
+            className="mt-4 rounded-2xl border border-amber-400/50 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-200"
+          >
+            {coop.error}
+          </div>
+        )}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-12">
           <section className="space-y-6 lg:col-span-8">
@@ -181,13 +191,11 @@ export default function CoopStagingRoom({
               <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
                 {CHARACTERS.map((c) => {
                   const locked = !unlockMet(profile, c);
+                  const altUnlocked = Boolean(c.altKit && unlockMet(profile, c.altKit));
                   const active = selectedCharId === c.id;
                   return (
-                    <button
+                    <div
                       key={c.id}
-                      type="button"
-                      disabled={locked}
-                      onClick={() => onSelectCharacter(c)}
                       className={`flex flex-col items-center rounded-2xl border p-3 text-center transition ${
                         active
                           ? 'border-2 border-game-warm bg-game-bg'
@@ -196,12 +204,28 @@ export default function CoopStagingRoom({
                           : 'border-white/15 bg-game-bg/70 hover:border-game-signal/60'
                       }`}
                     >
-                      <CharacterPortrait character={c} />
-                      <b className="mt-2 line-clamp-1 text-xs">{c.name}</b>
-                      <span className="mt-0.5 text-[11px] text-game-signal">
-                        {locked ? 'Locked' : c.special.name}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        disabled={locked}
+                        onClick={() => onSelectCharacter(c, active ? selectedAlt : false)}
+                        className="flex w-full flex-col items-center"
+                      >
+                        <CharacterPortrait character={c} />
+                        <b className="mt-2 line-clamp-1 text-xs">{c.name}</b>
+                        <span className="mt-0.5 text-[11px] text-game-signal">
+                          {locked ? 'Locked' : c.special.name}
+                        </span>
+                      </button>
+                      {!locked && altUnlocked && active && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectCharacter(c, !selectedAlt)}
+                          className="mt-2 rounded-lg border border-game-signal/40 bg-game-panel px-2 py-1 text-[10px] font-bold text-game-warm"
+                        >
+                          {selectedAlt ? 'Alt Kit Active' : 'Use Alt Kit'}
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>

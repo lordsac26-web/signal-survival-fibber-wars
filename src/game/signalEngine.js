@@ -47,7 +47,7 @@ import { createEncounterDirector, perimeterSpawn } from '@/game/combat/encounter
 import { CAMP_ATTACK, createCampState, updateCamp, campVelocity } from '@/game/combat/antiCamp';
 import drawCampCone from '@/game/art/drawCampCone';
 import { PIN,createPinState,stepPin,sidestepVelocity } from '@/game/combat/bossAntiPin';
-import { stepCoopPeers, drawCoopPeers } from '@/game/multiplayer/coopArenaSync';
+import { stepCoopPeers, drawCoopPeers, syncAuthoritativeCoopWorld } from '@/game/multiplayer/coopArenaSync';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
 const clamp=(n,a,b)=>n<a?a:n>b?b:n;
@@ -361,7 +361,35 @@ function kill(e){if(!e.active)return;if(e.ditch){stepDitch(e.ditch,0,{alive:fals
  // solo checkpoint payload, and the meeting/lure cleanup all run exactly
  // once — the death-sequence hold calls the same complete(false).
  function complete(won){if(deathDone)return;deathDone=true;meeting.active=false;const harvest=won?Math.round(run.harvesting||0):0;signal+=harvest;earnedSignal+=harvest;sfx(won?'clear':'death');cancelAnimationFrame(raf);cb.finish({...run,hp:Math.max(0,p.hp),signal,earnedSignal,kills,xp,pendingLevels:levels,specialProgress:0,specialUnlocked:true,specialCooldown,deployCds:{...deployCds},won,damageDealt:Math.round(damageDealt),healed:Math.round(healed),damageTaken:Math.round(damageTaken),killsByType,lastWaveMetrics:{duration:duration-Math.max(0,time),kills:kills-startKills,earnedSignal:earnedSignal-startEarned,xpEarned:+xpEarnedWave.toFixed(2),levelsGained:levels}})}
- function fixedUpdate(dt){const oldX=p.x,oldY=p.y;areaFx.life=Math.max(0,areaFx.life-dt);time-=dt;soundClock-=dt;hurtBoost=Math.max(0,hurtBoost-dt);p.inv=Math.max(0,p.inv-dt);specialCooldown=Math.max(0,specialCooldown-dt);specialTimer=Math.max(0,specialTimer-dt);if(charId==='isr'){if(specialTimer<1e-8)specialTimer=0;if(specialCooldown<1e-8)specialCooldown=0}if(specialTimer>0&&run.character.special.id==='clause'){const ce=KNOWLEDGE_DUMP.total-specialTimer;if(ce>=KNOWLEDGE_DUMP.charge-1e-8&&!clauseFired){clauseFired=true;cb.event?.({type:'knowledgeImpact',time:duration-time,remaining:specialTimer});// KNOWLEDGE DUMP: the old fixed-90
+ function fixedUpdate(dt){
+  const oldX=p.x,oldY=p.y;
+  if(run.coopAuthoritative&&run.coopWorldRef?.current){
+   areaFx.life=Math.max(0,areaFx.life-dt);soundClock-=dt;
+   let ix=input.current.x,iy=input.current.y;
+   if(ix||iy){const m=Math.hypot(ix,iy)||1,boost=specialTimer>0?(run.character.special.id==='sprint'?1.8:run.character.special.id==='clause'?.3:1):1;p.x+=ix/m*run.speed*boost*dt;p.y+=iy/m*run.speed*boost*dt}
+   p.x=clamp(p.x,p.r,W-p.r);p.y=clamp(p.y,p.r,H-p.r);
+   if(input.current.cycle){input.current.cycle=false;const list=run.deployables||[];if(list.length){const cur=Math.min(Math.max(0,input.current.deploySel||0),list.length-1);const nxt=(cur+1)%list.length;input.current.deploySel=nxt;cb.flash(`DEPLOY: ${list[nxt].name}`)}}
+   if(input.current.special){input.current.special=false;run.onCoopAction?.({action:'special'})}
+   if(input.current.deploy){input.current.deploy=false;const idx=Math.min(Math.max(0,(input.current.deploySel||0)),Math.max(0,(run.deployables||[]).length-1));run.onCoopAction?.({action:'deploy',deployIndex:idx})}
+   run.onCoopInput?.({x:ix,y:iy,viewportW:viewW,viewportH:viewH});
+   const synced=syncAuthoritativeCoopWorld({run,dt,p,enemies,shots,foeShots,turrets,structures,pickups,puddles,meeting,surge,arts:{ditchArt,apparitionArt,routerArt,critterArt,jitterArt,lagArt,blobArtDef,puddingArt,pudArtDef,petArt,bendArt,bendArtDef,sqArt},fxCallbacks:{damageNumber,particle,addShake,sfx,flash:cb.flash,showArea:(ax,ay,ar,ac)=>{queryX=ax;queryY=ay;queryR=ar;queryColor=ac;queryArcAngle=0;queryArcHalf=Math.PI;queryLimit=Infinity;showArea()}}});
+   if(synced?.world){
+    time=synced.world.time;
+    if(synced.me){
+     signal=synced.me.signal;earnedSignal=synced.me.earnedSignal||0;kills=synced.me.kills||0;xp=synced.me.xp||0;
+     levels=synced.me.pendingLevels||0;specialCooldown=synced.me.specialCooldown||0;specialTimer=synced.me.special||0;
+     damageDealt=synced.me.damageDealt||0;healed=synced.me.healed||0;damageTaken=synced.me.damageTaken||0;
+     if(synced.me.deployCds)Object.assign(deployCds,synced.me.deployCds);
+    }
+   }
+   if(spriteState){if(run.character.id==='oracle')updateSpriteAnimation(spriteState,p.x-oldX,p.y-oldY,dt,characterArt.definition);else{spriteState.special=specialTimer>0?specialTimer:0;if(charId==='isr')updateISRAnimation(spriteState,p.x-oldX,p.y-oldY,dt);else updateTechAnimation(spriteState,p.x-oldX,p.y-oldY,dt,characterArt.definition)}}
+   updateCamera();
+   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(!q.active)continue;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=.94;q.vy*=.94;q.life-=dt;if(q.life<=0)particles.release(q)}
+   for(let i=0;i<numbers.items.length;i++){const n=numbers.items[i];if(!n.active)continue;n.y-=25*dt;n.life-=dt;if(n.life<=0)numbers.release(n)}
+   hudClock-=dt;if(hudClock<=0){let boss=synced?.world?.boss||null;const depList=run.deployables||[],depIdx=depList.length?Math.min(Math.max(0,input.current.deploySel||0),depList.length-1):0;cb.hud({hp:p.hp,maxHp:p.maxHp,time:Math.max(0,time),signal,earnedSignal,xp,xpTarget:signalForLevel((synced?.me?.baseLevel||run.level)+levels),level:(synced?.me?.level||run.level+levels),kills,boss,specialUnlocked:true,specialCooldown,specialName:run.character.special.name,characterId:charId,specialRemaining:(charId==='isr'||charId==='admin')?specialTimer:0,fps:Math.round(fps),stress,position:{x:p.x,y:p.y},viewport:{...viewport},weaponRanges:run.weapons.map(w=>effectiveRange(weaponOf(w),run,viewport)),signatureReach:signatureWeapon?effectiveRange(signatureWeapon,run,viewport):0,deploy:depList.length?{items:depList.map((d,i)=>({icon:d.icon,name:d.name,stacks:d.stacks,cd:deployCds[d.structure]||0,cdMax:deployCdMax(d,deployStats(d)),selected:i===depIdx})),structures:structures.items.filter(s=>s.active).length,cap:structCap(),blocked:false}:null});hudClock=.1}
+   return;
+  }
+  areaFx.life=Math.max(0,areaFx.life-dt);time-=dt;soundClock-=dt;hurtBoost=Math.max(0,hurtBoost-dt);p.inv=Math.max(0,p.inv-dt);specialCooldown=Math.max(0,specialCooldown-dt);specialTimer=Math.max(0,specialTimer-dt);if(charId==='isr'){if(specialTimer<1e-8)specialTimer=0;if(specialCooldown<1e-8)specialCooldown=0}if(specialTimer>0&&run.character.special.id==='clause'){const ce=KNOWLEDGE_DUMP.total-specialTimer;if(ce>=KNOWLEDGE_DUMP.charge-1e-8&&!clauseFired){clauseFired=true;cb.event?.({type:'knowledgeImpact',time:duration-time,remaining:specialTimer});// KNOWLEDGE DUMP: the old fixed-90
 // instakill burst is gone. At release the total is 30x the Veteran's
 // combined current weapon damage, split EVENLY across every impairment
 // inside the burst radius; any boss takes half its split share. An empty

@@ -1,76 +1,197 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
-const CONN_STORAGE_KEY = 'signal_coop_conn_id';
+const ACTIVE_USER_KEY = 'signal_coop_active_user';
+const CONN_PREFIX = 'signal_coop_conn:';
+const TAB_PREFIX = 'signal_tab_';
 
-function getOrCreateConnId() {
-  try {
-    let id = sessionStorage.getItem(CONN_STORAGE_KEY);
-    if (!id) {
-      id = crypto.randomUUID();
-      sessionStorage.setItem(CONN_STORAGE_KEY, id);
-    }
-    return id;
-  } catch {
+function randomId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Resolves a tab-isolated, room-scoped, user-scoped connection id.
+ * - Duplicating a tab yields a fresh window.name (or clears mismatched tab token) so two tabs never share a connId.
+ * - Switching authenticated userId clears all stored connIds in sessionStorage.
+ * - Switching roomId uses a distinct storage key.
+ */
+export function resolveCoopConnId(
+  roomId,
+  userId = 'anon',
+  storage = typeof sessionStorage !== 'undefined' ? sessionStorage : null,
+  win = typeof window !== 'undefined' ? window : null
+) {
+  const cleanRoom = String(roomId || 'default').trim();
+  const cleanUser = String(userId || 'anon').trim();
+  if (!storage) return randomId();
+
+  try {
+    const prevUser = storage.getItem(ACTIVE_USER_KEY);
+    if (prevUser && prevUser !== cleanUser) {
+      const toRemove = [];
+      for (let i = 0; i < storage.length; i++) {
+        const k = storage.key(i);
+        if (k && k.startsWith(CONN_PREFIX)) toRemove.push(k);
+      }
+      for (const k of toRemove) storage.removeItem(k);
+    }
+    storage.setItem(ACTIVE_USER_KEY, cleanUser);
+
+    let tabId = 'tab';
+    if (win) {
+      if (typeof win.name === 'string' && win.name.startsWith(TAB_PREFIX)) {
+        tabId = win.name;
+      } else {
+        tabId = `${TAB_PREFIX}${randomId()}`;
+        try {
+          win.name = tabId;
+        } catch {
+          // ignore read-only window.name in restricted environments
+        }
+      }
+    }
+
+    const storageKey = `${CONN_PREFIX}${cleanRoom}:${cleanUser}:${tabId}`;
+    let connId = storage.getItem(storageKey);
+    if (!connId) {
+      connId = randomId();
+      storage.setItem(storageKey, connId);
+    }
+    return connId;
+  } catch {
+    return randomId();
   }
 }
 
-export default function useCoopRoom(roomId, initialConfig = null) {
+export default function useCoopRoom(roomId, initialConfig = null, userId = null) {
   const [status, setStatus] = useState(roomId ? 'connecting' : 'idle');
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [seat, setSeat] = useState(null);
   const [room, setRoom] = useState(null);
   const [users, setUsers] = useState([]);
   const [chat, setChat] = useState([]);
+  const [reconnectNonce, setReconnectNonce] = useState(0);
 
   const handleRef = useRef(null);
   const seatRef = useRef(null);
   const peersRef = useRef([]);
+  const worldRef = useRef(null);
   const combatEventsRef = useRef([]);
-  const initSentRef = useRef(false);
+  const initConfigRef = useRef(initialConfig);
+  const lastRevisionRef = useRef(0);
+
+  useEffect(() => {
+    initConfigRef.current = initialConfig;
+  }, [initialConfig]);
 
   useEffect(() => {
     if (!roomId) {
       setStatus('idle');
+      setError('');
+      setErrorCode('');
       setSeat(null);
       setRoom(null);
       setUsers([]);
       setChat([]);
+      seatRef.current = null;
       peersRef.current = [];
+      worldRef.current = null;
       combatEventsRef.current = [];
-      initSentRef.current = false;
+      lastRevisionRef.current = 0;
       return undefined;
     }
 
     setStatus('connecting');
     setError('');
-    const connId = getOrCreateConnId();
+    setErrorCode('');
+    lastRevisionRef.current = 0;
+
+    const connId = resolveCoopConnId(roomId, userId || 'anon');
     const actorHandle = base44.actors.CoopRoom(roomId).connect({ id: connId });
     handleRef.current = actorHandle;
+
+    const syncUsersAndPeers = (incomingUsers) => {
+      if (!Array.isArray(incomingUsers)) return;
+      setUsers(incomingUsers);
+      const prevMap = new Map(peersRef.current.map((p) => [p.seat, p]));
+      peersRef.current = incomingUsers.map((u) => {
+        const old = prevMap.get(u.seat);
+        return old ? { ...old, ...u } : { ...u };
+      });
+    };
+
+    const syncWorldPayload = (world) => {
+      if (!world || typeof world !== 'object') return;
+      worldRef.current = world;
+      if (Array.isArray(world.players)) {
+        const prevMap = new Map(peersRef.current.map((p) => [p.seat, p]));
+        peersRef.current = world.players.map((p) => {
+          const old = prevMap.get(p.seat);
+          return old ? { ...old, ...p } : { ...p };
+        });
+      }
+    };
 
     const sub = actorHandle.subscribe((msg) => {
       if (!msg || typeof msg !== 'object') return;
 
+      // Guard against cross-room stale frames
+      if (msg.roomId && msg.roomId !== roomId) return;
+      if (msg.room?.roomId && msg.room.roomId !== roomId) return;
+
+      if (msg.type === 'room_error') {
+        const code = msg.code || 'room_error';
+        setErrorCode(code);
+        setError(msg.message || 'Unable to join co-op shift room.');
+        if (code === 'room_full' || code === 'match_already_started') {
+          setStatus('rejected');
+        }
+        return;
+      }
+
+      const incomingRev = msg.revision ?? msg.room?.revision ?? 0;
+      if (incomingRev > 0 && incomingRev < lastRevisionRef.current && msg.type !== 'world_tick') {
+        return;
+      }
+      if (incomingRev > lastRevisionRef.current) {
+        lastRevisionRef.current = incomingRev;
+      }
+
       if (msg.type === 'welcome') {
         setStatus('connected');
+        setError('');
+        setErrorCode('');
         seatRef.current = msg.seat;
         setSeat(msg.seat);
-        setRoom(msg.room);
-        setUsers(msg.users || []);
+        if (msg.room) setRoom(msg.room);
+        syncUsersAndPeers(msg.users || []);
         setChat(msg.chat || []);
-        peersRef.current = (msg.users || []).map((u) => ({ ...u }));
+        if (msg.world) syncWorldPayload(msg.world);
 
-        if (!initSentRef.current && initialConfig) {
-          initSentRef.current = true;
+        const cfg = initConfigRef.current;
+        if (cfg?.isHostInit) {
+          cfg.isHostInit = false;
           actorHandle.send({
             type: 'init_room',
             roomId,
-            registryId: initialConfig.registryId || null,
-            title: initialConfig.title || 'Field Crew Shift',
-            arenaChoice: initialConfig.arenaChoice || 'random',
-            name: initialConfig.name || undefined,
-            characterId: initialConfig.characterId || 'oracle'
+            registryId: cfg.registryId || null,
+            title: cfg.title || 'Field Crew Shift',
+            arenaChoice: cfg.arenaChoice || 'random',
+            name: cfg.name || undefined,
+            characterId: cfg.characterId || 'oracle',
+            useAlt: Boolean(cfg.useAlt)
+          });
+        } else {
+          actorHandle.send({
+            type: 'join_room',
+            roomId,
+            name: cfg?.name || undefined,
+            characterId: cfg?.characterId || undefined,
+            useAlt: cfg?.useAlt
           });
         }
         return;
@@ -79,14 +200,16 @@ export default function useCoopRoom(roomId, initialConfig = null) {
       if (msg.type === 'presence' || msg.type === 'phase_change') {
         setStatus('connected');
         if (msg.room) setRoom(msg.room);
-        if (Array.isArray(msg.users)) {
-          setUsers(msg.users);
-          const prevMap = new Map(peersRef.current.map((p) => [p.seat, p]));
-          peersRef.current = msg.users.map((u) => {
-            const old = prevMap.get(u.seat);
-            return old ? { ...old, ...u } : { ...u };
-          });
+        if (Array.isArray(msg.users)) syncUsersAndPeers(msg.users);
+        if (msg.world !== undefined) {
+          if (msg.world) syncWorldPayload(msg.world);
+          else worldRef.current = null;
         }
+        return;
+      }
+
+      if (msg.type === 'world_tick' && msg.world) {
+        syncWorldPayload(msg.world);
         return;
       }
 
@@ -117,7 +240,7 @@ export default function useCoopRoom(roomId, initialConfig = null) {
       actorHandle.close();
       handleRef.current = null;
     };
-  }, [roomId]);
+  }, [roomId, userId, reconnectNonce]);
 
   const send = useCallback((payload) => {
     if (!handleRef.current) return;
@@ -154,8 +277,26 @@ export default function useCoopRoom(roomId, initialConfig = null) {
   }, [send]);
 
   const confirmKit = useCallback(
-    ({ weapons, hp, maxHp }) => {
-      send({ type: 'confirm_kit', weapons, hp, maxHp });
+    ({ pickedIds, weapons, hp, maxHp }) => {
+      send({ type: 'confirm_kit', pickedIds, weapons, hp, maxHp });
+    },
+    [send]
+  );
+
+  const sendCombatInput = useCallback(
+    (inputState) => {
+      send({ type: 'combat_input', ...inputState });
+    },
+    [send]
+  );
+
+  const sendCombatAction = useCallback(
+    (actionPayload) => {
+      send({
+        type: 'combat_action',
+        actionId: actionPayload?.actionId || randomId(),
+        ...actionPayload
+      });
     },
     [send]
   );
@@ -181,6 +322,13 @@ export default function useCoopRoom(roomId, initialConfig = null) {
     [send]
   );
 
+  const syncIntermission = useCallback(
+    (snapshot) => {
+      send({ type: 'sync_intermission', ...snapshot });
+    },
+    [send]
+  );
+
   const markIntermissionReady = useCallback(
     (payload) => {
       send({ type: 'intermission_ready', ...payload });
@@ -192,6 +340,10 @@ export default function useCoopRoom(roomId, initialConfig = null) {
     send({ type: 'return_lobby' });
   }, [send]);
 
+  const leaveRoom = useCallback(() => {
+    send({ type: 'leave_room' });
+  }, [send]);
+
   const sendChat = useCallback(
     (text) => {
       send({ type: 'chat', text });
@@ -199,13 +351,21 @@ export default function useCoopRoom(roomId, initialConfig = null) {
     [send]
   );
 
+  const retryConnection = useCallback(() => {
+    setError('');
+    setErrorCode('');
+    setReconnectNonce((n) => n + 1);
+  }, []);
+
   return {
     status,
     error,
+    errorCode,
     seat,
     room,
     users,
     chat,
+    worldRef,
     peersRef,
     combatEventsRef,
     isHost: Boolean(seat && room && seat === room.hostSeat),
@@ -214,11 +374,16 @@ export default function useCoopRoom(roomId, initialConfig = null) {
     toggleReady,
     startShift,
     confirmKit,
+    sendCombatInput,
+    sendCombatAction,
     sendTelemetry,
     sendCombatEvent,
     reportWaveResult,
+    syncIntermission,
     markIntermissionReady,
     returnToLobby,
-    sendChat
+    leaveRoom,
+    sendChat,
+    retryConnection
   };
 }
