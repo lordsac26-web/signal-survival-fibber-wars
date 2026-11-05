@@ -12,7 +12,7 @@ export const STAT_INFO = {
   damage: { label: 'Damage', kind: 'multiplier', desc: 'Hit damage = base × Damage × (crit ? 2 : 1) × (1 + 0.004 × Splice Quality); dirty foes additionally × (1 + 0.01 × Cleanliness).' },
   attackSpeed: { label: 'Attack Speed', kind: 'multiplier', desc: 'Tool interval = base seconds / Attack Speed. Pedestal and Frenzy multiply speed further; deployed turrets use their own fire interval.' },
   crit: { label: 'Crit Chance', kind: 'percent', desc: 'Chance for a hit to deal double damage; capped at 100%.' },
-  range: { label: 'Reach modifier', kind: 'multiplier', desc: 'Applied once to viewport-derived tool reach. Gear +0.03 adds 3 percentage points to the character factor (Oracle 1.35 → 1.38). Weapon reach ratings scale family/quality, not absolute distance. Normal ranged caps: 42% of the shorter visible side, Oracle 44%; melee 18%; a single shared ×${RANGE_MULTIPLIER} balance multiplier then lifts the final reach (effective ${42*RANGE_MULTIPLIER}% / ${44*RANGE_MULTIPLIER}% / ${18*RANGE_MULTIPLIER}%). Combat HUD shows actual world units. Flat bonuses, if present, add world units before the cap. Projectile distance freezes at launch; DPI never changes reach.' },
+  range: { label: 'Reach modifier', kind: 'multiplier', desc: `Applied once to viewport-derived tool reach. Gear +0.03 adds 3 percentage points to the character factor (Oracle 1.35 → 1.38). Weapon reach ratings scale family/quality, not absolute distance. Normal ranged caps: 42% of the shorter visible side, Oracle 44%; melee 18%; a single shared ×${RANGE_MULTIPLIER} balance multiplier then lifts the final reach (effective ${42*RANGE_MULTIPLIER}% / ${44*RANGE_MULTIPLIER}% / ${18*RANGE_MULTIPLIER}%). Combat HUD shows actual world units. Flat bonuses, if present, add world units before the cap. Projectile distance freezes at launch; DPI never changes reach.` },
   knockback: { label: 'Knockback', kind: 'flat', desc: 'Critical hits move impairments away by 8 map units per point (plus rolled critical-knockback bonuses).' },
   pierce: { label: 'Pierce', kind: 'flat', desc: 'Normal shots penetrate round(Pierce) additional targets; inherently piercing pulses already penetrate all targets in their travel lifetime.' },
   armor: { label: 'Jacket Protection', kind: 'flat', desc: 'Contact damage = max(25% of the incoming hit, max(2, enemy damage − 1.5 × Armor)) × (1 − min(40%, 0.3% × Signal Integrity)). Armor can never reduce a hit below a quarter of its pre-armor damage.' },
@@ -60,7 +60,7 @@ export function statBreakdown(run, key) {
   const info = STAT_INFO[key] || { kind: 'flat' };
   const base = run.character?.stats?.[key] ?? 0;
   let items = 0;
-  for (const it of [...(run.weapons || []),...(run.items || [])]) for (const m of it.mods || []) if (m.stat === key) items += m.value;
+  for (const it of [...(run.weapons || []),...(run.items || []),...(run.statMods || [])]) for (const m of it.mods || []) if (m.stat === key) items += m.value;
   const pct = info.kind === 'multiplier' || info.kind === 'percent';
   const capped = (key === 'dodge' && base + items > .5) ? ' • capped at 50%' : (key === 'crit' && base + items > 1) ? ' • capped at 100%' : '';
   return {
