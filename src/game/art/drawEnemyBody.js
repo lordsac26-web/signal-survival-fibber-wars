@@ -22,7 +22,7 @@ export default function drawEnemyBody(ctx, e) {
       else if (['dirty', 'pete', 'peteMini'].includes(e.kind)) drawTechEnemy(c, e.art, e.anim, e.x, e.y, e.kind === 'peteMini' ? PETE.miniScale : 1);
       else if (e.mac) drawBendSprite(c, e.art, e.anim, e.x, e.y);
       else drawLagSprite(c, e.art, e.anim, e.x, e.y);
-    } else if (e.sprite) c.drawImage(e.sprite, Math.round(e.x - e.sprite.width / 2), Math.round(e.y - e.sprite.height / 2));
+    }
   });
   if (!result.drawn) {
     reportEnemyVisual(e.kind, result.failure);

@@ -225,7 +225,7 @@ export function syncAuthoritativeCoopWorld(state) {
       visual.facing = snapshot.facing || src.facing || ((src.vx || 0) < 0 ? 'left' : 'right');
     }
     if (e.ditch) {
-      e.ditch.phase = src.state || src.phase || 'chase';
+      e.ditch.phase = src.renderState?.phase || src.state || (typeof src.phase === 'string' ? src.phase : 'chase');
       e.ditch.facing = src.renderState?.facing || src.facing || ((src.vx || 0) < 0 ? 'left' : 'right');
       e.ditch.animT = (e.ditch.animT || 0) + dt;
     }

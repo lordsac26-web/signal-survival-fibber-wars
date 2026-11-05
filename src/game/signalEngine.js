@@ -48,6 +48,8 @@ import { CAMP_ATTACK, createCampState, updateCamp, campVelocity } from '@/game/c
 import drawCampCone from '@/game/art/drawCampCone';
 import { PIN,createPinState,stepPin,sidestepVelocity } from '@/game/combat/bossAntiPin';
 import { stepCoopPeers, drawCoopPeers, syncAuthoritativeCoopWorld } from '@/game/multiplayer/coopArenaSync';
+import drawEnemyBody from '@/game/art/drawEnemyBody';
+import enemyVisibilityDebug from '@/game/multiplayer/enemyVisibilityDebug';
 
 const TYPES=Object.keys(ENEMIES),STEP=1/60,MAX_DT=.033;
 const clamp=(n,a,b)=>n<a?a:n>b?b:n;
@@ -363,7 +365,7 @@ function kill(e){if(!e.active)return;if(e.ditch){stepDitch(e.ditch,0,{alive:fals
  function complete(won){if(deathDone)return;deathDone=true;meeting.active=false;const harvest=won?Math.round(run.harvesting||0):0;signal+=harvest;earnedSignal+=harvest;sfx(won?'clear':'death');cancelAnimationFrame(raf);cb.finish({...run,hp:Math.max(0,p.hp),signal,earnedSignal,kills,xp,pendingLevels:levels,specialProgress:0,specialUnlocked:true,specialCooldown,deployCds:{...deployCds},won,damageDealt:Math.round(damageDealt),healed:Math.round(healed),damageTaken:Math.round(damageTaken),killsByType,lastWaveMetrics:{duration:duration-Math.max(0,time),kills:kills-startKills,earnedSignal:earnedSignal-startEarned,xpEarned:+xpEarnedWave.toFixed(2),levelsGained:levels}})}
  function fixedUpdate(dt){
   const oldX=p.x,oldY=p.y;
-  if(run.coopAuthoritative&&run.coopWorldRef?.current){
+  if(run.coopAuthoritative){
    areaFx.life=Math.max(0,areaFx.life-dt);soundClock-=dt;
    let ix=input.current.x,iy=input.current.y;
    if(ix||iy){const m=Math.hypot(ix,iy)||1,boost=specialTimer>0?(run.character.special.id==='sprint'?1.8:run.character.special.id==='clause'?.3:1):1;p.x+=ix/m*run.speed*boost*dt;p.y+=iy/m*run.speed*boost*dt}
@@ -656,9 +658,18 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
    else if(t.weaponTurret&&pedArt)drawPedestalTurret(ctx,pedArt,t,Math.round(t.x),Math.round(t.y),grow); // weapon-deployed turrets share the splice-pedestal pack
    else drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
   for(let i=0;i<wrecks.items.length;i++){const w=wrecks.items[i];if(w.active&&ditchArt)drawDitchWitch(ctx,ditchArt,{phase:'dying',facing:w.facing,deathProgress:w.t/w.dur,vfxT:0},w.x,w.y,false)}
+  if(run.coopAuthoritative){
+   const drawn=[];
+   for(const e of enemies.items){
+    if(!e.active||e.hp<=0||e.x+(e.r||0)<camX-120||e.x-(e.r||0)>camX+viewW+120||e.y+(e.r||0)<camY-120||e.y-(e.r||0)>camY+viewH+120)continue;
+    drawn.push(drawEnemyBody(ctx,e));
+   }
+   enemyVisibilityDebug(ctx,run,enemies.items,drawn,{x:camX,y:camY,width:viewW,height:viewH});
+  }else{
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.art&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40){if(e.ditch)drawDitchWitch(ctx,e.art,e.ditch,e.x,e.y,e.ditch.phase==='chase');else if(e.caster)drawConeEnemy(ctx,e.art,e.caster,e.x,e.y);else if(e.critter)drawCrosstalk(ctx,critterArt,e.critter,e.x,e.y);else if(e.jit)drawJitterSprite(ctx,jitterArt,e.jit,e.x,e.y,e.jit.phase==='chase');else if(e.art===puddingArt)drawPuddingSprite(ctx,puddingArt,e.anim,e.x,e.y);else if(e.art===blobArtDef)drawTechEnemy(ctx,e.art,e.anim,e.x,e.y);else if(petArt&&(e.kind==='pete'||e.kind==='peteMini'))drawTechEnemy(ctx,petArt,e.anim,e.x,e.y,e.kind==='peteMini'?PETE.miniScale:1);else if(e.mac&&bendArtDef)drawBendSprite(ctx,bendArtDef,e.anim,e.x,e.y);else drawLagSprite(ctx,e.art,e.anim,e.x,e.y)}}
   for(let k=0;k<TYPES.length;k++){const kind=TYPES[k];for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&!e.art&&e.kind===kind&&e.x>camX-40&&e.x<camX+viewW+40&&e.y>camY-40&&e.y<camY+viewH+40)ctx.drawImage(e.sprite,Math.round(e.x-e.sprite.width/2),Math.round(e.y-e.sprite.height/2))}}
   for(let i=0;i<enemies.items.length;i++){const e=enemies.items[i];if(e.active&&e.sq&&e.x>camX-90&&e.x<camX+viewW+90&&e.y>camY-90&&e.y<camY+viewH+90)drawSquirrelSprite(ctx,e.sq.art,e.sq,e.x,e.y)}
+  }
   for(let i=0;i<shots.items.length;i++){const s=shots.items[i];if(s.active&&s.x>camX-28&&s.x<camX+viewW+28&&s.y>camY-28&&s.y<camY+viewH+28)drawProjectile(ctx,s)}
   for(let i=0;i<foeShots.items.length;i++){const s=foeShots.items[i];if(s.active&&s.x>camX-28&&s.x<camX+viewW+28&&s.y>camY-28&&s.y<camY+viewH+28){if(s.rock)drawDitchRock(ctx,ditchArt,s);else if(s.ring&&bendArtDef)drawBendRing(ctx,bendArtDef,s);else drawProjectile(ctx,s)}}
   for(let i=0;i<particles.items.length;i++){const q=particles.items[i];if(q.active&&q.x>=camX&&q.x<=camX+viewW&&q.y>=camY&&q.y<=camY+viewH){ctx.globalAlpha=Math.max(0,q.life*2);ctx.fillStyle=q.color;ctx.fillRect(Math.round(q.x),Math.round(q.y),3,3)}}ctx.globalAlpha=1;
@@ -675,7 +686,7 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
     ctx.save();ctx.globalAlpha=.09+ci*.06+lock*.04;ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.arc(px,py,CLAUSE_RADIUS,0,7);ctx.fill();
     ctx.globalAlpha=.3+lock*.4+(lock>0?Math.sin(performance.now()*.025)*.08*lock:0);ctx.strokeStyle='#fde047';ctx.lineWidth=2;ctx.setLineDash([12,9]);ctx.beginPath();ctx.arc(px,py,CLAUSE_RADIUS,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
    if(!clauseFired){ctx.save();ctx.globalAlpha=.2+ci*.3;ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.arc(px,py-20,28+ci*15,0,7);ctx.fill();ctx.restore()}}else if(sid==='cash'){ctx.save();ctx.globalAlpha=.25+Math.sin(performance.now()*.01)*.05;ctx.fillStyle='#22c55e';ctx.beginPath();ctx.arc(px,py-20,25,0,7);ctx.fill();ctx.restore()}else if(sid==='sprint'){ctx.save();ctx.globalAlpha=.2+Math.sin(performance.now()*.008)*.08;ctx.fillStyle='#22d3ee';ctx.beginPath();ctx.arc(px,py-20,24,0,7);ctx.fill();ctx.restore()}else if(sid!=='outage'){ctx.strokeStyle='#fde047';ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,py,25+Math.sin(performance.now()*.02)*5,0,7);ctx.stroke()}}}
- function key(e){if(dying>0){dying=0;complete(false);return}if(e.key==='F9'){stress=!stress;if(stress){for(let i=0;i<500;i++)spawnEnemy(null,true)}cb.flash(stress?'STRESS MODE: 500 IMPAIRMENTS':'STRESS MODE OFF')}} window.addEventListener('keydown',key);resize();sfx('wave');if(run.wave%5===0)sfx('boss');
+ function key(e){if(dying>0){dying=0;complete(false);return}if(e.key==='F9'&&!run.coopAuthoritative){stress=!stress;if(stress){for(let i=0;i<500;i++)spawnEnemy(null,true)}cb.flash(stress?'STRESS MODE: 500 IMPAIRMENTS':'STRESS MODE OFF')}} window.addEventListener('keydown',key);resize();sfx('wave');if(run.wave%5===0)sfx('boss');
  function frame(now){
   if(paused.current){last=now;if(!over||dying>0)raf=requestAnimationFrame(frame);return}
   let delta=Math.min(MAX_DT,(now-last)/1000);last=now;
