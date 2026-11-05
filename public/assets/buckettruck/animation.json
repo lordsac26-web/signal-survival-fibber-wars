@@ -3,7 +3,7 @@
   "tileWidth": 230,
   "tileHeight": 190,
   "rightEdgeAnchorX": 210,
-  "groundBaselineY": 174,
+  "groundBaselineY": 185,
   "frames": [
     {
       "name": "pose_a",
@@ -42,7 +42,8 @@
     "Background removed via border flood-fill through grayscale pixels only.",
     "Despeckle kept every connected component >=60px (not a single \"largest blob\"), so the boom-to-body connector was never at risk of being dropped -- verified all 3 frames keep the full truck+arm intact.",
     "No per-frame rescaling applied: all 3 source renders are already the same real-world scale (verified visually), so resizing was skipped to avoid introducing distortion from unreliable auto-measurement.",
-    "Alignment anchors the sprite's rear-bumper edge (rightmost opaque pixel) to a fixed tile x, and the wheel-contact point (lowest opaque pixel) to a fixed tile y, in every frame."
+    "Alignment anchors the sprite's rear-bumper edge (rightmost opaque pixel) to a fixed tile x, and the wheel-contact point (lowest opaque pixel) to a fixed tile y, in every frame.",
+    "Playtest fix: the source sheet is not in the workspace, so the clipped tire band was completed inside each tile (widest per-frame tread run sampled, tapered down to the new wheel-contact row y=185) instead of re-extracting from the unavailable source."
   ],
   "notes": [
     "Turret/structure sprite for the Bucket-Truck Boss signature + deployable -- static vehicle art, no walk cycle.",
