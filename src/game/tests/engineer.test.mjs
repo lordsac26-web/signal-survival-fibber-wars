@@ -279,4 +279,6 @@ test('engineer sheet: every strip decodes at declared size, frames nonempty and 
   assert(opaque > 400, 'portrait holds a full figure');
   assert.equal(maxy, portrait.height - 1, 'figure is bottom-anchored on the baseline');
   assert(miny > 0 && maxx < portrait.width - 1 && minx > 0, 'figure sits inside the frame with margin');
+  const guide = readFileSync(new URL('../../pages/FieldGuide.jsx', import.meta.url), 'utf8');
+  assert.match(guide, /e\.id==='engineer' && <EngineerPortrait/, 'Field Guide Characters tab renders EngineerPortrait');
 });
