@@ -19,9 +19,9 @@ export const DITCH=Object.freeze({
   deathDuration:.55,arenaMargin:38,bladeReach:34
 });
 
-export const createDitchState=(random=Math.random)=>({
+export const createDitchState=random=>({
   phase:'chase',mode:'charge',nextMode:'charge',
-  clock:0,remaining:0,cooldown:DITCH.initialMin+random()*(DITCH.initialMax-DITCH.initialMin),
+  clock:0,remaining:0,cooldown:typeof random==='function'?DITCH.initialMin+random()*(DITCH.initialMax-DITCH.initialMin):DITCH.initialMin,
   angle:0,facing:'right',struck:false,rocksFired:false,rootX:0,rootY:0,vfxT:0
 });
 
