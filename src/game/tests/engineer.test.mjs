@@ -149,7 +149,10 @@ async function encounter(configure) {
 test('engine placement: one ordinary deployable item fields 3 concurrent instances, the 4th is refused while all live', { timeout: 120000 }, async () => {
   // The Barricade Kit is now UNIQUE deployable gear (one instance per shift),
   // so the 3-instance ladder test runs on the ordinary Rat Guard instead.
-  const h = await encounter(r => { r.wave = 6; r.hp = 3000; r.maxHp = 3000; r.armor = 60; r.deployables = [{ id: 'rat', structure: 'ratTrap', name: 'Rat Guard', icon: '🪤', stacks: 1, deploy: true }] });
+  // The Rat Guard chomps 4 foes and then disappears, so the ladder needs a
+  // clearing aura: every impairment dies at the probe's reach before it can
+  // ever step on a trap — the instance count is then purely the ladder's.
+  const h = await encounter(r => { r.wave = 6; r.hp = 3000; r.maxHp = 3000; r.armor = 60; r.crit = 0; r.instakill = 1; r.weapons = [{ id: 'clear', baseId: 'cleaver', name: 'Clearing aura', pattern: 'nova', damage: 999, rate: .2, range: 500, mods: [], slotType: 'melee', rarity: 'common' }]; r.deployables = [{ id: 'rat', structure: 'ratTrap', name: 'Rat Guard', icon: '🪤', stacks: 1, deploy: true }] });
   try {
     pump(1 / 60);
     const posts = () => h.state.samples.at(-1)?.posts ?? [];

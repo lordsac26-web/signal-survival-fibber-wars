@@ -25,6 +25,7 @@ test('local atlas decodes at 690×190; every frame carries the full wheel band i
           const lum=.299*decoded.rgba[i]+.587*decoded.rgba[i+1]+.114*decoded.rgba[i+2];
           if(lum<60){run++;if(run>best)best=run}else run=0}
         else run=0}
+    }
     // the wheel band was completed inside the frame: tire contact at row 185
     // with clearance above the tile bottom, and a real tread run at contact
     assert.equal(lowest,185,`frame ${f}: wheel-contact row is 185, not clipped at the tile edge`);

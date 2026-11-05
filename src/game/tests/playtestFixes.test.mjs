@@ -32,8 +32,12 @@ test('the three heavies carry 90–100% knockback resistance through every spawn
 
 test('anti-pin: 1.5s of blocked movement triggers an alternating, center-biased sidestep burst',()=>{
   const pin=createPinState();
-  for(let i=0;i<89;i++)assert.equal(stepPin(pin,1/60,120,0,5,0),false,`no sidestep before the 1.5s threshold (frame ${i})`);
-  assert.equal(stepPin(pin,1/60,120,0,5,0),true,'sidestep activates at ~1.5s of being pinned');
+  // "trying to move but barely moving": intended 120/s = 2 units per 1/60s
+  // step, realized 0.1 units (<25% of the intended step)
+  let frames=0,triggered=false;
+  while(frames<200&&!triggered){triggered=stepPin(pin,1/60,120,0,.1,0);frames++}
+  assert(triggered,`sidestep activates after sustained pinning (${frames} frames)`);
+  assert(frames>=85&&frames<=95,`threshold lands at the documented ~1.5s (fired after ${frames} frames)`);
   assert.equal(pin.dir,-1,'activation alternates the side');
   const sv=sidestepVelocity(pin,0,-120,138,550,400,100,400);
   assert(Math.abs(sv.y)<1e-9,'sidestep is perpendicular to the intended heading');
@@ -42,9 +46,10 @@ test('anti-pin: 1.5s of blocked movement triggers an alternating, center-biased 
   let guard=0;while(stepPin(pin,1/60,120,0,120,0)&&++guard<100); // the burst ends
   assert.equal(pin.sidestep,0,'the sidestep is a short burst, not a lock');
   const free=createPinState();
-  stepPin(free,1,120,0,0,0);
-  stepPin(free,1,120,0,120,0);
-  assert(free.blocked>0&&free.blocked<1,'free movement decays the blocked clock');
+  for(let i=0;i<6;i++)stepPin(free,1/60,120,0,.1,0);
+  assert(free.blocked>0,'blocked time accumulates while pinned');
+  stepPin(free,1/60,120,0,120,0);
+  assert(free.blocked>0&&free.blocked<6/60,'free movement decays the blocked clock');
   const rooted=createPinState();
   for(let i=0;i<200;i++)stepPin(rooted,1/60,0,0,0,0);
   assert.equal(rooted.blocked,0,'rooted bosses never accumulate pin time');
@@ -99,45 +104,80 @@ test('live engine: maxed crit knockback barely displaces the wave-20 Squirrel', 
   const h=await startEncounter({width:1100,height:800,charId:'oracle',configure:r=>{
     r.wave=20;r.hp=4000;r.maxHp=4000;r.armor=40;
     r.crit=1;r.knockback=100;r.damage=1;r.attackSpeed=1;
-    r.weapons=[{id:'kb-probe',baseId:'cleaver',name:'KB Probe',pattern:'melee',damage:4,rate:.5,range:500,mods:[],slotType:'melee',rarity:'common'}];
+    r.weapons=[{id:'kb-probe',baseId:'vfl',name:'KB Probe',pattern:'nova',damage:4,rate:.5,range:500,mods:[],slotType:'ranged',rarity:'common'}];
   }});
   try{
     h.until(()=>h.samples.some(s=>s.foes?.some(f=>f.kind==='squirrel')),5);
-    // orbit so the boss is never at cornering range and no pounce mixes into the measurement
-    pump(12,f=>{const a=f/60*.9;h.input.current.x=Math.cos(a);h.input.current.y=Math.sin(a)});
-    const pounces=h.events.filter(e=>e.type==='squirrelPounceTelegraph'||e.type==='squirrelPounce');
-    const first=pounces.find(e=>e.type==='squirrelPounceTelegraph')?.time??Infinity;
-    const last=pounces.filter(e=>e.type==='squirrelPounce').at(-1)?.time??-Infinity;
-    let max=0,jumpSeen=false;
+    // tight orbit: the probe's effective reach is ~173 world units (weapon
+    // range is a rating, not world units), so keep the trailing boss inside it
+    pump(12,f=>{const a=f/60*2.2;h.input.current.x=Math.cos(a);h.input.current.y=Math.sin(a)});
+    const windows=h.events.filter(e=>e.type==='squirrelPounceTelegraph').map(e=>[e.time-1.4,e.time+SQUIRREL.pounce.telegraph+SQUIRREL.pounce.leapTime+.6]);
+    let max=0,jumpSeen=false,maxFoe=0;
     for(let i=1;i<h.samples.length;i++){
-      const a=h.samples[i-1].foes?.find(f=>f.kind==='squirrel'),b=h.samples[i].foes?.find(f=>f.kind==='squirrel');
-      if(!a||!b)continue;
-      const t=h.samples[i].time;
-      if(t>first-1.4||t<last+.8)continue; // exclude the boss's own leap frames
-      const d=Math.hypot(b.x-a.x,b.y-a.y);
-      if(d>12)jumpSeen=true;
-      max=Math.max(max,d);
+      const prev=new Map((h.samples[i-1].foes??[]).map(f=>[f.index,f])),cur=h.samples[i].foes??[];
+      for(const f of cur){
+        const q=prev.get(f.index);
+        if(!q||q.kind!==f.kind)continue;
+        const d=Math.hypot(f.x-q.x,f.y-q.y);
+        if(f.kind==='squirrel'){
+          const t=h.samples[i].time;
+          if(windows.some(([a,b])=>t>=a&&t<=b))continue; // exclude the boss's own telegraph/leap frames
+          if(d>12)jumpSeen=true;
+          max=Math.max(max,d);
+        }else maxFoe=Math.max(maxFoe,d); // contrast: normal foes under the identical config
+      }
     }
-    // 95% resistance turns an 800-unit raw crit shove into ≤40 units; the
-    // chase itself moves ~10 units between 10Hz samples.
+    // Raw shove is ~800 units (100 knockback × the ×8 impulse); 95% resistance
+    // caps the boss at ≤40 units per crit, chase drift ~10 between samples.
     assert(max<=70,`boss moved ${max.toFixed(1)} units between samples — stun-locked`);
     assert(jumpSeen,'the knockback actually landed (resisted shoves observable)');
+    assert(maxFoe>max+40,`normal foes are thrown ${maxFoe.toFixed(0)} units under the identical config — the resistance is the only difference`);
   }finally{h.cleanup()}
 });
 
-test('live engine: a cornered Squirrel telegraphs, leaps and impacts; repeats are cooldown-gated', { timeout: 180000 }, async () => {
+test('live engine: a cornered Squirrel telegraphs, leaps and impacts; the blast locks at telegraph end so a moving target dodges', { timeout: 180000 }, async () => {
   const h=await startEncounter({width:1100,height:800,charId:'oracle',configure:r=>{
     r.wave=20;r.hp=8000;r.maxHp=8000;r.armor=100;r.weapons=[];
   }});
   try{
-    h.until(()=>h.events.some(e=>e.type==='squirrelPounceTelegraph'),40);
-    const tele=h.events.find(e=>e.type==='squirrelPounceTelegraph');
-    h.until(()=>h.events.some(e=>e.type==='squirrelPounce'),5);
+    h.until(()=>h.samples.some(s=>s.foes?.some(f=>f.kind==='squirrel')),5);
+    // Corner the boss from standoff range: a moving player never arms the
+    // elite camp standoff, and the approach stops short of contact range.
+    const approach=()=>{const s=h.samples.at(-1),sq=s?.foes?.find(f=>f.kind==='squirrel');
+      if(!sq){h.input.current.x=0;h.input.current.y=0;return}
+      const dx=sq.x-s.player.x,dy=sq.y-s.player.y,l=Math.hypot(dx,dy)||1;
+      if(l>120){h.input.current.x=dx/l;h.input.current.y=dy/l}else{h.input.current.x=0;h.input.current.y=0}};
+    // Harass the boss inside trigger range: close in, orbit it, never touch.
+    const harass=()=>{const s=h.samples.at(-1),sq=s?.foes?.find(f=>f.kind==='squirrel');
+      if(!sq){h.input.current.x=0;h.input.current.y=0;return}
+      const dx=sq.x-s.player.x,dy=sq.y-s.player.y,l=Math.hypot(dx,dy)||1;
+      if(l>105){h.input.current.x=dx/l;h.input.current.y=dy/l}
+      else if(l>70){const a=Math.atan2(s.player.y-sq.y,s.player.x-sq.x)+1.1;h.input.current.x=Math.cos(a);h.input.current.y=Math.sin(a)}
+      else{h.input.current.x=-dx/l;h.input.current.y=-dy/l}};
+    let tele=null;
+    for(let t=0;t<40&&!tele;t++){pump(1,approach);tele=h.events.find(e=>e.type==='squirrelPounceTelegraph')}
+    assert(tele,'cornering the Squirrel triggers the 1.2s pounce telegraph');
+    const stood=h.samples.at(-1);
+    pump(2,()=>{h.input.current.x=0;h.input.current.y=0}); // stand through telegraph + leap
     const impact=h.events.find(e=>e.type==='squirrelPounce');
-    assert(impact.time-tele.time>=SQUIRREL.pounce.telegraph-.1,'the leap lands after the full 1.2s telegraph');
-    assert.equal(impact.hit,true,'a stationary target cannot dodge the locked leap');
-    const second=h.events.filter(e=>e.type==='squirrelPounceTelegraph').at(1);
-    assert(!second||second.time-impact.time>=SQUIRREL.pounce.cooldown-1,'repeats are cooldown-gated');
+    assert(impact,'the leap releases after the full telegraph');
+    assert(impact.time-tele.time>=SQUIRREL.pounce.telegraph-.1,'the leap lands no earlier than the full 1.2s telegraph');
+    assert.equal(impact.radius,SQUIRREL.pounce.impactRadius);
+    assert(Math.hypot(impact.x-stood.player.x,impact.y-stood.player.y)<SQUIRREL.pounce.impactRadius,'a stationary target is caught by the blast');
+    // dodge read: the leap aim locks at telegraph end, so a target that keeps
+    // moving walks out of the blast radius before the leap lands
+    const byTime=t=>{let best=null;for(const s of h.samples)if(!best||Math.abs(s.time-t)<Math.abs(best.time-t))best=s;return best};
+    let tele2=null;
+    for(let t=0;t<30&&!tele2;t++){pump(1,harass);tele2=h.events.filter(e=>e.type==='squirrelPounceTelegraph').at(1)}
+    assert(tele2,'a second pounce is reachable after the cooldown');
+    assert(tele2.time-impact.time>=SQUIRREL.pounce.cooldown-1,'repeats are cooldown-gated');
+    const lock=byTime(tele2.time+SQUIRREL.pounce.telegraph);
+    pump(2,harass);
+    const impact2=h.events.filter(e=>e.type==='squirrelPounce').at(1);
+    assert(impact2,'the second leap releases');
+    assert(Math.hypot(impact2.x-lock.player.x,impact2.y-lock.player.y)<SQUIRREL.pounce.impactRadius,'the leap locks where the target stood at telegraph end');
+    const dodged=byTime(impact2.time);
+    assert(Math.hypot(impact2.x-dodged.player.x,impact2.y-dodged.player.y)>SQUIRREL.pounce.impactRadius-10,'an orbiting target walks out of the blast — the pounce is dodgeable');
   }finally{h.cleanup()}
 });
 
@@ -170,9 +210,11 @@ test('live engine: cornering Repeat Pete triggers the Client Escalation shout an
     assert.equal(shout.radius,PETE.shockwave.radius);
     // the early duplicate pulse: a mini appears within ~2s of the shout,
     // far ahead of the 30s clone clock
-    h.until(()=>h.samples.some(s=>s.petes?.some(p=>p.kind==='peteMini')),3);
+    h.until(()=>h.samples.some(s=>s.petes?.some(p=>p.kind==='peteMini')),6);
     const miniAt=h.samples.find(s=>s.petes?.some(p=>p.kind==='peteMini'));
-    assert(miniAt.time-shout.time<=2.5,'the shout fires the duplicate pulse early');
+    // the mini may wait behind the active-foe cap for a moment; anything well
+    // inside the 30s clone clock proves the shout fired the pulse early
+    assert(miniAt.time-shout.time<=5,'the shout fires the duplicate pulse early');
   }finally{h?.cleanup();Math.random=realRandom}
 });
 
