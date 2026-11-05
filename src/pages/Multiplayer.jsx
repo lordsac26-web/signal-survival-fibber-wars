@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import useProfile from '@/game/progression/useProfile';
 import useCoopRoom from '@/game/multiplayer/useCoopRoom';
 import { characterById } from '@/game/data/characters';
-import { createRun, rebuildRunStats } from '@/game/progression/runRules';
+import { createRun, rebuildStats } from '@/game/progression/runRules';
 import { applyStartingKit } from '@/game/progression/startingKit';
 import { enterShop, shopTransaction } from '@/game/shop/shopRules';
 import { pickUpgrade, upgradeChoices, rerollUpgradeChoices, skipUpgrade } from '@/game/progression/upgradeRules';
@@ -25,7 +25,7 @@ import SummaryScreen from '@/components/game/SummaryScreen';
 function hydrateSeatRun(meSeat, roomState, fallbackCharId) {
   const ch = characterById(meSeat?.characterId || fallbackCharId || 'oracle');
   const base = createRun(ch, Boolean(meSeat?.useAlt), roomState?.seed || 1);
-  const merged = rebuildRunStats({
+  const merged = rebuildStats({
     ...base,
     wave: roomState?.wave || 1,
     arenaChoice: roomState?.arenaChoice || 'random',
