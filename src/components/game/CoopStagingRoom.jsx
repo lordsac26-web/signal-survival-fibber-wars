@@ -16,6 +16,7 @@ export default function CoopStagingRoom({
   onLeave
 }) {
   const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
   const [chatText, setChatText] = useState('');
 
   const inviteUrl = `${window.location.origin}/multiplayer?room=${encodeURIComponent(roomId)}`;
@@ -26,6 +27,16 @@ export default function CoopStagingRoom({
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback if clipboard blocked
+    }
+  };
+
+  const copyRoomId = async () => {
+    try {
+      await navigator.clipboard.writeText(roomId);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
     } catch {
       // Fallback if clipboard blocked
     }
@@ -53,9 +64,15 @@ export default function CoopStagingRoom({
                   Shift Foreman (Host)
                 </span>
               )}
-              <span className="rounded-full bg-game-bg px-3 py-1 font-mono text-xs text-game-muted">
-                Room: {roomId.slice(0, 12)}
-              </span>
+              <button
+                type="button"
+                onClick={copyRoomId}
+                title="Click to copy full Room ID"
+                className="inline-flex items-center gap-1.5 rounded-full bg-game-bg px-3 py-1 font-mono text-xs text-game-muted hover:text-game-signal"
+              >
+                <span>Room ID: {roomId}</span>
+                {copiedId ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+              </button>
             </div>
             <h1 className="mt-2 font-heading text-2xl font-bold sm:text-3xl">
               {coop.room?.title || 'Field Crew Staging Bay'}

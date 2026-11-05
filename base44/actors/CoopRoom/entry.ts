@@ -515,20 +515,13 @@ export default class CoopRoom extends Actor {
   }
 
   findExistingSeatForConn(conn) {
-    const authUserId = conn.identity?.type === 'authenticated' ? conn.identity.userId : null;
-    const liveIds = new Set(this.getConnections().map((c) => c.id));
     for (const u of this.users.values()) {
-      if (u.connId === conn.id && (!u.userId || !authUserId || u.userId === authUserId)) return { seatObj: u, restoredFromCache: false };
-    }
-    if (authUserId) {
-      for (const u of this.users.values()) {
-        if (u.userId === authUserId && (!u.connId || !liveIds.has(u.connId) || u.connId === conn.id)) return { seatObj: u, restoredFromCache: false };
-      }
+      if (u.connId === conn.id) return { seatObj: u, restoredFromCache: false };
     }
     for (const [key, entry] of this.disconnectedSeats.entries()) {
       if (Date.now() > entry.expiresAt) { this.disconnectedSeats.delete(key); continue; }
       const u = entry.seatObj;
-      if ((u.connId === conn.id && (!u.userId || !authUserId || u.userId === authUserId)) || (authUserId && u.userId === authUserId)) {
+      if (u.connId === conn.id) {
         this.disconnectedSeats.delete(key);
         return { seatObj: u, restoredFromCache: true };
       }
@@ -620,10 +613,6 @@ export default class CoopRoom extends Actor {
 
   getSeatByConn(conn) {
     for (const u of this.users.values()) if (u.connId === conn.id) return u;
-    const authUserId = conn.identity?.type === 'authenticated' ? conn.identity.userId : null;
-    if (authUserId) {
-      for (const u of this.users.values()) if (u.userId === authUserId) { u.connId = conn.id; return u; }
-    }
     return null;
   }
 
@@ -641,9 +630,21 @@ export default class CoopRoom extends Actor {
     const u = this.getSeatByConn(conn);
     if (!u) return;
 
+    if (msg.type === 'sync_state') {
+      conn.send({
+        type: 'presence',
+        roomId: this.room.roomId,
+        room: this.publicRoom(),
+        users: this.publicUsers(),
+        world: this.world ? serializeCombatWorld(this.world, [...this.users.values()]) : null
+      });
+      return;
+    }
+
     if (msg.type === 'init_room' || msg.type === 'join_room') {
       if (typeof msg.roomId === 'string' && msg.roomId.trim() && !this.room.roomId) this.room.roomId = msg.roomId.trim().slice(0, 64);
-      if (msg.type === 'init_room' && u.seat === this.room.hostSeat && this.room.phase === 'lobby') {
+      if (msg.type === 'init_room' && this.room.phase === 'lobby') {
+        this.room.hostSeat = u.seat;
         if (!this.room.registryId && typeof msg.registryId === 'string' && /^[a-f0-9]{24}$/i.test(msg.registryId) && (!msg.roomId || msg.registryId === msg.roomId)) {
           this.room.registryId = msg.registryId;
           this.room.roomId = msg.registryId;
@@ -653,6 +654,18 @@ export default class CoopRoom extends Actor {
           this.room.arenaChoice = msg.arenaChoice;
           this.room.arenaTheme = resolveArena(this.room.arenaChoice, this.room.seed, this.room.wave, null);
         }
+      } else if (!this.room.registryId && this.room.roomId && /^[a-f0-9]{24}$/i.test(this.room.roomId)) {
+        try {
+          const lobby = await this.client.asServiceRole.entities.CoopLobby.get(this.room.roomId);
+          if (lobby && lobby.id === this.room.roomId) {
+            this.room.registryId = lobby.id;
+            if (lobby.title) this.room.title = String(lobby.title).slice(0, 48);
+            if (lobby.arena_choice && VALID_CHOICES.has(lobby.arena_choice)) {
+              this.room.arenaChoice = lobby.arena_choice;
+              this.room.arenaTheme = resolveArena(this.room.arenaChoice, this.room.seed, this.room.wave, null);
+            }
+          }
+        } catch { /* ignore if private room */ }
       }
       if (typeof msg.name === 'string' && msg.name.trim()) u.name = msg.name.trim().slice(0, 28);
       if (!u.ready && this.room.phase === 'lobby') {

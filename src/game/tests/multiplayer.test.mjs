@@ -259,3 +259,40 @@ test('stepCoopPeers and drawCoopPeers render remote teammates and disconnected i
     'renders remote teammate with their true character sprite art instead of placeholder shapes'
   );
 });
+
+test('4-player co-op room synchronizes all 4 seats in lobby and combat without merging same-account tabs', () => {
+  const actorSrc = readFileSync(new URL('../../../base44/actors/CoopRoom/entry.ts', import.meta.url), 'utf8');
+  assert(
+    !actorSrc.includes('u.userId === authUserId'),
+    'CoopRoom matches seats strictly by per-tab conn.id so multiple tabs/windows on the same account get separate seats (1-4)'
+  );
+
+  // Verify 4 tabs get 4 distinct connection IDs even for the same userId
+  const storage = makeMockStorage();
+  const tabs = [{ name: '' }, { name: '' }, { name: '' }, { name: '' }];
+  const connIds = tabs.map((t) => resolveCoopConnId('room-4p', 'same-user-id', storage, t));
+  assert.equal(new Set(connIds).size, 4, '4 tabs produce 4 distinct connection IDs for 4 seats');
+
+  // Verify 4-player world snapshot renders all 3 remote teammates for each seat
+  const peersRef = {
+    current: [
+      { seat: 1, name: 'delongc', characterId: 'don', x: 500, y: 380, hp: 115, maxHp: 115, alive: true, connected: true },
+      { seat: 2, name: 'Craig D', characterId: 'oracle', x: 560, y: 380, hp: 90, maxHp: 90, alive: true, connected: true },
+      { seat: 3, name: 'Craig DeLong', characterId: 'veteran', x: 500, y: 430, hp: 115, maxHp: 115, alive: true, connected: true },
+      { seat: 4, name: 'Tech 4', characterId: 'engineer', x: 560, y: 430, hp: 95, maxHp: 95, alive: true, connected: true }
+    ]
+  };
+  const run = {
+    coop: true,
+    coopAuthoritative: true,
+    coopSeat: 1,
+    coopPeers: peersRef,
+    coopEvents: { current: [] }
+  };
+  const rec = makeRecordingCtx();
+  drawCoopPeers(rec.ctx, run);
+  const labels = rec.record.filter((r) => r[0] === 'fillText').map((r) => String(r[1]));
+  assert(labels.some((l) => l.includes('P2 Craig D')), 'renders P2 in 4-player match');
+  assert(labels.some((l) => l.includes('P3 Craig DeLo')), 'renders P3 in 4-player match');
+  assert(labels.some((l) => l.includes('P4 Tech 4')), 'renders P4 in 4-player match');
+});

@@ -74,7 +74,42 @@ export default function Multiplayer() {
   const lastInputSentRef = useRef({ ts: 0, x: 0, y: 0 });
 
   const playerName = user?.full_name || user?.email?.split('@')[0] || 'Technician';
-  const coop = useCoopRoom(roomId, initConfig, user?.id || 'anon');
+  const effectiveInitConfig = initConfig || {
+    isHostInit: false,
+    name: playerName,
+    characterId: selectedCharId,
+    useAlt: selectedAlt
+  };
+  const coop = useCoopRoom(roomId, effectiveInitConfig, user?.id || 'anon');
+
+  // If a user entered a truncated/prefix room ID in the URL, resolve it to the canonical 24-char CoopLobby ID
+  useEffect(() => {
+    if (!roomId || roomId.length >= 24) return;
+    let cancelled = false;
+    base44.entities.CoopLobby.filter(
+      { status: { $in: ['lobby', 'loadout', 'combat', 'intermission'] } },
+      { sort: '-updated_date', limit: 20 }
+    )
+      .then((page) => {
+        if (cancelled) return;
+        const list = Array.isArray(page) ? page : page?.items || [];
+        const needle = roomId.trim().toLowerCase();
+        const match = list.find(
+          (r) =>
+            r.id &&
+            (r.id.toLowerCase() === needle ||
+              r.id.toLowerCase().startsWith(needle) ||
+              String(r.title || '').toLowerCase() === needle)
+        );
+        if (match && match.id !== roomId) {
+          setSearchParams({ room: match.id }, { replace: true });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, setSearchParams]);
 
   const assignRun = (nextRun) => {
     const { combineNotices = [], ...clean } = nextRun;

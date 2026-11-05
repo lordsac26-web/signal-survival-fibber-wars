@@ -3,7 +3,11 @@ import { base44 } from '@/api/base44Client';
 
 const ACTIVE_USER_KEY = 'signal_coop_active_user';
 const CONN_PREFIX = 'signal_coop_conn:';
+const RELOAD_PREFIX = 'signal_coop_reload:';
 const TAB_PREFIX = 'signal_tab_';
+
+const inMemoryTabConnIds = new Map();
+let unloadHookRegistered = false;
 
 function randomId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -12,9 +16,27 @@ function randomId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function ensureUnloadHook() {
+  if (unloadHookRegistered || typeof window === 'undefined' || typeof sessionStorage === 'undefined') return;
+  unloadHookRegistered = true;
+  window.addEventListener('beforeunload', () => {
+    try {
+      for (const [, entry] of inMemoryTabConnIds.entries()) {
+        if (entry?.storageKey) {
+          sessionStorage.setItem(`${RELOAD_PREFIX}${entry.storageKey}`, String(Date.now()));
+        }
+      }
+    } catch {
+      // ignore storage errors on unload
+    }
+  });
+}
+
 /**
  * Resolves a tab-isolated, room-scoped, user-scoped connection id.
- * - Duplicating a tab yields a fresh window.name (or clears mismatched tab token) so two tabs never share a connId.
+ * - Duplicating a tab in Chrome/Edge copies sessionStorage and window.name without firing beforeunload,
+ *   so we detect the missing reload stamp and mint a fresh tabId + connId for the duplicated tab.
+ * - Reloading the same tab preserves its connId so the player reclaims their seat.
  * - Switching authenticated userId clears all stored connIds in sessionStorage.
  * - Switching roomId uses a distinct storage key.
  */
@@ -28,17 +50,26 @@ export function resolveCoopConnId(
   const cleanUser = String(userId || 'anon').trim();
   if (!storage) return randomId();
 
+  const isRealBrowserWindow = typeof window !== 'undefined' && win === window;
+  if (isRealBrowserWindow) ensureUnloadHook();
+
   try {
     const prevUser = storage.getItem(ACTIVE_USER_KEY);
     if (prevUser && prevUser !== cleanUser) {
       const toRemove = [];
       for (let i = 0; i < storage.length; i++) {
         const k = storage.key(i);
-        if (k && k.startsWith(CONN_PREFIX)) toRemove.push(k);
+        if (k && (k.startsWith(CONN_PREFIX) || k.startsWith(RELOAD_PREFIX))) toRemove.push(k);
       }
       for (const k of toRemove) storage.removeItem(k);
+      if (isRealBrowserWindow) inMemoryTabConnIds.clear();
     }
     storage.setItem(ACTIVE_USER_KEY, cleanUser);
+
+    const memKey = `${cleanRoom}:${cleanUser}`;
+    if (isRealBrowserWindow && inMemoryTabConnIds.has(memKey)) {
+      return inMemoryTabConnIds.get(memKey).connId;
+    }
 
     let tabId = 'tab';
     if (win) {
@@ -54,11 +85,34 @@ export function resolveCoopConnId(
       }
     }
 
-    const storageKey = `${CONN_PREFIX}${cleanRoom}:${cleanUser}:${tabId}`;
+    let storageKey = `${CONN_PREFIX}${cleanRoom}:${cleanUser}:${tabId}`;
     let connId = storage.getItem(storageKey);
+
+    if (connId && isRealBrowserWindow) {
+      const reloadKey = `${RELOAD_PREFIX}${storageKey}`;
+      const reloadTs = Number(storage.getItem(reloadKey) || 0);
+      storage.removeItem(reloadKey);
+      const isGenuineReload = reloadTs > 0 && Date.now() - reloadTs < 20000;
+      if (!isGenuineReload) {
+        // Duplicated tab detected: mint a fresh tabId & connId so this tab gets its own seat
+        tabId = `${TAB_PREFIX}${randomId()}`;
+        try {
+          win.name = tabId;
+        } catch {
+          // ignore
+        }
+        storageKey = `${CONN_PREFIX}${cleanRoom}:${cleanUser}:${tabId}`;
+        connId = null;
+      }
+    }
+
     if (!connId) {
       connId = randomId();
       storage.setItem(storageKey, connId);
+    }
+
+    if (isRealBrowserWindow) {
+      inMemoryTabConnIds.set(memKey, { connId, storageKey });
     }
     return connId;
   } catch {
@@ -235,7 +289,16 @@ export default function useCoopRoom(roomId, initialConfig = null, userId = null)
       }
     });
 
+    const syncInterval = setInterval(() => {
+      try {
+        actorHandle.send({ type: 'sync_state' });
+      } catch {
+        // ignore transient send errors
+      }
+    }, 2500);
+
     return () => {
+      clearInterval(syncInterval);
       sub.unsubscribe();
       actorHandle.close();
       handleRef.current = null;

@@ -55,21 +55,55 @@ export default function CoopRoomBrowser({
     return () => unsub?.();
   }, []);
 
-  const handleJoinSubmit = (e) => {
+  const handleJoinSubmit = async (e) => {
     e.preventDefault();
     const raw = roomInput.trim();
     if (!raw) return;
+    let candidate = raw;
     try {
       const url = new URL(raw);
       const param = url.searchParams.get('room');
       if (param) {
-        onJoinRoom(param);
-        return;
+        candidate = param.trim();
       }
     } catch {
-      // Plain room code
+      // Plain room code or shift title
     }
-    onJoinRoom(raw);
+
+    const needle = candidate.toLowerCase();
+    const findMatch = (list) =>
+      (list || []).find(
+        (r) =>
+          r?.id &&
+          (r.id.toLowerCase() === needle ||
+            r.id.toLowerCase().startsWith(needle) ||
+            String(r.title || '').toLowerCase() === needle)
+      );
+
+    const localMatch = findMatch(rooms);
+    if (localMatch) {
+      onJoinRoom(localMatch.id);
+      return;
+    }
+
+    if (candidate.length < 24) {
+      try {
+        const page = await base44.entities.CoopLobby.filter(
+          { status: { $in: ['lobby', 'loadout', 'combat', 'intermission'] } },
+          { sort: '-updated_date', limit: 20 }
+        );
+        const list = Array.isArray(page) ? page : page?.items || [];
+        const remoteMatch = findMatch(list);
+        if (remoteMatch) {
+          onJoinRoom(remoteMatch.id);
+          return;
+        }
+      } catch {
+        // fall through to candidate
+      }
+    }
+
+    onJoinRoom(candidate);
   };
 
   const handlePublicCreate = async () => {
