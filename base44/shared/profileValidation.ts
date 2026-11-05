@@ -17,9 +17,9 @@ export function validateProfile(data,userId,previous=null) {
     if(!Array.isArray(r.weapons) || r.weapons.length>(c==='veteran'?8:(c==='admin'||c==='engineer')?4:6) || new Set(r.weapons.map(w=>w.id)).size!==r.weapons.length) throw new Error('Tool slots or duplicate instance ids invalid');
     if(c==='engineer' && r.weapons.length+(r.items||[]).length+(r.deployables||[]).length>4) throw new Error('Field Engineer item budget exceeded');
     if(c==='engineer'){ // per-category caps inside the 4-slot budget: 1 ranged, 2 melee, 4 deployables
-      const cat=(i:any)=>i.deploy||i.pattern==='turret'?'deployable':i.baseId?(melee(i)?'melee':'ranged'):'passive';
+      const cat=i=>i.deploy||i.pattern==='turret'?'deployable':i.baseId?(melee(i)?'melee':'ranged'):'passive';
       const all=[...r.weapons,...(r.items||[]),...(r.deployables||[])];
-      const n=(k:string)=>all.filter((i:any)=>cat(i)===k).length;
+      const n=k=>all.filter(i=>cat(i)===k).length;
       if(n('ranged')>1||n('melee')>2||n('deployable')>4) throw new Error('Field Engineer category cap exceeded');
     }
     if(r.weapons.some(w=>!w || typeof w.id!=='string' || patterns[w.baseId]!==w.pattern || !Number.isFinite(w.damage) || w.damage<0 || !Number.isFinite(w.rate) || w.rate<=0 || (c==='oracle'&&melee(w)))) throw new Error('Forbidden or malformed weapon');

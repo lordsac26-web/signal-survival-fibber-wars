@@ -8,7 +8,7 @@ import {unlockMet} from '@/game/data/unlocks';
 import {guideEntries} from '@/game/data/reference';
 const c=characterById('isr');
 test('ISR reused once, original stats/kits/career gate and saves retained; ability granted on selection',()=>{
- assert.equal(CHARACTERS.filter(c=>c.id==='isr').length,1);assert.equal(CHARACTERS.length,7);
+ assert.equal(CHARACTERS.filter(c=>c.id==='isr').length,1);assert.equal(CHARACTERS.length,8);
  assert.deepEqual([c.stats.maxHp,c.stats.speed,c.stats.damage,c.start,c.altStart,c.restriction],[105,210,.8,['power'],['otdr'],'any']);
  assert(unlockMet({squirrelDefeated:true},c));assert(!unlockMet({squirrelDefeated:false},c));
  let r=createRun(c,false,'isr','existing-isr-save');assert(r.specialUnlocked);assert.equal(r.specialCooldown,0);

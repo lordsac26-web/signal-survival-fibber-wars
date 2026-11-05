@@ -349,7 +349,10 @@ function kill(e){if(!e.active)return;const gain=charId==='isr'?outageKillHeal(p,
   // FIBER SPLICE SURGE: arm the planted cabinet (fixed at activation), fire
   // pulses on the schedule, then clear state when the timer ends. Pause
   // freezes everything because this whole block runs off specialTimer.
-  if(specialTimer>0&&run.character.special.id==='surge'){
+  // The branch stays open while surge.active so the LAST pulse (elapsed
+  // exactly 4.8, specialTimer 0) still fires — a strictly `specialTimer>0`
+  // gate left pulse 4 to float-rounding luck.
+  if((specialTimer>0||surge.active)&&run.character.special.id==='surge'){
    const elapsed=surgeTotal()-specialTimer;
    if(!surge.active){surge.active=true;surge.id++;surge.pulse=0;surge.x=clamp(p.x,30,W-30);surge.y=clamp(p.y,30,H-30);surge.rings.length=0;
     cb.event?.({type:'surgeStart',time:duration-time,x:surge.x,y:surge.y,radius:SURGE.ringRadius,arming:SURGE.arming,duration:surgeTotal()});

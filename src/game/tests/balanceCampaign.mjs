@@ -5,6 +5,8 @@ import { applyStartingKit } from '@/game/progression/startingKit';
 import { characterById } from '@/game/data/characters';
 import { WEAPONS } from '@/game/data/combat';
 import { enterShop,shopTransaction,offerReason } from '@/game/shop/shopRules';
+import { hasCombineTarget } from '@/game/items/acquisition';
+import { engineerCategory,engineerWeaponCapBlocked } from '@/game/progression/runRules';
 import { pickUpgrade,skipUpgrade,upgradeChoices } from '@/game/progression/upgradeRules';
 import { waveDuration } from '@/game/data/tuning';
 import { rerollCost,healingCost } from '@/game/shop/economy';
@@ -25,13 +27,22 @@ function intermission(run){
   while(run.pendingLevels>0){const choices=upgradeChoices(run);try{run=pickUpgrade(run,choices[0].id)}catch(error){if(run.character.id==='engineer')run=skipUpgrade(run);else throw error}}
   run=enterShop(run);
   if(run.hp<run.maxHp*.7&&run.signal>=healingCost(run.wave))run=shopTransaction(run,{type:'heal'});
-  // Field Engineer growth is combine-driven: with the 4-item budget full,
+  // Field Engineer growth is combine-driven: with the 4-slot budget full,
   // only same-identity duplicates upgrade him, so his average play rerolls
-  // hunting combine targets and buys any that appear.
+  // hunting combine targets and buys any that appear — passing the owned
+  // same-category tool as the replacement when a cap makes a plain add a swap.
   if(run.character.id==='engineer'){
     for(let attempt=0;attempt<4;attempt++){
       const buyable=run.shop.offers.filter(i=>i&&!offerReason(run,i));
-      if(buyable.length){try{run=shopTransaction(run,{type:'buy',offerId:buyable[0].id})}catch{break}continue}
+      if(buyable.length){
+        const item=buyable[0];let ev={type:'buy',offerId:item.id};
+        if(item.baseId && !hasCombineTarget(run,item) && engineerWeaponCapBlocked(run,item)){
+          const cat=engineerCategory(item),owned=run.weapons.find(w=>engineerCategory(w)===cat);
+          if(owned)ev.replaceId=owned.id;
+        }
+        try{run=shopTransaction(run,ev)}catch{break}
+        continue;
+      }
       if(run.signal>=rerollCost(run.wave,run.shop.rerolls)+20){try{run=shopTransaction(run,{type:'reroll'})}catch{break}}else break;
     }
     return {...run,wave:run.wave+1};
@@ -60,16 +71,17 @@ export const AVERAGE_BUILDS={
   admin:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper']},
   clone:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper','cleaver','splicer']},
   isr:{mover:['vfl','otdr','power','stripper'],camper:['vfl','otdr','power','stripper','cleaver','splicer']},
-  engineer:{mover:['tray','vfl','otdr'],camper:['tray','vfl','otdr']}
+  engineer:{mover:['tray','vfl'],camper:['tray','vfl']}
 };
 export async function simulateCampaign(seed,moving,lastWave=30,starter=null,charId='nomad'){
   const art=await arts(charId),realRandom=Math.random;Math.random=seeded(seed);const rows=[];
   let run=createRun(characterById(charId),false,seed,`phase2-${seed}-${moving}${starter?`-${starter.baseId}`:''}-${charId}`),deathWave=null;
   const build=starter&&charId==='nomad'?(moving?['vfl','otdr','power','stripper']:['vfl','otdr','power','stripper','cleaver','splicer']):AVERAGE_BUILDS[charId][moving?'mover':'camper'];
   const fixture=build.map((id,i)=>({...WEAPONS[id],baseId:id,id:`fixture-${i}`,mods:[],rarity:'common'}));
-  // The Field Engineer's average build spends half his 4-slot budget on
-  // deployable-type items; his simulated play places them on cooldown (Q),
-  // exactly like the owner-designed play pattern.
+  // The Field Engineer's average build fills his 4-slot budget exactly:
+  // 1 deployable turret tool (the tray) + 1 ranged + 1 deployable ITEM
+  // (the sim Q-places it on cooldown, like the owner-designed play pattern)
+  // + the shared fixture-gear passive.
   if(charId==='engineer')run.deployables=[{structure:'turretMount',name:'Turret Mount',icon:'🔩',stacks:1}];
   if(starter)run=applyStartingKit(run,[starter.id]);
   else run.weapons=fixture;

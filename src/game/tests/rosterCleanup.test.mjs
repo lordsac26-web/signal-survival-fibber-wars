@@ -11,9 +11,9 @@ import {activateSignature} from '@/game/combat/signatures';
 import {decodePng} from './pngDecode.mjs';
 const read=p=>readFileSync(new URL('../../'+p,import.meta.url),'utf8');
 test('exact remaining roster and guide; live cards have portraits; selection enforces both career gates',()=>{
-  const ids=['nomad','veteran','oracle','don','admin','clone','isr'];assert.deepEqual(CHARACTERS.map(c=>c.id),ids);assert.deepEqual(guideEntries().Characters.map(c=>c.id),ids);
+  const ids=['nomad','veteran','oracle','don','admin','engineer','clone','isr'];assert.deepEqual(CHARACTERS.map(c=>c.id),ids);assert.deepEqual(guideEntries().Characters.map(c=>c.id),ids);
   const portraits=read('components/game/CharacterPortrait.jsx');for(const id of ids)assert(portraits.includes(`c.id==='${id}'`));
-  const select=read('components/game/CharacterSelect.jsx');assert(select.includes('CHARACTERS.map'));assert(select.includes('unlockMet(save,c)'));assert.equal(freshProfile().unlocked.length,5);
+  const select=read('components/game/CharacterSelect.jsx');assert(select.includes('CHARACTERS.map'));assert(select.includes('unlockMet(save,c)'));assert.equal(freshProfile().unlocked.length,6);
   for(const id of RETIRED_CHARACTER_IDS){assert.equal(characterById(id),undefined);assert(!portraits.includes(`c.id==='${id}'`))}
   for(const id of ['callback','deepclean','fortify','barrier','deadline','frenzy'])assert.equal(activateSignature({character:{special:{id}}},{},{}),null);
 });
