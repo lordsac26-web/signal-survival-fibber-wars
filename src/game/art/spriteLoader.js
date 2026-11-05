@@ -1,4 +1,4 @@
-import { characterSprite, enemySpriteDef, structureSpriteDef } from '@/game/art/characterSprites';
+import { CHARACTER_SPRITES, characterSprite, enemySpriteDef, structureSpriteDef } from '@/game/art/characterSprites';
 import { TOOL_ICON_ATLAS } from '@/game/art/toolAtlas';
 const cache=new Map(),resolvedCache=new Map();
 function image(url,width,height){return new Promise((resolve,reject)=>{
@@ -33,6 +33,8 @@ function preloadSprite(definition){
   cache.set(definition,promise);return promise;
 }
 export const preloadCharacterSprite=id=>preloadSprite(characterSprite(id));
+export const preloadAllCharacterSprites=()=>Promise.all(Object.keys(CHARACTER_SPRITES).map(id=>preloadCharacterSprite(id)));
+export const loadedCharacterSprite=id=>resolvedCache.get(characterSprite(id))||null;
 export const preloadEnemySprite=kind=>preloadSprite(enemySpriteDef(kind));
 export const loadedEnemySprite=kind=>resolvedCache.get(enemySpriteDef(kind))||null;
 export const preloadStructureSprite=id=>preloadSprite(structureSpriteDef(id));

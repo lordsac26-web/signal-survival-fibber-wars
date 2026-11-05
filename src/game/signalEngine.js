@@ -38,7 +38,7 @@ import { createCritterState, stepCritter, critterVelocity, critterContactReady, 
 import drawCrosstalk from '@/game/art/crosstalkSpriteAnimation';
 import { DITCH, createDitchState, stepDitch, ditchVelocity, ditchContactReady, clampDitchBounds, ditchRockBurst } from '@/game/combat/ditchWitch';
 import { drawDitchWitch, drawDitchTelegraph, drawDitchRock } from '@/game/art/ditchWitchSpriteAnimation';
-import { loadedEnemySprite } from '@/game/art/spriteLoader';
+import { loadedCharacterSprite, loadedEnemySprite } from '@/game/art/spriteLoader';
 import { APPARITION, ROUTER_ATTACK, createConeState, stepCone, consumeConeHit, casterVelocity, cancelHiddenCharge } from '@/game/combat/coneAttack';
 import drawConeEnemy from '@/game/art/drawConeEnemy';
 import { scaledEnemy, enemyDamageMultiplier } from '@/game/combat/difficulty';
@@ -649,9 +649,10 @@ if(ix||iy)heading=Math.atan2(iy,ix);updateCamp(camp,p,dt);
    if(placeBlocked){const bx=Math.round(p.x),by=Math.round(p.y);ctx.save();ctx.globalAlpha=.1;ctx.fillStyle='#ef4444';ctx.beginPath();ctx.arc(bx,by,PLACE_PROXIMITY,0,7);ctx.fill();ctx.globalAlpha=.85;ctx.strokeStyle='#f87171';ctx.lineWidth=2;ctx.setLineDash([9,7]);ctx.beginPath();ctx.arc(bx,by,PLACE_PROXIMITY,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore()}
   for(let i=0;i<turrets.items.length;i++){const t=turrets.items[i];if(!t.active)continue;const grow=Math.min(1,t.born*4);ctx.globalAlpha=t.life<1?Math.max(.2,t.life):1;
    if(t.mode==='helper'){ // Don's crew: the four extracted individual crew
-    // sprites while his special runs; the placeholder helper is the mutually
-    // exclusive fallback (asset failure), never drawn alongside.
-    if(run.character.id==='don'&&specialTimer>0&&characterArt&&characterArt.crewInd)drawCrewHelper(ctx,characterArt,t);else drawHelper(ctx,Math.round(t.x),Math.round(t.y),t.color)}
+    // sprites while his special runs (local or co-op ally Don); placeholder is
+    // the mutually exclusive fallback (asset failure), never drawn alongside.
+    const donArt=(run.character.id==='don'?characterArt:null)||loadedCharacterSprite('don');
+    if(donArt&&donArt.crewInd&&(run.coop||(run.character.id==='don'&&specialTimer>0)))drawCrewHelper(ctx,donArt,t);else drawHelper(ctx,Math.round(t.x),Math.round(t.y),t.color)}
    else if(t.weaponTurret&&pedArt)drawPedestalTurret(ctx,pedArt,t,Math.round(t.x),Math.round(t.y),grow); // weapon-deployed turrets share the splice-pedestal pack
    else drawTurretBody(Math.round(t.x),Math.round(t.y),t.color,t.lookA,t.r*grow+3);ctx.globalAlpha=1}
   for(let i=0;i<wrecks.items.length;i++){const w=wrecks.items[i];if(w.active&&ditchArt)drawDitchWitch(ctx,ditchArt,{phase:'dying',facing:w.facing,deathProgress:w.t/w.dur,vfxT:0},w.x,w.y,false)}

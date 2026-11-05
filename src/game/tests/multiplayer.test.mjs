@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolveCoopConnId } from '@/game/multiplayer/useCoopRoom';
 import { stepCoopPeers, drawCoopPeers, syncAuthoritativeCoopWorld } from '@/game/multiplayer/coopArenaSync';
 import ObjectPool from '@/game/performance/ObjectPool';
+import { CHARACTER_SPRITES } from '@/game/art/characterSprites';
 import { makeRecordingCtx } from './engineHarness.mjs';
 
 function makeMockStorage() {
@@ -228,5 +229,33 @@ test('stepCoopPeers and drawCoopPeers render remote teammates and disconnected i
   assert(
     rec.record.some((r) => r[0] === 'fillText' && String(r[1]).includes('P2 Partner (DC)')),
     'renders partner callsign with disconnect tag in world space'
+  );
+
+  // When sprite art is loaded for the teammate's character, drawCoopPeers renders the true character sprite via drawImage
+  const fakeAtlas = { id: 'engineer-atlas' };
+  const fakeWalk = { id: 'engineer-walk' };
+  peersRef.current[1].art = {
+    definition: CHARACTER_SPRITES.engineer,
+    atlas: fakeAtlas,
+    walk: fakeWalk,
+    walkLeft: fakeWalk,
+    attack: fakeAtlas,
+    special: fakeAtlas
+  };
+  peersRef.current[1].x = 660;
+  stepCoopPeers(run, 0.1, {
+    player: { x: 550, y: 400, hp: 100, maxHp: 100 },
+    heal() {},
+    damageBoss() {},
+    nearestAt: () => null,
+    launch() {},
+    particle() {},
+    flash() {}
+  });
+  const spriteRec = makeRecordingCtx();
+  drawCoopPeers(spriteRec.ctx, run);
+  assert(
+    spriteRec.record.some((r) => r[0] === 'drawImage' && (r[1] === fakeAtlas || r[1] === fakeWalk)),
+    'renders remote teammate with their true character sprite art instead of placeholder shapes'
   );
 });

@@ -4,10 +4,44 @@ import { STRUCTURES } from '@/game/data/structures';
 import { SQUIRREL, ROUS } from '@/game/data/bosses';
 import { enemySprite } from '@/game/performance/spriteAtlas';
 import { createLagAnimation, updateLagAnimation } from '@/game/art/enemySpriteAnimation';
-import { createTechAnimation, updateTechAnimation } from '@/game/art/techSpriteAnimation';
+import { createTechAnimation, updateTechAnimation, drawTechSprite, drawTechDeathFrame } from '@/game/art/techSpriteAnimation';
+import { createSpriteAnimation, updateSpriteAnimation, drawCharacterSprite } from '@/game/art/spriteAnimation';
+import { createISRAnimation, updateISRAnimation } from '@/game/art/isrSpriteAnimation';
+import { drawISR } from '@/game/art/drawISR';
+import { loadedCharacterSprite, preloadCharacterSprite } from '@/game/art/spriteLoader';
 import { createPuddingAnimation, updatePuddingAnimation } from '@/game/art/puddingSpriteAnimation';
 import { createBendAnimation, updateBendAnimation } from '@/game/art/bendSpriteAnimation';
 import { createSquirrelAnimation, updateSquirrelAnimation } from '@/game/art/squirrelSpriteAnimation';
+
+function ensurePeerSpriteState(peer, charId) {
+  if (!peer.spriteState || peer.spriteCharId !== charId) {
+    peer.spriteCharId = charId;
+    peer.spriteState =
+      charId === 'isr'
+        ? createISRAnimation()
+        : charId === 'oracle'
+        ? createSpriteAnimation()
+        : createTechAnimation();
+  }
+  return peer.spriteState;
+}
+
+function updatePeerSprite(peer, dx, dy, dt) {
+  const charId = characterById(peer.characterId || 'oracle').id;
+  const spriteState = ensurePeerSpriteState(peer, charId);
+  const art = peer.art || loadedCharacterSprite(charId);
+  if (!art && typeof window !== 'undefined') {
+    preloadCharacterSprite(charId).catch(() => {});
+  }
+  spriteState.special = (peer.special || 0) > 0 ? peer.special : 0;
+  if (charId === 'oracle') {
+    if (art?.definition) updateSpriteAnimation(spriteState, dx, dy, dt, art.definition);
+  } else if (charId === 'isr') {
+    updateISRAnimation(spriteState, dx, dy, dt);
+  } else if (art?.definition) {
+    updateTechAnimation(spriteState, dx, dy, dt, art.definition);
+  }
+}
 
 function reconcilePoolById(pool, list, dt, configureItem) {
   const incoming = Array.isArray(list) ? list : [];
@@ -86,9 +120,15 @@ export function syncAuthoritativeCoopWorld(state) {
     const prevPeers = new Map((run.coopPeers.current || []).map((pr) => [pr.seat, pr]));
     run.coopPeers.current = players.map((pl) => {
       const old = prevPeers.get(pl.seat);
+      const prevRx = old?.rx !== undefined ? old.rx : pl.x;
+      const prevRy = old?.ry !== undefined ? old.ry : pl.y;
       const rx = old?.rx !== undefined ? old.rx + (pl.x - old.rx) * Math.min(1, dt * 14) : pl.x;
       const ry = old?.ry !== undefined ? old.ry + (pl.y - old.ry) * Math.min(1, dt * 14) : pl.y;
-      return { ...(old || {}), ...pl, rx, ry };
+      const peerObj = { ...(old || {}), ...pl, rx, ry };
+      const dx = Math.abs(rx - prevRx) > 0.001 ? rx - prevRx : (pl.vx || 0) * dt;
+      const dy = Math.abs(ry - prevRy) > 0.001 ? ry - prevRy : (pl.vy || 0) * dt;
+      updatePeerSprite(peerObj, dx, dy, dt);
+      return peerObj;
     });
   }
 
@@ -231,6 +271,17 @@ export function syncAuthoritativeCoopWorld(state) {
     s.pattern = src.pattern || 'projectile';
     s.mortar = Boolean(src.mortar);
     s.helper = Boolean(src.helper);
+    if (isNew && run.coopPeers?.current) {
+      for (const peer of run.coopPeers.current) {
+        if (!peer || peer.seat === run.coopSeat || !peer.spriteState) continue;
+        if (Math.hypot((peer.rx ?? peer.x) - src.x, (peer.ry ?? peer.y) - src.y) < 48) {
+          peer.spriteState.attack = Math.max(peer.spriteState.attack || 0, 0.35);
+          if (Math.abs(src.vx || 0) > 5) {
+            peer.spriteState.attackFace = src.vx < 0 ? 'left' : 'right';
+          }
+        }
+      }
+    }
   });
 
   // 4. Reconcile enemy projectiles
@@ -344,6 +395,9 @@ export function syncAuthoritativeCoopWorld(state) {
       if (ev.seat === run.coopSeat) {
         fxCallbacks.sfx('hit');
         fxCallbacks.addShake(4);
+      } else if (run.coopPeers?.current) {
+        const hitPeer = run.coopPeers.current.find((pr) => pr.seat === ev.seat);
+        if (hitPeer?.spriteState) hitPeer.spriteState.hurt = 0.18;
       }
     } else if (ev.type === 'ping') {
       fxCallbacks.particle(ev.x || p.x, ev.y || p.y, '#67e8f9', 14);
@@ -386,8 +440,11 @@ export function stepCoopPeers(run, dt, api) {
     if (!peer || peer.seat === run.coopSeat) continue;
     const tx = Number.isFinite(peer.x) ? peer.x : 550;
     const ty = Number.isFinite(peer.y) ? peer.y : 400;
-    peer.rx = (peer.rx ?? tx) + (tx - (peer.rx ?? tx)) * Math.min(1, dt * 12);
-    peer.ry = (peer.ry ?? ty) + (ty - (peer.ry ?? ty)) * Math.min(1, dt * 12);
+    const prevRx = peer.rx ?? tx;
+    const prevRy = peer.ry ?? ty;
+    peer.rx = prevRx + (tx - prevRx) * Math.min(1, dt * 12);
+    peer.ry = prevRy + (ty - prevRy) * Math.min(1, dt * 12);
+    updatePeerSprite(peer, peer.rx - prevRx, peer.ry - prevRy, dt);
     if (!peer.alive || peer.hp <= 0) continue;
 
     if (!run.coopAuthoritative) {
@@ -440,47 +497,67 @@ export function drawCoopPeers(ctx, run) {
     ctx.strokeStyle = !connected ? '#94a3b8' : alive ? '#67e8f9' : '#f87171';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(x, y + 6, 19, 0, Math.PI * 2);
+    ctx.arc(x, y + 2, 18, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Allied technician body & hard hat
-    ctx.fillStyle = ch.color || '#38bdf8';
-    ctx.beginPath();
-    ctx.arc(x, y, 15, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = ch.vest || '#facc15';
-    ctx.fillRect(x - 12, y + 2, 24, 14);
-    ctx.fillStyle = ch.belt || '#1e293b';
-    ctx.fillRect(x - 13, y + 10, 26, 4);
-    ctx.fillStyle = '#facc15';
-    ctx.beginPath();
-    ctx.arc(x, y - 12, 11, Math.PI, 0);
-    ctx.fill();
-    ctx.fillRect(x - 13, y - 13, 26, 3);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x - 7, y - 5, 5, 6);
-    ctx.fillRect(x + 2, y - 5, 5, 6);
+    const art = peer.art || loadedCharacterSprite(ch.id);
+    const spriteState = ensurePeerSpriteState(peer, ch.id);
+    const rawX = peer.rx ?? peer.x ?? 550;
+    const rawY = peer.ry ?? peer.y ?? 400;
+    const drawX = (peer.special || 0) > 0 && ch.id === 'nomad' ? rawX + Math.sin(performance.now() * 0.05) * 2 : rawX;
+    const drawY = (peer.special || 0) > 0 && ch.id === 'nomad' ? rawY + Math.cos(performance.now() * 0.05) * 2 : rawY;
 
-    if ((peer.special || 0) > 0) {
-      ctx.strokeStyle = '#fde047';
+    if (art && spriteState) {
+      if (!alive && art.definition?.deathColumns && art.death) {
+        drawTechDeathFrame(ctx, art, art.definition.deathColumns - 1, drawX, drawY);
+      } else if (ch.id === 'isr') {
+        drawISR(ctx, art, spriteState, drawX, drawY);
+      } else if (ch.id === 'oracle') {
+        drawCharacterSprite(ctx, art, spriteState, drawX, drawY);
+      } else {
+        drawTechSprite(ctx, art, spriteState, drawX, drawY);
+      }
+    } else {
+      // Fallback technician silhouette when sprite assets are not loaded (e.g. headless tests)
+      ctx.fillStyle = ch.color || '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(x, y, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = ch.vest || '#facc15';
+      ctx.fillRect(x - 12, y + 2, 24, 14);
+      ctx.fillStyle = ch.belt || '#1e293b';
+      ctx.fillRect(x - 13, y + 10, 26, 4);
+      ctx.fillStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(x, y - 12, 11, Math.PI, 0);
+      ctx.fill();
+      ctx.fillRect(x - 13, y - 13, 26, 3);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x - 7, y - 5, 5, 6);
+      ctx.fillRect(x + 2, y - 5, 5, 6);
+    }
+
+    if ((peer.special || 0) > 0 && ch.special?.id !== 'outage') {
+      ctx.strokeStyle = ch.special?.id === 'cash' ? '#22c55e' : ch.special?.id === 'sprint' ? '#22d3ee' : '#fde047';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(x, y - 4, 24, 0, Math.PI * 2);
+      ctx.arc(x, y - 18, 24, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    // Overhead HP bar + seat callsign
+    // Overhead HP bar + seat callsign positioned cleanly above full character sprites
+    const barY = art ? y - 52 : y - 34;
     const ratio = Math.max(0, Math.min(1, (peer.hp || 0) / Math.max(1, peer.maxHp || 100)));
     ctx.fillStyle = 'rgba(15,23,42,0.85)';
-    ctx.fillRect(x - 22, y - 34, 44, 6);
+    ctx.fillRect(x - 22, barY, 44, 6);
     ctx.fillStyle = ratio > 0.35 ? '#22d3ee' : '#f87171';
-    ctx.fillRect(x - 21, y - 33, Math.round(42 * ratio), 4);
+    ctx.fillRect(x - 21, barY + 1, Math.round(42 * ratio), 4);
 
     ctx.font = 'bold 11px Chivo, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e0f2fe';
     const label = `P${peer.seat} ${String(peer.name || 'Tech').slice(0, 10)}${!connected ? ' (DC)' : ''}`;
-    ctx.fillText(label, x, y - 39);
+    ctx.fillText(label, x, barY - 5);
     ctx.restore();
   }
 }
