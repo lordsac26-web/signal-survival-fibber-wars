@@ -757,7 +757,7 @@ export default class CoopRoom extends Actor {
       u.kitConfirmed = true;
       this.room.revision = (this.room.revision || 0) + 1;
 
-      if ([...this.users.values()].every((p) => p.kitConfirmed) && this.room.phase === 'loadout') {
+      if ([...this.users.values()].every((p) => p.kitConfirmed || p.connected === false) && this.room.phase === 'loadout') {
         await this.enterCombatWave();
       } else {
         this.broadcastPresence();

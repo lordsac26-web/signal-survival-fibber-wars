@@ -96,7 +96,7 @@ test('syncAuthoritativeCoopWorld reconciles server world entities, players, and 
       { seat: 2, name: 'Ally', characterId: 'don', x: 615, y: 412, hp: 110, maxHp: 115, alive: true, signal: 14, kills: 2 }
     ],
     enemies: [
-      { id: 101, kind: 'crs', x: 450, y: 360, vx: 20, vy: 10, hp: 18, max: 26, r: 14, boss: false, elite: false, state: 'chase', facing: 'right' },
+      { id: 101, kind: 'lag', x: 450, y: 360, vx: 20, vy: 10, hp: 18, max: 24, r: 13, boss: false, elite: false, state: 'chase', facing: 'right' },
       { id: 102, kind: 'squirrel', x: 700, y: 420, vx: -15, vy: 0, hp: 1850, max: 2200, r: 30, boss: true, elite: true, state: 'chase', facing: 'left', phase: 1 }
     ],
     shots: [{ id: 201, x: 530, y: 395, vx: 400, vy: 0, r: 5, color: '#38bdf8', pattern: 'beam', mortar: false, helper: false }],

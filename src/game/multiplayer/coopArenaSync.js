@@ -119,10 +119,10 @@ export function syncAuthoritativeCoopWorld(state) {
           ? SQUIRREL
           : src.kind === 'rous'
           ? ROUS
-          : ENEMIES[src.kind] || ENEMIES.crs;
+          : ENEMIES[src.kind] || ENEMIES.lag;
       e.color = base?.color || '#f87171';
       e.sound = base?.sound || 'hit';
-      e.sprite = e.boss ? null : enemySprite(src.kind, base || ENEMIES.crs);
+      e.sprite = e.boss ? null : enemySprite(src.kind, base || ENEMIES.lag);
       e.art = null;
       e.anim = null;
       e.sq = null;
@@ -304,12 +304,12 @@ export function syncAuthoritativeCoopWorld(state) {
     meeting.active = false;
   }
 
-  if (Array.isArray(world.surges) && world.surges.length > 0) {
-    const sg = world.surges[0];
+  const activeSurge = (Array.isArray(world.surges) && world.surges[0]) || world.surge || null;
+  if (activeSurge) {
     surge.active = true;
-    surge.x = sg.x;
-    surge.y = sg.y;
-    surge.pulse = sg.pulse || 0;
+    surge.x = activeSurge.x;
+    surge.y = activeSurge.y;
+    surge.pulse = activeSurge.pulse || 0;
   } else {
     surge.active = false;
   }
@@ -323,13 +323,13 @@ export function syncAuthoritativeCoopWorld(state) {
     if (ev.id) run.coopProcessedFxRef.lastId = ev.id;
 
     if (ev.type === 'dmg') {
-      fxCallbacks.damageNumber(ev.x, ev.y, ev.amount, ev.crit);
+      fxCallbacks.damageNumber(ev.x, ev.y, ev.amount ?? ev.value ?? 1, ev.crit);
       fxCallbacks.particle(ev.x, ev.y, ev.color || '#67e8f9', ev.crit ? 6 : 2);
     } else if (ev.type === 'kill') {
       fxCallbacks.particle(ev.x, ev.y, ev.color || '#f87171', 8);
       if (ev.elite) fxCallbacks.addShake(4);
     } else if (ev.type === 'area') {
-      fxCallbacks.showArea(ev.x, ev.y, ev.r || 120, ev.color || '#fbbf24');
+      fxCallbacks.showArea(ev.x, ev.y, ev.r ?? ev.reach ?? 120, ev.color || '#fbbf24');
       fxCallbacks.particle(ev.x, ev.y, ev.color || '#fbbf24', 10);
       fxCallbacks.sfx('burst');
     } else if (ev.type === 'special') {
@@ -347,7 +347,7 @@ export function syncAuthoritativeCoopWorld(state) {
       }
     } else if (ev.type === 'ping') {
       fxCallbacks.particle(ev.x || p.x, ev.y || p.y, '#67e8f9', 14);
-      fxCallbacks.flash(`${ev.name || 'ALLY'} PINGED SECTOR`);
+      fxCallbacks.flash(`${String(ev.name || 'ALLY').toUpperCase()} PINGED SECTOR`);
     } else if (ev.type === 'flash' && ev.text) {
       fxCallbacks.flash(ev.text);
     }
