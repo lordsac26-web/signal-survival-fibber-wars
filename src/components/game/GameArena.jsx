@@ -62,7 +62,7 @@ export default function GameArena({ run, onFinish }) {
     // CHANGED: `paused` ref is now the 5th argument to createSignalEngine —
     // see signalEngine.js for what it does inside the loop.
     let disposed=false,clean=null;
-    const loadEnemy = kind => preloadEnemySprite(kind).catch(error => {
+    const guardEnemy = (promise, kind) => promise.catch(error => {
       if (!run.coopAuthoritative) throw error;
       reportEnemyVisual(kind, error.message);
       return null; // Shared collision state stays authoritative; draw a visible pixel body.
@@ -70,7 +70,7 @@ export default function GameArena({ run, onFinish }) {
     // Character art (Oracle or Dispatch Don), the Lag Sprite enemy art, the
     // Bucket-Truck turret art, and the Squirrel boss art load in parallel;
     // a failure blocks start with a retry.
-    Promise.all([preloadCharacterSprite(run.character.id),loadEnemy('lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),loadEnemy('squirrel'),loadEnemy('dirty'),loadEnemy('packet'),loadEnemy('jitter'),loadEnemy('pete'),loadEnemy('bend'),loadEnemy('crosstalk'),loadEnemy('attenuation'),loadEnemy('rous'),preloadArenaFloor(run.arenaTheme),preloadStaticSprite('barricade'),preloadStaticSprite('spliceCabinetIdle'),preloadStaticSprite('spliceCabinetActive'),loadEnemy('ditch'),run.coop?preloadAllCharacterSprites():Promise.resolve(null)]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor,barricadeSprite,cabinetIdle,cabinetActive,ditchArt])=>{
+    Promise.all([preloadCharacterSprite(run.character.id),guardEnemy(preloadEnemySprite('lag'),'lag'),preloadStructureSprite('bucket'),preloadStructureSprite('pedestal_turret'),guardEnemy(preloadEnemySprite('squirrel'),'squirrel'),guardEnemy(preloadEnemySprite('dirty'),'dirty'),guardEnemy(preloadEnemySprite('packet'),'packet'),guardEnemy(preloadEnemySprite('jitter'),'jitter'),guardEnemy(preloadEnemySprite('pete'),'pete'),guardEnemy(preloadEnemySprite('bend'),'bend'),guardEnemy(preloadEnemySprite('crosstalk'),'crosstalk'),guardEnemy(preloadEnemySprite('attenuation'),'attenuation'),guardEnemy(preloadEnemySprite('rous'),'rous'),preloadArenaFloor(run.arenaTheme),preloadStaticSprite('barricade'),preloadStaticSprite('spliceCabinetIdle'),preloadStaticSprite('spliceCabinetActive'),guardEnemy(preloadEnemySprite('ditch'),'ditch'),run.coop?preloadAllCharacterSprites():Promise.resolve(null)]).then(([art,lagArt,truckArt,pedestalArt,squirrelArt,blobArt,puddingArt,jitterArt,peteArt,bendArt,critterArt,apparitionArt,routerArt,arenaFloor,barricadeSprite,cabinetIdle,cabinetActive,ditchArt])=>{
       if(disposed)return;
       clean=createSignalEngine(canvas.current,run,input,{
         hud:nextHud=>{setHud(nextHud);run.onCoopTelemetry?.(nextHud)},reach:reach=>setHud(current=>({...current,...reach})),finish:onFinish,

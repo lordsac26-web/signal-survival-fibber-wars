@@ -5,7 +5,8 @@ import { resolveCoopConnId } from '@/game/multiplayer/useCoopRoom';
 import { stepCoopPeers, drawCoopPeers, syncAuthoritativeCoopWorld } from '@/game/multiplayer/coopArenaSync';
 import ObjectPool from '@/game/performance/ObjectPool';
 import { CHARACTER_SPRITES } from '@/game/art/characterSprites';
-import { makeRecordingCtx } from './engineHarness.mjs';
+import drawEnemyBody from '@/game/art/drawEnemyBody';
+import { makeRecordingCtx, preloadEnemySprite } from './engineHarness.mjs';
 
 function makeMockStorage() {
   const map = new Map();
@@ -295,4 +296,107 @@ test('4-player co-op room synchronizes all 4 seats in lobby and combat without m
   assert(labels.some((l) => l.includes('P2 Craig D')), 'renders P2 in 4-player match');
   assert(labels.some((l) => l.includes('P3 Craig DeLo')), 'renders P3 in 4-player match');
   assert(labels.some((l) => l.includes('P4 Tech 4')), 'renders P4 in 4-player match');
+});
+
+test('all 12 enemy species render valid sprite bodies in authoritative co-op and fall back visibly when art is absent', async () => {
+  const [lagArt, puddingArt, jitterArt, blobArtDef, bendArt, critterArt, apparitionArt, ditchArt, petArt, routerArt, sqArt] = await Promise.all([
+    preloadEnemySprite('lag'),
+    preloadEnemySprite('packet'),
+    preloadEnemySprite('jitter'),
+    preloadEnemySprite('dirty'),
+    preloadEnemySprite('bend'),
+    preloadEnemySprite('crosstalk'),
+    preloadEnemySprite('attenuation'),
+    preloadEnemySprite('ditch'),
+    preloadEnemySprite('pete'),
+    preloadEnemySprite('rous'),
+    preloadEnemySprite('squirrel')
+  ]);
+
+  const arts = {
+    lagArt,
+    puddingArt,
+    pudArtDef: puddingArt,
+    jitterArt,
+    blobArtDef,
+    bendArt,
+    bendArtDef: bendArt,
+    critterArt,
+    apparitionArt,
+    ditchArt,
+    petArt,
+    routerArt,
+    sqArt
+  };
+
+  const allKinds = ['lag', 'packet', 'jitter', 'dirty', 'bend', 'crosstalk', 'attenuation', 'ditch', 'pete', 'peteMini', 'rous', 'squirrel'];
+  const worldSnapshot = {
+    seq: 1,
+    wave: 20,
+    time: 40,
+    players: [{ seat: 1, name: 'Host', characterId: 'oracle', x: 550, y: 400, hp: 74, maxHp: 74, alive: true }],
+    enemies: [
+      ...allKinds.map((kind, idx) => ({
+        id: idx + 1,
+        kind,
+        x: 420 + idx * 24,
+        y: 380,
+        vx: idx % 2 === 0 ? 45 : -45,
+        vy: 15,
+        hp: 50,
+        max: 50,
+        r: 18,
+        boss: kind === 'rous' || kind === 'squirrel',
+        elite: ['bend', 'attenuation', 'ditch', 'pete', 'rous', 'squirrel'].includes(kind),
+        phase: 'chase',
+        state: 'chase',
+        facing: idx % 2 === 0 ? 'right' : 'left'
+      })),
+      { id: 999, kind: 'lag', x: 500, y: 400, hp: 0, max: 24, r: 13 }
+    ],
+    shots: [],
+    foeShots: [],
+    turrets: [],
+    structures: [],
+    pickups: [],
+    puddles: [],
+    fx: []
+  };
+
+  const enemies = new ObjectPool(32, (i) => ({ poolIndex: i, active: false, x: 0, y: 0, hp: 0, r: 14 }));
+  const emptyPool = () => new ObjectPool(8, (i) => ({ poolIndex: i, active: false, x: 0, y: 0 }));
+
+  syncAuthoritativeCoopWorld({
+    run: { coop: true, coopAuthoritative: true, coopSeat: 1, coopWorldRef: { current: worldSnapshot }, coopPeers: { current: [] } },
+    dt: 1 / 60,
+    p: { x: 550, y: 400, hp: 74, maxHp: 74 },
+    enemies,
+    shots: emptyPool(),
+    foeShots: emptyPool(),
+    turrets: emptyPool(),
+    structures: emptyPool(),
+    pickups: emptyPool(),
+    puddles: emptyPool(),
+    meeting: { active: false, x: 0, y: 0 },
+    surge: { active: false, x: 0, y: 0, pulse: 0 },
+    arts,
+    fxCallbacks: { damageNumber() {}, particle() {}, addShake() {}, sfx() {}, flash() {}, showArea() {} }
+  });
+
+  const liveEnemies = enemies.items.filter((e) => e.active);
+  assert.equal(liveEnemies.length, allKinds.length, 'hydrates all 12 living enemy species and excludes dead snapshot enemy');
+
+  for (const e of liveEnemies) {
+    const rec = makeRecordingCtx();
+    const res = drawEnemyBody(rec.ctx, e);
+    assert.equal(res.fallback, false, `${e.kind} renders its true sprite atlas without fallback (${res.failure})`);
+    assert(rec.record.some((r) => r[0] === 'drawImage'), `${e.kind} issues drawImage call`);
+  }
+
+  // Verify fallback pixel body renders visibly when art is missing
+  const missingArtEnemy = { netId: 777, kind: 'ditch', x: 500, y: 400, r: 26, color: '#f97316', art: null };
+  const fallbackRec = makeRecordingCtx();
+  const fallbackRes = drawEnemyBody(fallbackRec.ctx, missingArtEnemy);
+  assert.equal(fallbackRes.fallback, true, 'reports fallback when sprite art is missing');
+  assert(fallbackRec.record.some((r) => r[0] === 'fillRect'), 'draws visible pixel-art silhouette fallback on canvas');
 });
