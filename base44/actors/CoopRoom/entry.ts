@@ -218,6 +218,9 @@ function createCombatWorld(room, seats) {
     u.alive = u.hp > 0;
     u.weaponCds = u.weapons.map(() => 0.15);
   }
+  for (let i = 0; i < 3; i++) {
+    spawnEnemyInWorld(world, null, true, 12, null, seats);
+  }
   return world;
 }
 
@@ -226,7 +229,7 @@ function pushFx(world, ev) {
   if (world.fx.length > 48) world.fx.splice(0, world.fx.length - 48);
 }
 
-function spawnEnemyInWorld(world, kindOverride = null, forced = false, cap = 12, pos = null) {
+function spawnEnemyInWorld(world, kindOverride = null, forced = false, cap = 12, pos = null, seats = []) {
   if (!forced && world.enemies.length >= cap) return null;
   const pool = ['lag', 'packet', 'jitter', 'dirty'];
   if (world.wave >= 2) pool.push('crosstalk');
@@ -239,15 +242,26 @@ function spawnEnemyInWorld(world, kindOverride = null, forced = false, cap = 12,
   const w = Math.max(0, world.wave - 1);
   const hpMult = (1 + w * 0.29 + w * w * 0.0275) * (row[6] ? 1.25 : 1);
   const dmgMult = (1 + w * 0.12) * (row[6] ? 1.15 : 1);
-  const edge = Math.floor(world.rng() * 4), pad = 28;
-  const x = pos ? clamp(pos.x, 24, W - 24) : edge === 1 ? W - pad : edge === 3 ? pad : Math.round(pad + world.rng() * (W - pad * 2));
-  const y = pos ? clamp(pos.y, 24, H - 24) : edge === 0 ? pad : edge === 2 ? H - pad : Math.round(pad + world.rng() * (H - pad * 2));
+  const living = Array.isArray(seats) ? seats.filter((s) => s && s.alive !== false && (s.hp ?? 1) > 0) : [];
+  const anchor = living.length ? living[Math.floor(world.rng() * living.length)] : null;
+  const vw = clamp(anchor?.viewport?.width || W, 320, W);
+  const vh = clamp(anchor?.viewport?.height || H, 240, H);
+  const ax = Number.isFinite(anchor?.x) ? anchor.x : W / 2;
+  const ay = Number.isFinite(anchor?.y) ? anchor.y : H / 2;
+  const camX = clamp(ax - vw / 2, 0, Math.max(0, W - vw));
+  const camY = clamp(ay - vh / 2, 0, Math.max(0, H - vh));
+  const edge = Math.floor(world.rng() * 4), pad = 24;
+  const rawX = edge === 1 ? camX + vw - pad : edge === 3 ? camX + pad : Math.round(camX + pad + world.rng() * Math.max(16, vw - pad * 2));
+  const rawY = edge === 0 ? camY + pad : edge === 2 ? camY + vh - pad : Math.round(camY + pad + world.rng() * Math.max(16, vh - pad * 2));
+  const x = pos ? clamp(pos.x, 24, W - 24) : clamp(rawX, 24, W - 24);
+  const y = pos ? clamp(pos.y, 24, H - 24) : clamp(rawY, 24, H - 24);
   const maxHp = Math.max(1, Math.round(row[1] * hpMult));
   const enemy = {
     id: world.nextEntityId++, kind, x, y, vx: 0, vy: 0, r: row[4],
     hp: maxHp, max: maxHp, speed: row[2], damage: +(row[3] * dmgMult).toFixed(2),
     value: row[5], color: row[0], elite: row[6], boss: row[7], dirty: row[8],
-    knockbackResist: row[9], phase: 'chase', castCd: 2.5, windup: 0, aim: 0, cloneT: kind === 'pete' ? 18 : 0, sqPhase: 1, hitByShots: new Set()
+    knockbackResist: row[9], phase: 'chase', facing: x > ax ? 'left' : 'right',
+    castCd: 2.5, windup: 0, aim: 0, cloneT: kind === 'pete' ? 18 : 0, sqPhase: 1, hitByShots: new Set()
   };
   world.enemies.push(enemy);
   return enemy;
@@ -327,9 +341,14 @@ function stepCombatWorld(world, room, seats, dt) {
       if (u.weaponCds[i] <= 0) {
         const w = u.weapons[i];
         u.weaponCds[i] = Math.max(0.1, (w.rate || 0.8) / (stats.attackSpeed || 1));
-        const reach = Math.max(48, Math.min((w.range || 240) * 0.65 * (stats.range || 1), 440));
+        const vw = clamp(u.viewport?.width || W, 320, W);
+        const vh = clamp(u.viewport?.height || H, 240, H);
+        const shortSide = Math.min(vw, vh);
+        const maxReach = shortSide * (u.characterId === 'oracle' ? 0.44 : 0.38) * 1.2;
+        const reach = Math.max(48, Math.min((w.range || 240) * 0.65 * (stats.range || 1), maxReach));
         let target = null, bestD = reach;
         for (const e of world.enemies) {
+          if (Math.abs(e.x - u.x) > vw * 0.52 || Math.abs(e.y - u.y) > vh * 0.52) continue;
           const d = Math.hypot(e.x - u.x, e.y - u.y);
           if (d <= bestD) { bestD = d; target = e; }
         }
@@ -350,12 +369,12 @@ function stepCombatWorld(world, room, seats, dt) {
 
   if (!world.bossSpawned && world.wave % 5 === 0) {
     world.bossSpawned = true;
-    spawnEnemyInWorld(world, world.wave % 20 === 0 ? 'squirrel' : 'rous', true, 99);
+    spawnEnemyInWorld(world, world.wave % 20 === 0 ? 'squirrel' : 'rous', true, 99, null, livingSeats);
   }
   const activeCap = Math.min(20, 6 + Math.floor(Math.max(0, world.wave - 1) / 6) + Math.max(0, seats.length - 1) * 2);
   world.spawnCd -= dt;
   if (world.spawnCd <= 0) {
-    if (world.enemies.length < activeCap) spawnEnemyInWorld(world, null, false, activeCap);
+    if (world.enemies.length < activeCap) spawnEnemyInWorld(world, null, false, activeCap, null, livingSeats);
     world.spawnCd = Math.max(0.24, (0.72 - world.wave * 0.022) / (1 + Math.max(0, seats.length - 1) * 0.18));
   }
 
@@ -389,6 +408,7 @@ function stepCombatWorld(world, room, seats, dt) {
     const ang = Math.atan2(tgt.y - e.y, tgt.x - e.x);
     e.vx = Math.cos(ang) * e.speed * slowMul;
     e.vy = Math.sin(ang) * e.speed * slowMul;
+    if (Math.abs(e.vx) > 0.5) e.facing = e.vx < 0 ? 'left' : 'right';
     e.x = clamp(e.x + e.vx * dt, e.r, W - e.r);
     e.y = clamp(e.y + e.vy * dt, e.r, H - e.r);
 
@@ -458,7 +478,11 @@ function serializeCombatWorld(world, seats) {
       damageDealt: Math.round(u.damageDealt || 0), healed: Math.round(u.healed || 0), damageTaken: Math.round(u.damageTaken || 0),
       deployCds: { ...(u.deployCds || {}) }, weapons: u.weapons || []
     })),
-    enemies: world.enemies.map((e) => ({ id: e.id, kind: e.kind, x: Math.round(e.x), y: Math.round(e.y), vx: Math.round(e.vx || 0), vy: Math.round(e.vy || 0), r: e.r, hp: Math.round(e.hp), max: Math.round(e.max), color: e.color, elite: e.elite, boss: e.boss, phase: e.phase })),
+    enemies: world.enemies.map((e) => {
+      const facing = e.facing || ((e.vx || 0) < -0.5 ? 'left' : 'right');
+      const phase = e.phase || 'chase';
+      return { id: e.id, kind: e.kind, x: Math.round(e.x), y: Math.round(e.y), vx: Math.round(e.vx || 0), vy: Math.round(e.vy || 0), r: e.r, hp: Math.round(e.hp), max: Math.round(e.max), color: e.color, elite: e.elite, boss: e.boss, phase, state: phase, facing, renderState: { phase, facing } };
+    }),
     shots: world.shots.map((s) => ({ id: s.id, seat: s.ownerSeat, x: Math.round(s.x), y: Math.round(s.y), vx: Math.round(s.vx), vy: Math.round(s.vy), r: s.r, color: s.color, pattern: s.pattern, mortar: s.mortar })),
     foeShots: world.foeShots,
     turrets: world.turrets,
@@ -631,6 +655,7 @@ export default class CoopRoom extends Actor {
     if (!u) return;
 
     if (msg.type === 'sync_state') {
+      if (this.room.phase === 'combat' && this.world) this.stepWorldToNow();
       conn.send({
         type: 'presence',
         roomId: this.room.roomId,
@@ -800,6 +825,7 @@ export default class CoopRoom extends Actor {
       if (this.hasProcessedAction(u, msg.actionId)) return;
       const action = String(msg.action || msg.kind || '');
       if (action === 'special' || action === 'heal_pulse') {
+        if (msg.kind === 'heal_pulse' && u.characterId !== 'nomad') return;
         const spec = charSpec(u.characterId);
         if (u.alive && u.hp > 0 && u.specialCooldown <= 0) {
           u.specialCooldown = spec.special.cooldown;
@@ -918,11 +944,19 @@ export default class CoopRoom extends Actor {
   }
 
   ensureSimLoop() {
-    this.lastSimAt = Date.now();
+    if (!this.lastSimAt) this.lastSimAt = Date.now();
+    if (!this.simTimer) {
+      this.simTimer = setInterval(() => {
+        this.stepWorldToNow();
+      }, TICK_MS);
+    }
   }
 
   stopSimLoop() {
-    this.simTimer = null;
+    if (this.simTimer) {
+      clearInterval(this.simTimer);
+      this.simTimer = null;
+    }
   }
 
   stepWorldToNow() {

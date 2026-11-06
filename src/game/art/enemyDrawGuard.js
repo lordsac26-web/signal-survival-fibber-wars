@@ -15,7 +15,8 @@ export function guardedEnemyDraw(ctx, draw) {
     if (key === 'drawImage') return (image, ...args) => {
       const w = image?.naturalWidth ?? image?.width, h = image?.naturalHeight ?? image?.height;
       if (!(w > 0 && h > 0) || !args.every(Number.isFinite) || image.complete === false) { failure = 'Unready image or non-finite atlas frame'; return; }
-      if (args.length === 8 && (args[0] < 0 || args[1] < 0 || args[2] <= 0 || args[3] <= 0 || args[0] + args[2] > w + .01 || args[1] + args[3] > h + .01)) { failure = 'Atlas frame outside image bounds'; return; }
+      if (args.length === 4 && (args[2] <= 0 || args[3] <= 0)) { failure = 'Empty destination draw bounds'; return; }
+      if (args.length === 8 && (args[0] < 0 || args[1] < 0 || args[2] <= 0 || args[3] <= 0 || args[6] <= 0 || args[7] <= 0 || args[0] + args[2] > w + .01 || args[1] + args[3] > h + .01)) { failure = 'Atlas frame outside image bounds'; return; }
       target.drawImage(image, ...args); bodies++;
     };
     const value = target[key]; return typeof value === 'function' ? value.bind(target) : value;

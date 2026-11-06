@@ -33,7 +33,7 @@ function preloadSprite(definition){
   cache.set(definition,promise);return promise;
 }
 export const preloadCharacterSprite=id=>preloadSprite(characterSprite(id));
-export const preloadAllCharacterSprites=()=>Promise.all(Object.keys(CHARACTER_SPRITES).map(id=>preloadCharacterSprite(id)));
+export const preloadAllCharacterSprites=()=>Promise.all(Object.keys(CHARACTER_SPRITES).map(id=>preloadCharacterSprite(id).catch(()=>null)));
 export const loadedCharacterSprite=id=>resolvedCache.get(characterSprite(id))||null;
 export const preloadEnemySprite=kind=>preloadSprite(enemySpriteDef(kind));
 export const loadedEnemySprite=kind=>resolvedCache.get(enemySpriteDef(kind))||null;

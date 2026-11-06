@@ -8,7 +8,7 @@ import { createTechAnimation, updateTechAnimation, drawTechSprite, drawTechDeath
 import { createSpriteAnimation, updateSpriteAnimation, drawCharacterSprite } from '@/game/art/spriteAnimation';
 import { createISRAnimation, updateISRAnimation } from '@/game/art/isrSpriteAnimation';
 import { drawISR } from '@/game/art/drawISR';
-import { loadedCharacterSprite, preloadCharacterSprite } from '@/game/art/spriteLoader';
+import { loadedCharacterSprite, preloadCharacterSprite, loadedEnemySprite, preloadEnemySprite } from '@/game/art/spriteLoader';
 import { createPuddingAnimation, updatePuddingAnimation } from '@/game/art/puddingSpriteAnimation';
 import { createBendAnimation, updateBendAnimation } from '@/game/art/bendSpriteAnimation';
 import { createSquirrelAnimation, updateSquirrelAnimation } from '@/game/art/squirrelSpriteAnimation';
@@ -138,6 +138,22 @@ export function syncAuthoritativeCoopWorld(state) {
   }
 
   // 2. Reconcile enemies and bosses
+  const resolvedArts = {
+    ditchArt: arts?.ditchArt || loadedEnemySprite('ditch'),
+    apparitionArt: arts?.apparitionArt || loadedEnemySprite('attenuation'),
+    routerArt: arts?.routerArt || loadedEnemySprite('rous'),
+    critterArt: arts?.critterArt || loadedEnemySprite('crosstalk'),
+    jitterArt: arts?.jitterArt || loadedEnemySprite('jitter'),
+    lagArt: arts?.lagArt || loadedEnemySprite('lag'),
+    blobArtDef: arts?.blobArtDef || loadedEnemySprite('dirty'),
+    puddingArt: arts?.puddingArt || loadedEnemySprite('packet'),
+    pudArtDef: arts?.pudArtDef || arts?.puddingArt || loadedEnemySprite('packet'),
+    petArt: arts?.petArt || loadedEnemySprite('pete'),
+    bendArt: arts?.bendArt || loadedEnemySprite('bend'),
+    bendArtDef: arts?.bendArtDef || arts?.bendArt || loadedEnemySprite('bend'),
+    sqArt: arts?.sqArt || loadedEnemySprite('squirrel')
+  };
+
   reconcilePoolById(enemies, world.enemies, dt, (e, src, isNew) => {
     const prevX = isNew ? src.x : e.x;
     const prevY = isNew ? src.y : e.y;
@@ -145,8 +161,10 @@ export function syncAuthoritativeCoopWorld(state) {
     const ty = src.y + (src.vy || 0) * dt * 0.35;
     e.x = isNew ? src.x : e.x + (tx - e.x) * Math.min(1, dt * 16);
     e.y = isNew ? src.y : e.y + (ty - e.y) * Math.min(1, dt * 16);
-    const mvx = (e.x - prevX) / Math.max(0.001, dt);
-    const mvy = (e.y - prevY) / Math.max(0.001, dt);
+    const stepVx = (e.x - prevX) / Math.max(0.001, dt);
+    const stepVy = (e.y - prevY) / Math.max(0.001, dt);
+    const mvx = Math.abs(e.x - prevX) > 0.01 ? stepVx : (src.vx || 0);
+    const mvy = Math.abs(e.y - prevY) > 0.01 ? stepVy : (src.vy || 0);
 
     e.kind = src.kind;
     e.hp = src.hp;
@@ -157,7 +175,8 @@ export function syncAuthoritativeCoopWorld(state) {
     e.shoutT = src.shoutT || 0;
     e.novaT = src.novaT || 0;
 
-    if (isNew || e.configuredKind !== src.kind) {
+    const needsArt = src.kind === 'squirrel' ? !e.sq?.art : !e.art;
+    if (isNew || e.configuredKind !== src.kind || needsArt) {
       e.configuredKind = src.kind;
       const base =
         src.kind === 'squirrel'
@@ -178,40 +197,43 @@ export function syncAuthoritativeCoopWorld(state) {
       e.mac = null;
       e.pud = null;
 
-      if (src.kind === 'ditch' && arts.ditchArt) {
-        e.art = arts.ditchArt;
+      if (src.kind === 'ditch' && resolvedArts.ditchArt) {
+        e.art = resolvedArts.ditchArt;
         e.ditch = createDitchState(() => .5);
-      } else if (src.kind === 'attenuation' && arts.apparitionArt) {
-        e.art = arts.apparitionArt;
+      } else if (src.kind === 'attenuation' && resolvedArts.apparitionArt) {
+        e.art = resolvedArts.apparitionArt;
         e.caster = createConeState(APPARITION);
-      } else if (src.kind === 'rous' && arts.routerArt) {
-        e.art = arts.routerArt;
+      } else if (src.kind === 'rous' && resolvedArts.routerArt) {
+        e.art = resolvedArts.routerArt;
         e.caster = createConeState(ROUTER_ATTACK);
-      } else if (src.kind === 'crosstalk' && arts.critterArt) {
-        e.art = arts.critterArt;
+      } else if (src.kind === 'crosstalk' && resolvedArts.critterArt) {
+        e.art = resolvedArts.critterArt;
         e.critter = createCritterState();
-      } else if (src.kind === 'jitter' && arts.jitterArt) {
-        e.art = arts.jitterArt;
+      } else if (src.kind === 'jitter' && resolvedArts.jitterArt) {
+        e.art = resolvedArts.jitterArt;
         e.jit = createJitterState(() => .5);
-      } else if (src.kind === 'lag' && arts.lagArt) {
-        e.art = arts.lagArt;
+      } else if (src.kind === 'lag' && resolvedArts.lagArt) {
+        e.art = resolvedArts.lagArt;
         e.anim = createLagAnimation();
-      } else if (src.kind === 'dirty' && arts.blobArtDef) {
-        e.art = arts.blobArtDef;
+      } else if (src.kind === 'dirty' && resolvedArts.blobArtDef) {
+        e.art = resolvedArts.blobArtDef;
         e.anim = createTechAnimation();
-      } else if (src.kind === 'packet' && arts.puddingArt) {
-        e.art = arts.puddingArt;
+      } else if (src.kind === 'packet' && resolvedArts.puddingArt) {
+        e.art = resolvedArts.puddingArt;
         e.anim = createPuddingAnimation();
         e.pud = { phase: 'chase' };
-      } else if ((src.kind === 'pete' || src.kind === 'peteMini') && arts.petArt) {
-        e.art = arts.petArt;
+      } else if ((src.kind === 'pete' || src.kind === 'peteMini') && resolvedArts.petArt) {
+        e.art = resolvedArts.petArt;
         e.anim = createTechAnimation();
-      } else if (src.kind === 'bend' && arts.bendArt) {
-        e.art = arts.bendArt;
+      } else if (src.kind === 'bend' && resolvedArts.bendArt) {
+        e.art = resolvedArts.bendArt;
         e.anim = createBendAnimation();
         e.mac = createBendState(() => .5);
-      } else if (src.kind === 'squirrel' && arts.sqArt) {
-        e.sq = { ...createSquirrelAnimation(), art: arts.sqArt, phase: src.phase || 1, pounceT: src.pounceT || 0 };
+      } else if (src.kind === 'squirrel' && resolvedArts.sqArt) {
+        e.sq = { ...createSquirrelAnimation(), art: resolvedArts.sqArt, phase: src.phase || 1, pounceT: src.pounceT || 0 };
+      } else if (typeof window !== 'undefined') {
+        const preloadKey = src.kind === 'peteMini' ? 'pete' : src.kind;
+        preloadEnemySprite(preloadKey).catch(() => {});
       }
     }
 
@@ -253,21 +275,21 @@ export function syncAuthoritativeCoopWorld(state) {
       e.pud.phase = src.renderState?.phase || src.state || (typeof src.phase === 'string' ? src.phase : 'chase');
       if (e.anim) e.anim.telegraph = e.pud.phase === 'telegraph';
     }
-    if (e.sq && arts.sqArt) {
+    if (e.sq && resolvedArts.sqArt) {
       e.sq.phase = src.phase || 1;
       e.sq.pounceT = src.pounceT || 0;
-      updateSquirrelAnimation(e.sq, mvx, mvy, dt, arts.sqArt.definition);
+      updateSquirrelAnimation(e.sq, mvx, mvy, dt, resolvedArts.sqArt.definition);
     } else if (e.anim) {
-      if (e.art === arts.puddingArt && arts.pudArtDef) {
-        updatePuddingAnimation(e.anim, mvx, mvy, dt, arts.pudArtDef.definition);
-      } else if (e.art === arts.blobArtDef) {
-        updateTechAnimation(e.anim, mvx * dt, mvy * dt, dt, arts.blobArtDef.definition);
-      } else if (arts.petArt && (e.kind === 'pete' || e.kind === 'peteMini')) {
-        updateTechAnimation(e.anim, mvx * dt, mvy * dt, dt, arts.petArt.definition);
-      } else if (e.mac && arts.bendArtDef) {
+      if (e.art === resolvedArts.puddingArt && resolvedArts.pudArtDef) {
+        updatePuddingAnimation(e.anim, mvx, mvy, dt, resolvedArts.pudArtDef.definition);
+      } else if (e.art === resolvedArts.blobArtDef) {
+        updateTechAnimation(e.anim, mvx * dt, mvy * dt, dt, resolvedArts.blobArtDef.definition);
+      } else if (resolvedArts.petArt && (e.kind === 'pete' || e.kind === 'peteMini')) {
+        updateTechAnimation(e.anim, mvx * dt, mvy * dt, dt, resolvedArts.petArt.definition);
+      } else if (e.mac && resolvedArts.bendArtDef) {
         updateBendAnimation(e.anim, mvx, mvy, dt, e.mac);
-      } else if (arts.lagArt) {
-        updateLagAnimation(e.anim, mvx * dt, mvy * dt, dt, arts.lagArt.definition);
+      } else if (resolvedArts.lagArt) {
+        updateLagAnimation(e.anim, mvx * dt, mvy * dt, dt, resolvedArts.lagArt.definition);
       }
     }
   });
